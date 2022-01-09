@@ -1,7 +1,7 @@
 pub enum HttpParameterInputSource {
     Path,
     Query,
-    Headers,
+    Header,
     FormData,
 }
 
@@ -10,7 +10,7 @@ impl HttpParameterInputSource {
         match self {
             HttpParameterInputSource::Path => "path",
             HttpParameterInputSource::Query => "query",
-            HttpParameterInputSource::Headers => "headers",
+            HttpParameterInputSource::Header => "header",
             HttpParameterInputSource::FormData => "formData",
         }
     }
