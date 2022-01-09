@@ -101,9 +101,7 @@ impl HttpContext {
             }
         }
 
-        return Err(HttpFailResult::as_header_parameter_required(
-            format!("Header: {}", header_name).as_str(),
-        ));
+        return Err(HttpFailResult::as_header_parameter_required(header_name));
     }
 
     pub async fn get_form_data(self) -> Result<QueryString, HttpFailResult> {

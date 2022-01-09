@@ -22,7 +22,7 @@ impl HttpFailResult {
     pub fn as_header_parameter_required(param_name: &str) -> Self {
         Self {
             content_type: WebContentType::Text,
-            content: format!("Query parameter '{}' is required", param_name).into_bytes(),
+            content: format!("Header '{}' is required", param_name).into_bytes(),
             status_code: 400,
             metric_it: true,
         }
