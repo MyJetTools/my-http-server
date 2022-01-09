@@ -95,8 +95,9 @@ impl HttpContext {
     }
 
     pub fn get_required_header(&self, header_name: &str) -> Result<&str, HttpFailResult> {
-        for (name, value) in self.req.headers() {
-            if name.as_str() == header_name {
+        for (http_header, value) in self.req.headers() {
+            let http_header = http_header.as_str();
+            if http_header == header_name {
                 return Ok(value.to_str().unwrap());
             }
         }
