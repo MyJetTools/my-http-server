@@ -1,4 +1,4 @@
-pub enum SwaggerParameterType {
+pub enum HttpParameterType {
     Integer,
     Long,
     Float,
@@ -12,36 +12,36 @@ pub enum SwaggerParameterType {
     Password,
 }
 
-impl SwaggerParameterType {
+impl HttpParameterType {
     pub fn to_str(&self) -> &str {
         match self {
-            SwaggerParameterType::Integer => "integer",
-            SwaggerParameterType::Long => "long",
-            SwaggerParameterType::Float => "float",
-            SwaggerParameterType::Double => "double",
-            SwaggerParameterType::String => "string",
-            SwaggerParameterType::Byte => "byte",
-            SwaggerParameterType::Binary => "binary",
-            SwaggerParameterType::Boolean => "boolean",
-            SwaggerParameterType::Date => "date",
-            SwaggerParameterType::DateTime => "dateTime",
-            SwaggerParameterType::Password => "password",
+            HttpParameterType::Integer => "integer",
+            HttpParameterType::Long => "long",
+            HttpParameterType::Float => "float",
+            HttpParameterType::Double => "double",
+            HttpParameterType::String => "string",
+            HttpParameterType::Byte => "byte",
+            HttpParameterType::Binary => "binary",
+            HttpParameterType::Boolean => "boolean",
+            HttpParameterType::Date => "date",
+            HttpParameterType::DateTime => "dateTime",
+            HttpParameterType::Password => "password",
         }
     }
 
     pub fn as_swagger_type(&self) -> &str {
         match self {
-            SwaggerParameterType::Integer => "integer",
-            SwaggerParameterType::Long => "integer",
-            SwaggerParameterType::Float => "number",
-            SwaggerParameterType::Double => "number",
-            SwaggerParameterType::String => "string",
-            SwaggerParameterType::Byte => "string",
-            SwaggerParameterType::Binary => "string",
-            SwaggerParameterType::Boolean => "boolean",
-            SwaggerParameterType::Date => "string",
-            SwaggerParameterType::DateTime => "string",
-            SwaggerParameterType::Password => "string",
+            HttpParameterType::Integer => "integer",
+            HttpParameterType::Long => "integer",
+            HttpParameterType::Float => "number",
+            HttpParameterType::Double => "number",
+            HttpParameterType::String => "string",
+            HttpParameterType::Byte => "string",
+            HttpParameterType::Binary => "string",
+            HttpParameterType::Boolean => "boolean",
+            HttpParameterType::Date => "string",
+            HttpParameterType::DateTime => "string",
+            HttpParameterType::Password => "string",
         }
     }
 }
