@@ -7,5 +7,5 @@ pub struct HttpActionDescription<'s> {
 }
 
 pub trait HttpActionDescriptionProvider {
-    fn get_controller_description(&self) -> HttpActionDescription;
+    fn get_controller_description(&self) -> Option<HttpActionDescription>;
 }

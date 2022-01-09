@@ -32,85 +32,95 @@ impl SwaggerJsonModel {
         }
     }
 
+    fn get_or_create(&mut self, route_path: &str) -> &mut SwaggerPathJsonModel {
+        if !self.paths.contains_key(route_path) {
+            self.paths
+                .insert(route_path.to_string(), SwaggerPathJsonModel::new());
+        }
+
+        return self.paths.get_mut(route_path).unwrap();
+    }
+
     pub fn populate_operations(&mut self, controllers: &ControllersMiddleware) {
         for route_action in controllers.get.no_keys.values() {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.get = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+                path_model.get = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
 
         for route_action in &controllers.get.with_keys {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.get = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+                path_model.get = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
 
         for route_action in controllers.post.no_keys.values() {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.post = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+                path_model.post = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
 
         for route_action in &controllers.post.with_keys {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.post = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+
+                path_model.post = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
 
         for route_action in controllers.put.no_keys.values() {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.put = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+                path_model.put = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
 
         for route_action in &controllers.put.with_keys {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.put = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+                path_model.put = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
 
         for route_action in controllers.delete.no_keys.values() {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.delete = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+                path_model.delete = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
 
         for route_action in &controllers.delete.with_keys {
-            let mut path_model = SwaggerPathJsonModel::new();
-            path_model.delete = Some(SwaggerVerbDescription::new(
-                route_action,
-                route_action.action.get_in_parameters_description(),
-            ));
-            self.paths
-                .insert(route_action.route.path.to_string(), path_model);
+            if let Some(action_description) = route_action.action.get_controller_description() {
+                let path_model = self.get_or_create(route_action.route.path.as_str());
+                path_model.delete = Some(SwaggerVerbDescription::new(
+                    action_description,
+                    route_action.action.get_in_parameters_description(),
+                ));
+            }
         }
     }
 }

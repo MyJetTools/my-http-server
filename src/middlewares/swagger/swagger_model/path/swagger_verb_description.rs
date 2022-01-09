@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::middlewares::{
-    controllers::documentation::HttpActionDescriptionProvider,
-    swagger::types::SwaggerInputParameter,
+    controllers::documentation::HttpActionDescription, swagger::types::SwaggerInputParameter,
 };
 
 use super::{ResponseJsonModel, SwaggerInParamJsonModel};
@@ -19,16 +18,15 @@ pub struct SwaggerVerbDescription {
 }
 
 impl SwaggerVerbDescription {
-    pub fn new<TSwaggerActionDescriptionProvider: HttpActionDescriptionProvider>(
-        provider: &TSwaggerActionDescriptionProvider,
+    pub fn new(
+        action_description: HttpActionDescription,
         in_parameters: Option<Vec<SwaggerInputParameter>>,
     ) -> Self {
-        let description = provider.get_controller_description();
         Self {
-            tags: vec![description.name.to_string()],
-            description: description.description.to_string(),
+            tags: vec![action_description.name.to_string()],
+            description: action_description.description.to_string(),
             parameters: into_json_parameters(in_parameters),
-            produces: vec![description.out_content_type.to_string().to_string()],
+            produces: vec![action_description.out_content_type.to_string().to_string()],
             responses: create_default_responses(),
         }
     }

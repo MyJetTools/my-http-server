@@ -13,7 +13,7 @@ pub struct DeleteRouteAction {
 }
 
 impl HttpActionDescriptionProvider for DeleteRouteAction {
-    fn get_controller_description(&self) -> HttpActionDescription {
+    fn get_controller_description(&self) -> Option<HttpActionDescription> {
         self.action.get_controller_description()
     }
 }

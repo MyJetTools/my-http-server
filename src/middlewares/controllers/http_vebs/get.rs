@@ -13,7 +13,7 @@ pub struct GetRouteAction {
 }
 
 impl HttpActionDescriptionProvider for GetRouteAction {
-    fn get_controller_description(&self) -> HttpActionDescription {
+    fn get_controller_description(&self) -> Option<HttpActionDescription> {
         self.action.get_controller_description()
     }
 }
