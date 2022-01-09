@@ -1,9 +1,7 @@
 use crate::{HttpContext, HttpFailResult, HttpOkResult};
 use async_trait::async_trait;
 
-use crate::middlewares::swagger::types::HttpInputParameter;
-
-use super::documentation::HttpActionDescription;
+use super::documentation::{HttpActionDescription, HttpInputParameter};
 
 #[async_trait]
 pub trait GetAction {

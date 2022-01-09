@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::{
-    controllers::documentation::HttpActionDescription, swagger::types::HttpInputParameter,
-};
+use crate::middlewares::controllers::documentation::{HttpActionDescription, HttpInputParameter};
 
 use super::{ResponseJsonModel, SwaggerInParamJsonModel};
 

@@ -55,8 +55,8 @@ impl HttpContext {
 
         if self.route.is_none() {
             return Err(HttpFailResult::as_forbidden(Some(format!(
-                "Path [{}] does not has keys in it",
-                path
+                "No route found to extract key [{}] from the path [{}]",
+                key, path
             ))));
         }
 

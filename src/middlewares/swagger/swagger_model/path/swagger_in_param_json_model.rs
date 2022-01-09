@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::swagger::types::HttpInputParameter;
+use crate::middlewares::controllers::documentation::HttpInputParameter;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SwaggerInParamJsonModel {
