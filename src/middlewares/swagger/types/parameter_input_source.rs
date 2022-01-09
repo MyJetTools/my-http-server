@@ -1,17 +1,17 @@
-pub enum SwaggerParameterInputSource {
+pub enum HttpParameterInputSource {
     Path,
     Query,
     Headers,
     FormData,
 }
 
-impl SwaggerParameterInputSource {
+impl HttpParameterInputSource {
     pub fn to_str(&self) -> &str {
         match self {
-            SwaggerParameterInputSource::Path => "path",
-            SwaggerParameterInputSource::Query => "query",
-            SwaggerParameterInputSource::Headers => "headers",
-            SwaggerParameterInputSource::FormData => "formData",
+            HttpParameterInputSource::Path => "path",
+            HttpParameterInputSource::Query => "query",
+            HttpParameterInputSource::Headers => "headers",
+            HttpParameterInputSource::FormData => "formData",
         }
     }
 }

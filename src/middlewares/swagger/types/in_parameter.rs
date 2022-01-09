@@ -1,9 +1,9 @@
-use super::{HttpParameterType, SwaggerParameterInputSource};
+use super::{HttpParameterInputSource, HttpParameterType};
 
-pub struct SwaggerInputParameter {
+pub struct HttpInputParameter {
     pub name: String,
     pub param_type: HttpParameterType,
     pub description: String,
-    pub source: SwaggerParameterInputSource,
+    pub source: HttpParameterInputSource,
     pub required: bool,
 }

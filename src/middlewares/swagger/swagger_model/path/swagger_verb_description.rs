@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::middlewares::{
-    controllers::documentation::HttpActionDescription, swagger::types::SwaggerInputParameter,
+    controllers::documentation::HttpActionDescription, swagger::types::HttpInputParameter,
 };
 
 use super::{ResponseJsonModel, SwaggerInParamJsonModel};
@@ -20,7 +20,7 @@ pub struct SwaggerVerbDescription {
 impl SwaggerVerbDescription {
     pub fn new(
         action_description: HttpActionDescription,
-        in_parameters: Option<Vec<SwaggerInputParameter>>,
+        in_parameters: Option<Vec<HttpInputParameter>>,
     ) -> Self {
         Self {
             tags: vec![action_description.name.to_string()],
@@ -32,7 +32,7 @@ impl SwaggerVerbDescription {
     }
 }
 
-fn into_json_parameters(src: Option<Vec<SwaggerInputParameter>>) -> Vec<SwaggerInParamJsonModel> {
+fn into_json_parameters(src: Option<Vec<HttpInputParameter>>) -> Vec<SwaggerInParamJsonModel> {
     match src {
         Some(src) => {
             let mut result: Vec<SwaggerInParamJsonModel> = Vec::with_capacity(src.len());

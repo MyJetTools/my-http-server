@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::swagger::types::SwaggerInputParameter;
+use crate::middlewares::swagger::types::HttpInputParameter;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SwaggerInParamJsonModel {
@@ -15,7 +15,7 @@ pub struct SwaggerInParamJsonModel {
     description: String,
 }
 
-impl Into<SwaggerInParamJsonModel> for SwaggerInputParameter {
+impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     fn into(self) -> SwaggerInParamJsonModel {
         SwaggerInParamJsonModel {
             name: self.name,
