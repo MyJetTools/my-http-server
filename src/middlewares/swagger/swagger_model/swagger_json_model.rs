@@ -43,28 +43,28 @@ impl SwaggerJsonModel {
 
     pub fn populate_operations(&mut self, controllers: &ControllersMiddleware) {
         for route_action in controllers.get.no_keys.values() {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.get = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
         for route_action in &controllers.get.with_keys {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.get = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
         for route_action in controllers.post.no_keys.values() {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.post = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
         for route_action in &controllers.post.with_keys {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
 
                 path_model.post = Some(SwaggerVerbDescription::new(action_description));
@@ -72,28 +72,28 @@ impl SwaggerJsonModel {
         }
 
         for route_action in controllers.put.no_keys.values() {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.put = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
         for route_action in &controllers.put.with_keys {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.put = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
         for route_action in controllers.delete.no_keys.values() {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.delete = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
         for route_action in &controllers.delete.with_keys {
-            if let Some(action_description) = route_action.action.get_controller_description() {
+            if let Some(action_description) = route_action.action.get_description() {
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.delete = Some(SwaggerVerbDescription::new(action_description));
             }
