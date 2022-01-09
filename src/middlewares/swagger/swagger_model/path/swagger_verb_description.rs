@@ -16,14 +16,11 @@ pub struct SwaggerVerbDescription {
 }
 
 impl SwaggerVerbDescription {
-    pub fn new(
-        action_description: HttpActionDescription,
-        in_parameters: Option<Vec<HttpInputParameter>>,
-    ) -> Self {
+    pub fn new(action_description: HttpActionDescription) -> Self {
         Self {
             tags: vec![action_description.name.to_string()],
             description: action_description.description.to_string(),
-            parameters: into_json_parameters(in_parameters),
+            parameters: into_json_parameters(action_description.input_params),
             produces: vec![action_description.out_content_type.to_string().to_string()],
             responses: create_default_responses(),
         }
