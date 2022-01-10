@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 rust-extensions = { branch = "main", git = "https://github.com/MyJetTools/rust-extensions.git" }
+my-telemetry = { branch = "main", git = "https://github.com/MyJetTools/my-telemetry.git" }
 
 tokio = { version = "*", features = ["full"] }
+
 lazy_static = "*"
 hyper = { version = "0.14", features = ["full"] }
 serde = { version = "*", features = ["derive"] }

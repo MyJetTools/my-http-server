@@ -6,7 +6,7 @@ pub struct HttpFailResult {
     pub content_type: WebContentType,
     pub status_code: u16,
     pub content: Vec<u8>,
-    pub metric_it: bool,
+    pub write_telemetry: bool,
 }
 
 impl HttpFailResult {
@@ -15,7 +15,7 @@ impl HttpFailResult {
             content_type: WebContentType::Text,
             content: format!("Query parameter '{}' is required", param_name).into_bytes(),
             status_code: 400,
-            metric_it: true,
+            write_telemetry: true,
         }
     }
 
@@ -24,7 +24,7 @@ impl HttpFailResult {
             content_type: WebContentType::Text,
             content: format!("Header '{}' is required", param_name).into_bytes(),
             status_code: 400,
-            metric_it: true,
+            write_telemetry: true,
         }
     }
 
@@ -33,16 +33,16 @@ impl HttpFailResult {
             content_type: WebContentType::Text,
             content: format!("Path parameter '{}' is required", param_name).into_bytes(),
             status_code: 400,
-            metric_it: true,
+            write_telemetry: true,
         }
     }
 
-    pub fn as_not_found(text: String, metric_it: bool) -> Self {
+    pub fn as_not_found(text: String, write_telemetry: bool) -> Self {
         Self {
             content_type: WebContentType::Text,
             content: text.into_bytes(),
             status_code: 404,
-            metric_it,
+            write_telemetry,
         }
     }
 
@@ -55,7 +55,7 @@ impl HttpFailResult {
                 format!("Unauthorized request").into_bytes()
             },
             status_code: 401,
-            metric_it: true,
+            write_telemetry: true,
         }
     }
 
@@ -68,7 +68,7 @@ impl HttpFailResult {
                 format!("Forbidden").into_bytes()
             },
             status_code: 403,
-            metric_it: true,
+            write_telemetry: true,
         }
     }
 }
@@ -89,7 +89,7 @@ impl From<UrlDecodeError> for HttpFailResult {
             status_code: 501,
             content_type: WebContentType::Text,
             content: format!("UrlDecodeError: {}", src.msg).into_bytes(),
-            metric_it: true,
+            write_telemetry: true,
         }
     }
 }

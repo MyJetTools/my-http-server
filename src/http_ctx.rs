@@ -7,7 +7,7 @@ use crate::{
 use hyper::{Body, Method, Request};
 
 pub struct HttpContext {
-    req: Request<Body>,
+    pub req: Request<Body>,
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
@@ -116,7 +116,7 @@ impl HttpContext {
             Ok(result) => return Ok(result),
             Err(err) => {
                 let result = HttpFailResult {
-                    metric_it: true,
+                    write_telemetry: true,
                     content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
                     content_type: WebContentType::Text,
                     status_code: 412,
