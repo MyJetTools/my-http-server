@@ -12,13 +12,13 @@ use std::sync::Arc;
 use crate::{HttpContext, HttpFailResult, HttpServerMiddleware};
 
 pub struct HttpServerData {
-    middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
+    middlewares: Vec<Arc<Box<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
     telemetry: Option<Arc<dyn MyTelemetry + Send + Sync + 'static>>,
 }
 
 pub struct MyHttpServer {
     pub addr: SocketAddr,
-    middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
+    middlewares: Vec<Arc<Box<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
     telemetry: Option<Arc<dyn MyTelemetry + Send + Sync + 'static>>,
 }
 
@@ -32,13 +32,16 @@ impl MyHttpServer {
     }
     pub fn add_middleware(
         &mut self,
-        middleware: Arc<dyn HttpServerMiddleware + Send + Sync + 'static>,
+        middleware: Box<dyn HttpServerMiddleware + Send + Sync + 'static>,
     ) {
-        self.middlewares.push(middleware);
+        self.middlewares.push(Arc::new(middleware));
     }
 
-    pub fn set_telemetry(&mut self, telemetry: Arc<dyn MyTelemetry + Send + Sync + 'static>) {
-        self.telemetry = Some(telemetry);
+    pub fn set_telemetry<TMyTelemetry: MyTelemetry + Send + Sync + 'static>(
+        &mut self,
+        telemetry: TMyTelemetry,
+    ) {
+        self.telemetry = Some(Arc::new(telemetry));
     }
 
     pub fn start<TAppStates>(&self, app_states: Arc<TAppStates>)
