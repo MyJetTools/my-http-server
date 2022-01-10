@@ -12,13 +12,13 @@ use std::sync::Arc;
 use crate::{HttpContext, HttpFailResult, HttpServerMiddleware};
 
 pub struct HttpServerData {
-    middlewares: Vec<Arc<Box<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
+    middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
     telemetry: Option<Arc<dyn MyTelemetry + Send + Sync + 'static>>,
 }
 
 pub struct MyHttpServer {
     pub addr: SocketAddr,
-    middlewares: Vec<Arc<Box<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
+    middlewares: Option<Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
     telemetry: Option<Arc<dyn MyTelemetry + Send + Sync + 'static>>,
 }
 
@@ -26,30 +26,43 @@ impl MyHttpServer {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
             addr,
-            middlewares: Vec::new(),
+            middlewares: Some(Vec::new()),
             telemetry: None,
         }
     }
     pub fn add_middleware(
         &mut self,
-        middleware: Box<dyn HttpServerMiddleware + Send + Sync + 'static>,
+        middleware: Arc<dyn HttpServerMiddleware + Send + Sync + 'static>,
     ) {
-        self.middlewares.push(Arc::new(middleware));
+
+        match &mut self.middlewares {
+            Some(middlewares) => middlewares.push(middleware),
+            None => {
+                panic!("Cannot add middleware after server is started");
+            }
+        }
     }
 
-    pub fn set_telemetry<TMyTelemetry: MyTelemetry + Send + Sync + 'static>(
-        &mut self,
-        telemetry: TMyTelemetry,
-    ) {
-        self.telemetry = Some(Arc::new(telemetry));
+    pub fn set_telemetry(&mut self, telemetry: Arc<dyn MyTelemetry + Send + Sync + 'static>) {
+        self.telemetry = Some(telemetry);
     }
 
-    pub fn start<TAppStates>(&self, app_states: Arc<TAppStates>)
+    pub fn start<TAppStates>(&mut self, app_states: Arc<TAppStates>)
     where
         TAppStates: ApplicationStates + Send + Sync + 'static,
     {
+
+        let mut middlewares = None;
+
+        std::mem::swap(&mut middlewares, &mut self.middlewares);
+
+
+        if middlewares.is_none(){
+            panic!("You can not start HTTP server two times");
+        }
+
         let http_server_data = HttpServerData {
-            middlewares: self.middlewares.clone(),
+            middlewares: middlewares.unwrap(),
             telemetry: self.telemetry.clone(),
         };
 
