@@ -79,6 +79,12 @@ impl HttpContext {
         Ok(full_body.iter().cloned().collect::<Vec<u8>>())
     }
 
+    pub async fn get_body_as_string(self) -> Result<String, HttpFailResult> {
+        let body = self.get_body_raw().await?;
+        let result = String::from_utf8(body)?;
+        Ok(result)
+    }
+
     pub async fn get_body_as_json<T>(self) -> Result<T, HttpFailResult>
     where
         T: DeserializeOwned,
