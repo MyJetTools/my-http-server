@@ -86,7 +86,7 @@ impl PostAction for MyController {
         .into()
     }
     
-        async fn handle_request(&self, ctx: HttpContext) -> Result<HttpOkResult, HttpFailResult> {
+    async fn handle_request(&self, ctx: HttpContext) -> Result<HttpOkResult, HttpFailResult> {
         let query = ctx.get_query_string()?;
 
         let app_name = ctx.get_value_from_path_optional("name")?;
