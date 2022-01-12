@@ -34,7 +34,6 @@ impl MyHttpServer {
         &mut self,
         middleware: Arc<dyn HttpServerMiddleware + Send + Sync + 'static>,
     ) {
-
         match &mut self.middlewares {
             Some(middlewares) => middlewares.push(middleware),
             None => {
@@ -51,13 +50,11 @@ impl MyHttpServer {
     where
         TAppStates: ApplicationStates + Send + Sync + 'static,
     {
-
         let mut middlewares = None;
 
         std::mem::swap(&mut middlewares, &mut self.middlewares);
 
-
-        if middlewares.is_none(){
+        if middlewares.is_none() {
             panic!("You can not start HTTP server two times");
         }
 

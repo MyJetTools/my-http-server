@@ -4,7 +4,7 @@ use crate::{
     http_path::{GetPathValueResult, PathSegments},
     HttpFailResult, QueryString, RequestIp, WebContentType,
 };
-use hyper::{Body, Method, Request};
+use hyper::{Body, Error, Method, Request};
 
 pub struct HttpContext {
     pub req: Request<Body>,
@@ -69,6 +69,13 @@ impl HttpContext {
                 format!("Route [{}] does not have key[{}]", route.path, key),
             ))),
         }
+    }
+
+    pub async fn get_body(self) -> Result<Vec<u8>, Error> {
+        let body = self.req.into_body();
+        let full_body = hyper::body::to_bytes(body).await?;
+
+        Ok(full_body.iter().cloned().collect::<Vec<u8>>())
     }
 
     pub fn get_path(&self) -> &str {

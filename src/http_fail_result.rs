@@ -73,6 +73,17 @@ impl HttpFailResult {
     }
 }
 
+impl Into<HttpFailResult> for hyper::Error {
+    fn into(self) -> HttpFailResult {
+        HttpFailResult {
+            content_type: WebContentType::Text,
+            status_code: 501,
+            content: format!("{:?}", self).into_bytes(),
+            write_telemetry: true,
+        }
+    }
+}
+
 impl Into<Response<Body>> for HttpFailResult {
     fn into(self) -> Response<Body> {
         Response::builder()
