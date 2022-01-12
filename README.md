@@ -4,6 +4,7 @@
 Cargo.toml
 
 ````Toml
+[dependencies]
 tokio = { version = "*", features = ["full"] }
 tokio-util = "*"
 hyper = { version = "*", features = ["full"] }
