@@ -32,7 +32,7 @@ async fn main() {
         http_server.add_middleware(Arc::new(SwaggerMiddleware::new(
         controllers.clone(),
         "MyService".to_string(),
-        crate::app::APP_VERSION.to_string(),
+        env!("CARGO_PKG_VERSION"),
     )));
     
     http_server.add_middleware(controllers);
