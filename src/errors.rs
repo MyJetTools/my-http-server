@@ -1,12 +1,12 @@
 use crate::{url_decoder::UrlDecodeError, HttpFailResult, WebContentType};
 use hyper::{Body, Response};
 
-impl Into<HttpFailResult> for hyper::Error {
-    fn into(self) -> HttpFailResult {
+impl From<hyper::Error> for HttpFailResult {
+    fn from(src: hyper::Error) -> Self {
         HttpFailResult {
             content_type: WebContentType::Text,
             status_code: 501,
-            content: format!("{:?}", self).into_bytes(),
+            content: format!("{:?}", src).into_bytes(),
             write_telemetry: true,
         }
     }
@@ -24,11 +24,12 @@ impl Into<Response<Body>> for HttpFailResult {
 
 impl From<UrlDecodeError> for HttpFailResult {
     fn from(src: UrlDecodeError) -> Self {
-        Self {
-            status_code: 501,
-            content_type: WebContentType::Text,
-            content: format!("UrlDecodeError: {}", src.msg).into_bytes(),
-            write_telemetry: true,
-        }
+        Self::as_fatal_error(format!("{:?}", src))
+    }
+}
+
+impl From<std::string::FromUtf8Error> for HttpFailResult {
+    fn from(src: std::string::FromUtf8Error) -> Self {
+        Self::as_fatal_error(format!("{}", src))
     }
 }

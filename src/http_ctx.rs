@@ -1,10 +1,11 @@
+use serde::de::DeserializeOwned;
 use std::net::SocketAddr;
 
 use crate::{
     http_path::{GetPathValueResult, PathSegments},
     HttpFailResult, QueryString, RequestIp, WebContentType,
 };
-use hyper::{Body, Error, Method, Request};
+use hyper::{Body, Method, Request};
 
 pub struct HttpContext {
     pub req: Request<Body>,
@@ -71,11 +72,25 @@ impl HttpContext {
         }
     }
 
-    pub async fn get_body(self) -> Result<Vec<u8>, Error> {
+    pub async fn get_body_raw(self) -> Result<Vec<u8>, HttpFailResult> {
         let body = self.req.into_body();
         let full_body = hyper::body::to_bytes(body).await?;
 
         Ok(full_body.iter().cloned().collect::<Vec<u8>>())
+    }
+
+    pub async fn get_body_as_json<T>(self) -> Result<T, HttpFailResult>
+    where
+        T: DeserializeOwned,
+    {
+        let body = self.get_body_raw().await?;
+
+        match serde_json::from_slice(body.as_slice()) {
+            Ok(result) => {
+                return Ok(result);
+            }
+            Err(err) => return Err(HttpFailResult::as_fatal_error(format!("{}", err))),
+        }
     }
 
     pub fn get_path(&self) -> &str {

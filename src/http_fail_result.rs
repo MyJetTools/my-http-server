@@ -70,4 +70,13 @@ impl HttpFailResult {
             write_telemetry: true,
         }
     }
+
+    pub fn as_fatal_error(text: String) -> Self {
+        Self {
+            content_type: WebContentType::Text,
+            content: text.into_bytes(),
+            status_code: 500,
+            write_telemetry: true,
+        }
+    }
 }
