@@ -1,3 +1,4 @@
+pub mod errors;
 mod http_ctx;
 mod http_fail_result;
 mod http_headers;
