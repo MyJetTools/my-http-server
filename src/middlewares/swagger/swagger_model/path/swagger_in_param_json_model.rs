@@ -2,7 +2,32 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::controllers::documentation::{types::HttpDataType, HttpInputParameter};
+use crate::middlewares::controllers::documentation::{
+    types::{ArrayElement, HttpDataType},
+    HttpInputParameter,
+};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InParamSchemaAdditionalProps {
+    #[serde(rename = "type")]
+    x_type: String,
+    pub items: HashMap<String, String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InParamSchema {
+    #[serde(rename = "$ref")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x_ref: Option<String>,
+
+    #[serde(rename = "additionalProperties")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    additional_properties: Option<InParamSchemaAdditionalProps>,
+
+    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x_type: Option<String>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SwaggerInParamJsonModel {
@@ -10,7 +35,7 @@ pub struct SwaggerInParamJsonModel {
     #[serde(skip_serializing_if = "Option::is_none")]
     p_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    schema: Option<HashMap<String, String>>,
+    schema: Option<InParamSchema>,
     name: String,
     #[serde(rename = "in")]
     p_in: String,
@@ -35,19 +60,40 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     }
 }
 
-fn get_schema(data_type: &HttpDataType) -> Option<HashMap<String, String>> {
+fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
     match data_type {
         HttpDataType::SimpleType(_) => None,
-        HttpDataType::Object(object_description) => {
-            let mut data = HashMap::new();
-            data.insert(
-                "$ref".to_string(),
-                format!("#/definitions/{}", object_description.struct_id),
-            );
-
-            Some(data)
-        }
+        HttpDataType::Object(object_description) => Some(InParamSchema {
+            x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
+            additional_properties: None,
+            x_type: None,
+        }),
         HttpDataType::None => None,
+        HttpDataType::ArrayOf(array_element) => {
+            let mut additional_properties = InParamSchemaAdditionalProps {
+                x_type: "array".to_string(),
+                items: HashMap::new(),
+            };
+
+            match array_element {
+                ArrayElement::SimpleType(data) => {
+                    additional_properties
+                        .items
+                        .insert("type".to_string(), data.as_swagger_type().to_string());
+                }
+                ArrayElement::Object(_) => {
+                    //TODO - we do not plugged objects yet
+                }
+            }
+
+            let schema = InParamSchema {
+                x_ref: None,
+                additional_properties: Some(additional_properties),
+                x_type: Some("object".to_string()),
+            };
+
+            Some(schema)
+        }
     }
 }
 
@@ -56,6 +102,7 @@ fn get_param_format(data_type: &HttpDataType) -> Option<String> {
         HttpDataType::SimpleType(param_type) => Some(param_type.as_str().to_string()),
         HttpDataType::Object(_) => None,
         HttpDataType::None => None,
+        HttpDataType::ArrayOf(_) => None,
     }
 }
 
@@ -64,5 +111,6 @@ fn get_param_type(data_type: &HttpDataType) -> Option<String> {
         HttpDataType::SimpleType(param_type) => Some(param_type.as_swagger_type().to_string()),
         HttpDataType::Object(_) => None,
         HttpDataType::None => None,
+        HttpDataType::ArrayOf(_) => None,
     }
 }

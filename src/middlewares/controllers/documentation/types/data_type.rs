@@ -1,8 +1,14 @@
 use super::{HttpObjectDescription, HttpParameterType};
 
+pub enum ArrayElement {
+    SimpleType(HttpParameterType),
+    Object(HttpObjectDescription),
+}
+
 pub enum HttpDataType {
     SimpleType(HttpParameterType),
     Object(HttpObjectDescription),
+    ArrayOf(ArrayElement),
     None,
 }
 

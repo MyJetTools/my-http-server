@@ -26,6 +26,10 @@ impl SwaggerDefinitionProperty {
             }
             .into(),
             HttpDataType::None => None,
+            HttpDataType::ArrayOf(_) => {
+                //TODO - Not Implemented yet
+                None
+            }
         }
     }
 }

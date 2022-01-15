@@ -45,5 +45,12 @@ fn get_schema(src: &HttpResult) -> OutSchemaJsonModel {
             x_type: None,
             x_ref: None,
         },
+        HttpDataType::ArrayOf(_) => {
+            //TODO - Not Implemented yet
+            OutSchemaJsonModel {
+                x_type: None,
+                x_ref: None,
+            }
+        }
     }
 }

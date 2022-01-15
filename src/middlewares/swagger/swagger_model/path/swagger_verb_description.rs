@@ -52,13 +52,16 @@ pub fn compile_produces_field(action_description: &HttpActionDescription) -> Vec
 
     for http_result in &action_description.results {
         let produce_type = match http_result.data_type {
-            HttpDataType::SimpleType(_) => WebContentType::Text.as_str(),
-            HttpDataType::Object(_) => WebContentType::Json.as_str(),
-            HttpDataType::None => WebContentType::Text.as_str(),
+            HttpDataType::SimpleType(_) => Some(WebContentType::Text.as_str()),
+            HttpDataType::Object(_) => Some(WebContentType::Json.as_str()),
+            HttpDataType::None => None,
+            HttpDataType::ArrayOf(_) => None,
         };
 
-        if !result.iter().any(|itm| itm == produce_type) {
-            result.push(produce_type.to_string());
+        if let Some(produce_type) = produce_type {
+            if !result.iter().any(|itm| itm == produce_type) {
+                result.push(produce_type.to_string());
+            }
         }
     }
 
