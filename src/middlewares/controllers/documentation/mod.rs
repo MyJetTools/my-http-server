@@ -4,6 +4,6 @@ mod in_parameter;
 pub mod types;
 
 pub use action_description_provider::{HttpActionDescription, HttpActionDescriptionProvider};
-pub use in_parameter::HttpInputParameter;
+pub use in_parameter::{HttpInputParameter, HttpParameterInputSource};
 
 pub use http_result::HttpResult;
