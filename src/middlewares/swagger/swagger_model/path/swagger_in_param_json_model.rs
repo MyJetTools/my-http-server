@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::middlewares::controllers::documentation::{types::HttpDataType, HttpInputParameter};
@@ -8,7 +10,7 @@ pub struct SwaggerInParamJsonModel {
     #[serde(skip_serializing_if = "Option::is_none")]
     p_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    scheme: Option<String>,
+    schema: Option<HashMap<String, String>>,
     name: String,
     #[serde(rename = "in")]
     p_in: String,
@@ -28,16 +30,22 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
             nullable: !self.required,
             p_type: get_param_type(&self.data_type),
             description: self.description,
-            scheme: get_scheme(&self.data_type),
+            schema: get_schema(&self.data_type),
         }
     }
 }
 
-fn get_scheme(data_type: &HttpDataType) -> Option<String> {
+fn get_schema(data_type: &HttpDataType) -> Option<HashMap<String, String>> {
     match data_type {
         HttpDataType::SimpleType(_) => None,
         HttpDataType::Object(object_description) => {
-            Some(format!("#/definitions/{}", object_description.struct_id))
+            let mut data = HashMap::new();
+            data.insert(
+                "$ref".to_string(),
+                format!("#/definitions/{}", object_description.struct_id),
+            );
+
+            Some(data)
         }
         HttpDataType::None => None,
     }
