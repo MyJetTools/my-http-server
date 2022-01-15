@@ -1,17 +1,25 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use crate::middlewares::controllers::documentation::{
     types::{ArrayElement, HttpDataType},
     HttpInputParameter,
 };
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ArrayItemInParamSchema {
+    #[serde(rename = "$ref")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x_ref: Option<String>,
+
+    #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x_type: Option<String>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InParamSchemaAdditionalProps {
     #[serde(rename = "type")]
     x_type: String,
-    pub items: HashMap<String, InParamSchema>,
+    pub items: ArrayItemInParamSchema,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -60,16 +68,14 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     }
 }
 
-fn get_array_element_schema(array_element: &ArrayElement) -> InParamSchema {
+fn get_array_element_schema(array_element: &ArrayElement) -> ArrayItemInParamSchema {
     match array_element {
-        ArrayElement::SimpleType(data) => InParamSchema {
+        ArrayElement::SimpleType(data) => ArrayItemInParamSchema {
             x_ref: None,
-            additional_properties: None,
             x_type: Some(data.as_swagger_type().to_string()),
         },
-        ArrayElement::Object(object_description) => InParamSchema {
+        ArrayElement::Object(object_description) => ArrayItemInParamSchema {
             x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
-            additional_properties: None,
             x_type: None,
         },
     }
@@ -87,12 +93,8 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
         HttpDataType::ArrayOf(array_element) => {
             let mut additional_properties = InParamSchemaAdditionalProps {
                 x_type: "array".to_string(),
-                items: HashMap::new(),
+                items: get_array_element_schema(array_element),
             };
-
-            additional_properties
-                .items
-                .insert("type".to_string(), get_array_element_schema(array_element));
 
             let schema = InParamSchema {
                 x_ref: None,

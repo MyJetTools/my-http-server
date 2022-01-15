@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::middlewares::controllers::{
     documentation::{
         types::{ArrayElement, HttpDataType},
-        HttpActionDescription, HttpInputParameter,
+        HttpActionDescription,
     },
     ControllersMiddleware,
 };
