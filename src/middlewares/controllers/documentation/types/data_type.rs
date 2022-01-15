@@ -11,3 +11,12 @@ pub enum HttpDataType {
     },
     None,
 }
+
+impl HttpDataType {
+    pub fn as_string() -> Self {
+        Self::SimpleType {
+            required: false,
+            param_type: HttpParameterType::String,
+        }
+    }
+}
