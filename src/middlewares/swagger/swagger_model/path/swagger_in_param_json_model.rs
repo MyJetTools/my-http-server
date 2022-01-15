@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::middlewares::controllers::documentation::{
@@ -31,6 +33,9 @@ pub struct InParamSchema {
     #[serde(rename = "additionalProperties")]
     #[serde(skip_serializing_if = "Option::is_none")]
     additional_properties: Option<InParamSchemaAdditionalProps>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    items: Option<HashMap<String, String>>,
 
     #[serde(rename = "type")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -88,14 +93,19 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
             x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
             additional_properties: None,
             x_type: None,
+            items: None,
         }),
         HttpDataType::None => None,
         HttpDataType::ArrayOf(array_element) => match array_element {
             ArrayElement::SimpleType(param_type) => {
+                let mut items = HashMap::new();
+                items.insert("type".to_string(), param_type.as_swagger_type().to_string());
+
                 let result = InParamSchema {
                     x_ref: None,
                     additional_properties: None,
-                    x_type: Some(param_type.as_swagger_type().to_string()),
+                    x_type: Some("array".to_string()),
+                    items: Some(items),
                 };
 
                 Some(result)
@@ -108,6 +118,7 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
 
                 let schema = InParamSchema {
                     x_ref: None,
+                    items: None,
                     additional_properties: Some(additional_properties),
                     x_type: Some("object".to_string()),
                 };
