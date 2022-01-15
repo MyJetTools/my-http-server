@@ -62,7 +62,7 @@ impl SwaggerJsonModel {
             if let Some(action_description) = route_action.action.get_description() {
                 definitions = populate_definitions(definitions, &action_description);
                 let path_model = self.get_or_create(route_action.route.path.as_str());
-                path_model.get = Some(SwaggerVerbDescription::new(action_description));
+                path_model.post = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
@@ -70,7 +70,7 @@ impl SwaggerJsonModel {
             if let Some(action_description) = route_action.action.get_description() {
                 definitions = populate_definitions(definitions, &action_description);
                 let path_model = self.get_or_create(route_action.route.path.as_str());
-                path_model.get = Some(SwaggerVerbDescription::new(action_description));
+                path_model.put = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
@@ -78,7 +78,7 @@ impl SwaggerJsonModel {
             if let Some(action_description) = route_action.action.get_description() {
                 definitions = populate_definitions(definitions, &action_description);
                 let path_model = self.get_or_create(route_action.route.path.as_str());
-                path_model.get = Some(SwaggerVerbDescription::new(action_description));
+                path_model.delete = Some(SwaggerVerbDescription::new(action_description));
             }
         }
 
