@@ -58,7 +58,7 @@ pub fn compile_produces_field(action_description: &HttpActionDescription) -> Vec
             } => WebContentType::Text.as_str(),
             HttpDataType::Object {
                 required: _,
-                description: _,
+                object_description: _,
             } => WebContentType::Json.as_str(),
             HttpDataType::None => WebContentType::Text.as_str(),
         };

@@ -42,10 +42,10 @@ fn get_schema(src: &HttpResult) -> OutSchemaJsonModel {
         },
         HttpDataType::Object {
             required: _,
-            description,
+            object_description,
         } => OutSchemaJsonModel {
             x_type: None,
-            x_ref: Some(description.struct_id.to_string()),
+            x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
         },
         HttpDataType::None => OutSchemaJsonModel {
             x_type: None,

@@ -7,7 +7,7 @@ pub enum HttpDataType {
     },
     Object {
         required: bool,
-        description: HttpObjectDescription,
+        object_description: HttpObjectDescription,
     },
     None,
 }
@@ -17,6 +17,20 @@ impl HttpDataType {
         Self::SimpleType {
             required: false,
             param_type: HttpParameterType::String,
+        }
+    }
+
+    pub fn is_required(&self) -> bool {
+        match self {
+            HttpDataType::SimpleType {
+                required,
+                param_type: _,
+            } => *required,
+            HttpDataType::Object {
+                required,
+                object_description: _,
+            } => *required,
+            HttpDataType::None => false,
         }
     }
 }
