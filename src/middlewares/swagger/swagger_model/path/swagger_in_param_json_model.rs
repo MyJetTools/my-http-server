@@ -22,7 +22,7 @@ pub struct SwaggerInParamJsonModel {
 impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     fn into(self) -> SwaggerInParamJsonModel {
         SwaggerInParamJsonModel {
-            p_in: self.src.as_str().to_string(),
+            p_in: self.source.as_str().to_string(),
             name: self.name,
             format: get_param_format(&self.data_type),
             nullable: !self.required,

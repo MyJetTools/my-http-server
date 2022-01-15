@@ -5,7 +5,7 @@ pub struct HttpInputParameter {
     pub data_type: HttpDataType,
     pub description: String,
     pub required: bool,
-    pub src: HttpParameterInputSource,
+    pub source: HttpParameterInputSource,
 }
 
 pub enum HttpParameterInputSource {
