@@ -30,10 +30,6 @@ pub struct InParamSchema {
     #[serde(skip_serializing_if = "Option::is_none")]
     x_ref: Option<String>,
 
-    #[serde(rename = "additionalProperties")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    additional_properties: Option<InParamSchemaAdditionalProps>,
-
     #[serde(skip_serializing_if = "Option::is_none")]
     items: Option<HashMap<String, String>>,
 
@@ -73,25 +69,12 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     }
 }
 
-fn get_array_element_schema(array_element: &ArrayElement) -> ArrayItemInParamSchema {
-    match array_element {
-        ArrayElement::SimpleType(data) => ArrayItemInParamSchema {
-            x_ref: None,
-            x_type: Some(data.as_swagger_type().to_string()),
-        },
-        ArrayElement::Object(object_description) => ArrayItemInParamSchema {
-            x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
-            x_type: None,
-        },
-    }
-}
-
 fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
     match data_type {
         HttpDataType::SimpleType(_) => None,
         HttpDataType::Object(object_description) => Some(InParamSchema {
             x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
-            additional_properties: None,
+
             x_type: None,
             items: None,
         }),
@@ -103,24 +86,17 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
 
                 let result = InParamSchema {
                     x_ref: None,
-                    additional_properties: None,
                     x_type: Some("array".to_string()),
                     items: Some(items),
                 };
 
                 Some(result)
             }
-            ArrayElement::Object(_) => {
-                let additional_properties = InParamSchemaAdditionalProps {
-                    x_type: "array".to_string(),
-                    items: get_array_element_schema(array_element),
-                };
-
+            ArrayElement::Object(object_description) => {
                 let schema = InParamSchema {
-                    x_ref: None,
+                    x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
                     items: None,
-                    additional_properties: Some(additional_properties),
-                    x_type: Some("object".to_string()),
+                    x_type: Some("array".to_string()),
                 };
 
                 Some(schema)
