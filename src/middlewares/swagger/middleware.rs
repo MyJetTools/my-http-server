@@ -5,6 +5,7 @@ use crate::{
     WebContentType,
 };
 use async_trait::async_trait;
+use tokio::sync::Mutex;
 
 use super::{super::controllers::ControllersMiddleware, swagger_model::SwaggerJsonModel};
 
@@ -12,6 +13,7 @@ pub struct SwaggerMiddleware {
     controllers: Arc<ControllersMiddleware>,
     title: String,
     version: String,
+    swagger_json_ok_result: Mutex<Option<HttpOkResult>>,
 }
 
 impl SwaggerMiddleware {
@@ -20,6 +22,7 @@ impl SwaggerMiddleware {
             controllers,
             title,
             version,
+            swagger_json_ok_result: Mutex::new(None),
         }
     }
 }
@@ -93,6 +96,11 @@ impl HttpServerMiddleware for SwaggerMiddleware {
         }
 
         if path == "/swagger/v1/swagger.json" {
+            let mut write_access = self.swagger_json_ok_result.lock().await;
+            if let Some(result) = &*write_access {
+                return Ok(MiddleWareResult::Ok(result.clone()));
+            }
+
             let mut json_model = SwaggerJsonModel::new(
                 self.title.clone(),
                 self.version.clone(),
@@ -102,29 +110,9 @@ impl HttpServerMiddleware for SwaggerMiddleware {
 
             json_model.populate_operations(self.controllers.as_ref());
 
-            let result = HttpOkResult::create_json_response(json_model);
+            *write_access = Some(HttpOkResult::create_json_response(json_model));
 
-            return Ok(MiddleWareResult::Ok(result));
-            /*
-            let mut placehloders = HashMap::new();
-
-            placehloders.insert("SCHEME", ctx.get_scheme());
-
-            placehloders.insert("HOST", host.to_string());
-            placehloders.insert("VERSION", crate::app::APP_VERSION.to_string());
-
-            let result = super::super::files::replace_placeholders(
-                super::resources::swagger_json,
-                &placehloders,
-            );
-
-            let result = HttpOkResult::Content {
-                content_type: Some(WebContentType::Json),
-                content: result,
-            };
-
-            return Ok(MiddleWareResult::Ok(result));
-            */
+            return Ok(MiddleWareResult::Ok(write_access.as_ref().unwrap().clone()));
         }
 
         let result = super::super::files::get(format!("./wwwroot{}", path).as_str()).await;
