@@ -1,12 +1,10 @@
-use crate::WebContentType;
-
-use super::HttpInputParameter;
+use super::{HttpInputParameter, HttpResult};
 
 pub struct HttpActionDescription<'s> {
     pub name: &'s str,
     pub description: &'s str,
-    pub out_content_type: WebContentType,
     pub input_params: Option<Vec<HttpInputParameter>>,
+    pub results: Vec<HttpResult>,
 }
 
 pub trait HttpActionDescriptionProvider {

@@ -78,7 +78,7 @@ impl Into<Response<Body>> for HttpOkResult {
 
         return match self {
             HttpOkResult::Ok => Response::builder()
-                .header("Content-Type", WebContentType::Text.to_string())
+                .header("Content-Type", WebContentType::Text.as_str())
                 .status(status_code)
                 .body(Body::from("OK"))
                 .unwrap(),
@@ -87,7 +87,7 @@ impl Into<Response<Body>> for HttpOkResult {
                 content,
             } => match content_type {
                 Some(content_type) => Response::builder()
-                    .header("Content-Type", content_type.to_string())
+                    .header("Content-Type", content_type.as_str())
                     .status(status_code)
                     .body(Body::from(content))
                     .unwrap(),
@@ -97,7 +97,7 @@ impl Into<Response<Body>> for HttpOkResult {
                     .unwrap(),
             },
             HttpOkResult::Text { text } => Response::builder()
-                .header("Content-Type", WebContentType::Text.to_string())
+                .header("Content-Type", WebContentType::Text.as_str())
                 .status(status_code)
                 .body(Body::from(text))
                 .unwrap(),

@@ -1,3 +1,4 @@
+mod definitions;
 pub mod path;
 mod swagger_info_json_model;
 mod swagger_json_model;

@@ -1,4 +1,4 @@
-use super::{HttpParameterInputSource, HttpParameterType};
+use super::{types::HttpParameterType, HttpParameterInputSource};
 
 pub struct HttpInputParameter {
     pub name: String,

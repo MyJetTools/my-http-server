@@ -15,7 +15,7 @@ impl From<hyper::Error> for HttpFailResult {
 impl Into<Response<Body>> for HttpFailResult {
     fn into(self) -> Response<Body> {
         Response::builder()
-            .header("Content-Type", self.content_type.to_string())
+            .header("Content-Type", self.content_type.as_str())
             .status(self.status_code)
             .body(Body::from(self.content))
             .unwrap()

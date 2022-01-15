@@ -61,6 +61,43 @@ impl ControllersMiddleware {
     ) {
         self.delete.register(route, action);
     }
+
+    pub fn list_of_get_route_actions<'s>(&'s self) -> Vec<&'s GetRouteAction> {
+        let mut result = Vec::with_capacity(self.get.no_keys.len() + self.get.with_keys.len());
+
+        result.extend(self.get.no_keys.values());
+        result.extend(&self.get.with_keys);
+
+        result
+    }
+
+    pub fn list_of_post_route_actions<'s>(&'s self) -> Vec<&'s PostRouteAction> {
+        let mut result = Vec::with_capacity(self.post.no_keys.len() + self.post.with_keys.len());
+
+        result.extend(self.post.no_keys.values());
+        result.extend(&self.post.with_keys);
+
+        result
+    }
+
+    pub fn list_of_put_route_actions<'s>(&'s self) -> Vec<&'s PutRouteAction> {
+        let mut result = Vec::with_capacity(self.put.no_keys.len() + self.put.with_keys.len());
+
+        result.extend(self.put.no_keys.values());
+        result.extend(&self.put.with_keys);
+
+        result
+    }
+
+    pub fn list_of_delete_route_actions<'s>(&'s self) -> Vec<&'s DeleteRouteAction> {
+        let mut result =
+            Vec::with_capacity(self.delete.no_keys.len() + self.delete.with_keys.len());
+
+        result.extend(self.delete.no_keys.values());
+        result.extend(&self.delete.with_keys);
+
+        result
+    }
 }
 
 #[async_trait]

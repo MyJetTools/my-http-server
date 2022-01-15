@@ -2,7 +2,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::controllers::documentation::{HttpActionDescription, HttpInputParameter};
+use crate::{
+    middlewares::controllers::documentation::{
+        types::HttpDataType, HttpActionDescription, HttpInputParameter, HttpResult,
+    },
+    WebContentType,
+};
 
 use super::{ResponseJsonModel, SwaggerInParamJsonModel};
 
@@ -17,12 +22,14 @@ pub struct SwaggerVerbDescription {
 
 impl SwaggerVerbDescription {
     pub fn new(action_description: HttpActionDescription) -> Self {
+        let produces = compile_produces_field(&action_description);
+
         Self {
             tags: vec![action_description.name.to_string()],
             description: action_description.description.to_string(),
             parameters: into_json_parameters(action_description.input_params),
-            produces: vec![action_description.out_content_type.to_string().to_string()],
-            responses: create_default_responses(),
+            produces,
+            responses: compile_responses(action_description.results.as_slice()),
         }
     }
 }
@@ -40,10 +47,39 @@ fn into_json_parameters(src: Option<Vec<HttpInputParameter>>) -> Vec<SwaggerInPa
     }
 }
 
-fn create_default_responses() -> HashMap<String, ResponseJsonModel> {
+pub fn compile_produces_field(action_description: &HttpActionDescription) -> Vec<String> {
+    let mut result = Vec::new();
+
+    for http_result in &action_description.results {
+        let produce_type = match http_result.data_type {
+            HttpDataType::SimpleType {
+                required: _,
+                param_type: _,
+            } => WebContentType::Text.as_str(),
+            HttpDataType::Object {
+                required: _,
+                description: _,
+            } => WebContentType::Json.as_str(),
+            HttpDataType::None => WebContentType::Text.as_str(),
+        };
+
+        if !result.iter().any(|itm| itm == produce_type) {
+            result.push(produce_type.to_string());
+        }
+    }
+
+    result
+}
+
+fn compile_responses(results: &[HttpResult]) -> HashMap<String, ResponseJsonModel> {
     let mut result = HashMap::new();
 
-    result.insert("200".to_string(), ResponseJsonModel::create_default());
+    for http_result in results {
+        result.insert(
+            format!("{}", http_result.http_code),
+            ResponseJsonModel::new(http_result),
+        );
+    }
 
     result
 }

@@ -13,7 +13,7 @@ pub enum HttpParameterType {
 }
 
 impl HttpParameterType {
-    pub fn to_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             HttpParameterType::Integer => "integer",
             HttpParameterType::Long => "long",
