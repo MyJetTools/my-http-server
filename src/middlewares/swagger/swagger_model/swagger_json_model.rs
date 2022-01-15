@@ -3,7 +3,10 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::middlewares::controllers::{
-    documentation::{types::HttpDataType, HttpActionDescription},
+    documentation::{
+        types::{ArrayElement, HttpDataType},
+        HttpActionDescription, HttpInputParameter,
+    },
     ControllersMiddleware,
 };
 
@@ -91,7 +94,25 @@ fn populate_definitions(
     action_description: &HttpActionDescription,
 ) -> Option<BTreeMap<String, SwaggerDefinitionModel>> {
     for http_results in &action_description.results {
-        if let HttpDataType::Object(object_description) = &http_results.data_type {
+        definitions = populate(definitions, &http_results.data_type);
+    }
+
+    if let Some(input_params) = &action_description.input_params {
+        for param in input_params {
+            definitions = populate(definitions, &param.data_type);
+        }
+    }
+
+    definitions
+}
+
+fn populate(
+    mut definitions: Option<BTreeMap<String, SwaggerDefinitionModel>>,
+    data_type: &HttpDataType,
+) -> Option<BTreeMap<String, SwaggerDefinitionModel>> {
+    match data_type {
+        HttpDataType::SimpleType(_) => {}
+        HttpDataType::Object(object_description) => {
             let swagger_definition_model = SwaggerDefinitionModel::from_object(object_description);
 
             if definitions.is_none() {
@@ -103,11 +124,8 @@ fn populate_definitions(
                 swagger_definition_model,
             );
         }
-    }
-
-    if let Some(input_params) = &action_description.input_params {
-        for param in input_params {
-            if let HttpDataType::Object(object_description) = &param.data_type {
+        HttpDataType::ArrayOf(array_element) => {
+            if let ArrayElement::Object(object_description) = array_element {
                 let swagger_definition_model =
                     SwaggerDefinitionModel::from_object(object_description);
 
@@ -121,6 +139,7 @@ fn populate_definitions(
                 );
             }
         }
+        HttpDataType::None => {}
     }
 
     definitions
