@@ -15,18 +15,12 @@ pub struct SwaggerDefinitionProperty {
 impl SwaggerDefinitionProperty {
     pub fn new(data_type: &HttpDataType) -> Option<Self> {
         match data_type {
-            HttpDataType::SimpleType {
-                required: _,
-                param_type,
-            } => Self {
+            HttpDataType::SimpleType(param_type) => Self {
                 x_ref: None,
                 x_type: Some(param_type.as_str().to_string()),
             }
             .into(),
-            HttpDataType::Object {
-                required: _,
-                object_description,
-            } => Self {
+            HttpDataType::Object(object_description) => Self {
                 x_ref: Some(object_description.struct_id.to_string()),
                 x_type: None,
             }

@@ -73,42 +73,26 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
 
 fn get_scheme(data_type: &HttpDataType) -> Option<String> {
     match data_type {
-        HttpDataType::SimpleType {
-            required: _,
-            param_type: _,
-        } => None,
-        HttpDataType::Object {
-            required: _,
-            object_description,
-        } => Some(format!("#/definitions/{}", object_description.struct_id)),
+        HttpDataType::SimpleType(_) => None,
+        HttpDataType::Object(object_description) => {
+            Some(format!("#/definitions/{}", object_description.struct_id))
+        }
         HttpDataType::None => None,
     }
 }
 
 fn get_param_format(data_type: &HttpDataType) -> Option<String> {
     match data_type {
-        HttpDataType::SimpleType {
-            required: _,
-            param_type,
-        } => Some(param_type.as_str().to_string()),
-        HttpDataType::Object {
-            required: _,
-            object_description: _,
-        } => None,
+        HttpDataType::SimpleType(param_type) => Some(param_type.as_str().to_string()),
+        HttpDataType::Object(_) => None,
         HttpDataType::None => None,
     }
 }
 
 fn get_param_type(data_type: &HttpDataType) -> Option<String> {
     match data_type {
-        HttpDataType::SimpleType {
-            required: _,
-            param_type,
-        } => Some(param_type.as_swagger_type().to_string()),
-        HttpDataType::Object {
-            required: _,
-            object_description: _,
-        } => None,
+        HttpDataType::SimpleType(param_type) => Some(param_type.as_swagger_type().to_string()),
+        HttpDataType::Object(_) => None,
         HttpDataType::None => None,
     }
 }

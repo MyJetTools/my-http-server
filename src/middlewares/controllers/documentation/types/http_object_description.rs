@@ -21,7 +21,8 @@ impl HttpObjectDescription {
     pub fn with_string_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_string(required),
+            HttpDataType::as_string(),
+            required,
         ));
         self
     }
@@ -29,7 +30,8 @@ impl HttpObjectDescription {
     pub fn with_integer_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_integer(required),
+            HttpDataType::as_integer(),
+            required,
         ));
         self
     }
@@ -37,7 +39,8 @@ impl HttpObjectDescription {
     pub fn with_long_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_long(required),
+            HttpDataType::as_long(),
+            required,
         ));
         self
     }
@@ -45,7 +48,8 @@ impl HttpObjectDescription {
     pub fn with_float_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_float(required),
+            HttpDataType::as_float(),
+            required,
         ));
         self
     }
@@ -53,7 +57,8 @@ impl HttpObjectDescription {
     pub fn with_double_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_double(required),
+            HttpDataType::as_double(),
+            required,
         ));
         self
     }
@@ -61,7 +66,8 @@ impl HttpObjectDescription {
     pub fn with_binary_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_binary(required),
+            HttpDataType::as_binary(),
+            required,
         ));
         self
     }
@@ -69,7 +75,8 @@ impl HttpObjectDescription {
     pub fn with_date_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_date(required),
+            HttpDataType::as_date(),
+            required,
         ));
         self
     }
@@ -77,7 +84,8 @@ impl HttpObjectDescription {
     pub fn with_date_time_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_date_time(required),
+            HttpDataType::as_date_time(),
+            required,
         ));
         self
     }
@@ -85,7 +93,8 @@ impl HttpObjectDescription {
     pub fn with_password_property(mut self, name: &str, required: bool) -> Self {
         self.properties.push(HttpObjectProperty::new(
             name,
-            HttpDataType::as_password(required),
+            HttpDataType::as_password(),
+            required,
         ));
         self
     }

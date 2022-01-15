@@ -52,14 +52,8 @@ pub fn compile_produces_field(action_description: &HttpActionDescription) -> Vec
 
     for http_result in &action_description.results {
         let produce_type = match http_result.data_type {
-            HttpDataType::SimpleType {
-                required: _,
-                param_type: _,
-            } => WebContentType::Text.as_str(),
-            HttpDataType::Object {
-                required: _,
-                object_description: _,
-            } => WebContentType::Json.as_str(),
+            HttpDataType::SimpleType(_) => WebContentType::Text.as_str(),
+            HttpDataType::Object(_) => WebContentType::Json.as_str(),
             HttpDataType::None => WebContentType::Text.as_str(),
         };
 

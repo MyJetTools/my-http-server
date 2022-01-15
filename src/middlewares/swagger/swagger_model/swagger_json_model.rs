@@ -91,11 +91,7 @@ fn populate_definitions(
     action_description: &HttpActionDescription,
 ) -> Option<BTreeMap<String, SwaggerDefinitionModel>> {
     for http_results in &action_description.results {
-        if let HttpDataType::Object {
-            required: _,
-            object_description,
-        } = &http_results.data_type
-        {
+        if let HttpDataType::Object(object_description) = &http_results.data_type {
             let swagger_definition_model = SwaggerDefinitionModel::from_object(object_description);
 
             if definitions.is_none() {

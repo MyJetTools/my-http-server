@@ -28,7 +28,7 @@ fn compile_required(src: &HttpObjectDescription) -> Vec<String> {
     let mut result = Vec::new();
 
     for prop in &src.properties {
-        if prop.prop_type.is_required() {
+        if prop.required {
             result.push(prop.name.to_string());
         }
     }

@@ -33,17 +33,11 @@ impl ResponseJsonModel {
 
 fn get_schema(src: &HttpResult) -> OutSchemaJsonModel {
     match &src.data_type {
-        HttpDataType::SimpleType {
-            required: _,
-            param_type,
-        } => OutSchemaJsonModel {
+        HttpDataType::SimpleType(param_type) => OutSchemaJsonModel {
             x_type: Some(param_type.as_str().to_string()),
             x_ref: None,
         },
-        HttpDataType::Object {
-            required: _,
-            object_description,
-        } => OutSchemaJsonModel {
+        HttpDataType::Object(object_description) => OutSchemaJsonModel {
             x_type: None,
             x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
         },
