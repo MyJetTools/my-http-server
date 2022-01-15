@@ -90,20 +90,31 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
             x_type: None,
         }),
         HttpDataType::None => None,
-        HttpDataType::ArrayOf(array_element) => {
-            let additional_properties = InParamSchemaAdditionalProps {
-                x_type: "array".to_string(),
-                items: get_array_element_schema(array_element),
-            };
+        HttpDataType::ArrayOf(array_element) => match array_element {
+            ArrayElement::SimpleType(param_type) => {
+                let result = InParamSchema {
+                    x_ref: None,
+                    additional_properties: None,
+                    x_type: Some(param_type.as_swagger_type().to_string()),
+                };
 
-            let schema = InParamSchema {
-                x_ref: None,
-                additional_properties: Some(additional_properties),
-                x_type: Some("object".to_string()),
-            };
+                Some(result)
+            }
+            ArrayElement::Object(_) => {
+                let additional_properties = InParamSchemaAdditionalProps {
+                    x_type: "array".to_string(),
+                    items: get_array_element_schema(array_element),
+                };
 
-            Some(schema)
-        }
+                let schema = InParamSchema {
+                    x_ref: None,
+                    additional_properties: Some(additional_properties),
+                    x_type: Some("object".to_string()),
+                };
+
+                Some(schema)
+            }
+        },
     }
 }
 
