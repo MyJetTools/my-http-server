@@ -105,5 +105,23 @@ fn populate_definitions(
         }
     }
 
+    if let Some(input_params) = &action_description.input_params {
+        for param in input_params {
+            if let HttpDataType::Object(object_description) = &param.data_type {
+                let swagger_definition_model =
+                    SwaggerDefinitionModel::from_object(object_description);
+
+                if definitions.is_none() {
+                    definitions = Some(BTreeMap::new());
+                }
+
+                definitions.as_mut().unwrap().insert(
+                    object_description.struct_id.to_string(),
+                    swagger_definition_model,
+                );
+            }
+        }
+    }
+
     definitions
 }
