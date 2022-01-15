@@ -11,7 +11,7 @@ use crate::middlewares::controllers::documentation::{
 pub struct InParamSchemaAdditionalProps {
     #[serde(rename = "type")]
     x_type: String,
-    pub items: HashMap<String, String>,
+    pub items: HashMap<String, InParamSchema>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -60,6 +60,21 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     }
 }
 
+fn get_array_element_schema(array_element: &ArrayElement) -> InParamSchema {
+    match array_element {
+        ArrayElement::SimpleType(data) => InParamSchema {
+            x_ref: None,
+            additional_properties: None,
+            x_type: Some(data.as_swagger_type().to_string()),
+        },
+        ArrayElement::Object(object_description) => InParamSchema {
+            x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
+            additional_properties: None,
+            x_type: None,
+        },
+    }
+}
+
 fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
     match data_type {
         HttpDataType::SimpleType(_) => None,
@@ -75,16 +90,9 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
                 items: HashMap::new(),
             };
 
-            match array_element {
-                ArrayElement::SimpleType(data) => {
-                    additional_properties
-                        .items
-                        .insert("type".to_string(), data.as_swagger_type().to_string());
-                }
-                ArrayElement::Object(_) => {
-                    //TODO - we do not plugged objects yet
-                }
-            }
+            additional_properties
+                .items
+                .insert("type".to_string(), get_array_element_schema(array_element));
 
             let schema = InParamSchema {
                 x_ref: None,
