@@ -21,52 +21,14 @@ pub struct SwaggerInParamJsonModel {
 
 impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     fn into(self) -> SwaggerInParamJsonModel {
-        match self {
-            HttpInputParameter::Path(data) => SwaggerInParamJsonModel {
-                p_in: "path".to_string(),
-                name: data.name,
-                format: get_param_format(&data.data_type),
-                nullable: !data.required,
-                p_type: get_param_type(&data.data_type),
-                description: data.description,
-                scheme: get_scheme(&data.data_type),
-            },
-            HttpInputParameter::Query(data) => SwaggerInParamJsonModel {
-                p_in: "query".to_string(),
-                name: data.name,
-                format: get_param_format(&data.data_type),
-                nullable: !data.required,
-                p_type: get_param_type(&data.data_type),
-                description: data.description,
-                scheme: get_scheme(&data.data_type),
-            },
-            HttpInputParameter::Header(data) => SwaggerInParamJsonModel {
-                p_in: "header".to_string(),
-                name: data.name,
-                format: get_param_format(&data.data_type),
-                nullable: !data.required,
-                p_type: get_param_type(&data.data_type),
-                description: data.description,
-                scheme: get_scheme(&data.data_type),
-            },
-            HttpInputParameter::FormData(data) => SwaggerInParamJsonModel {
-                p_in: "formData".to_string(),
-                name: data.name,
-                format: get_param_format(&data.data_type),
-                nullable: !data.required,
-                p_type: get_param_type(&data.data_type),
-                description: data.description,
-                scheme: get_scheme(&data.data_type),
-            },
-            HttpInputParameter::Body(data) => SwaggerInParamJsonModel {
-                p_in: "body".to_string(),
-                name: data.name,
-                format: get_param_format(&data.data_type),
-                nullable: !data.required,
-                p_type: get_param_type(&data.data_type),
-                description: data.description,
-                scheme: get_scheme(&data.data_type),
-            },
+        SwaggerInParamJsonModel {
+            p_in: self.src.as_str().to_string(),
+            name: self.name,
+            format: get_param_format(&self.data_type),
+            nullable: !self.required,
+            p_type: get_param_type(&self.data_type),
+            description: self.description,
+            scheme: get_scheme(&self.data_type),
         }
     }
 }
