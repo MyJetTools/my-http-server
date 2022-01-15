@@ -7,21 +7,13 @@ use crate::middlewares::controllers::documentation::{
     HttpInputParameter,
 };
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ArrayItemInParamSchema {
-    #[serde(rename = "$ref")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    x_ref: Option<String>,
-
+pub struct InParamSchemaItems {
     #[serde(rename = "type")]
     #[serde(skip_serializing_if = "Option::is_none")]
     x_type: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct InParamSchemaAdditionalProps {
-    #[serde(rename = "type")]
-    x_type: String,
-    pub items: ArrayItemInParamSchema,
+    #[serde(rename = "ref")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x_ref: Option<HashMap<String, String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -31,7 +23,7 @@ pub struct InParamSchema {
     x_ref: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    items: Option<HashMap<String, String>>,
+    items: Option<InParamSchemaItems>,
 
     #[serde(rename = "type")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,8 +73,10 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
         HttpDataType::None => None,
         HttpDataType::ArrayOf(array_element) => match array_element {
             ArrayElement::SimpleType(param_type) => {
-                let mut items = HashMap::new();
-                items.insert("type".to_string(), param_type.as_swagger_type().to_string());
+                let items = InParamSchemaItems {
+                    x_type: Some(param_type.as_swagger_type().to_string()),
+                    x_ref: None,
+                };
 
                 let result = InParamSchema {
                     x_ref: None,
@@ -92,10 +86,22 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
 
                 Some(result)
             }
+
             ArrayElement::Object(object_description) => {
+                let mut x_ref = HashMap::new();
+                x_ref.insert(
+                    "$ref".to_string(),
+                    format!("#/definitions/{}", object_description.struct_id),
+                );
+
+                let items = InParamSchemaItems {
+                    x_type: None,
+                    x_ref: Some(x_ref),
+                };
+
                 let schema = InParamSchema {
-                    x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
-                    items: None,
+                    x_ref: None,
+                    items: Some(items),
                     x_type: Some("array".to_string()),
                 };
 
