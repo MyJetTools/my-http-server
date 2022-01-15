@@ -11,9 +11,9 @@ pub struct InParamSchemaItems {
     #[serde(rename = "type")]
     #[serde(skip_serializing_if = "Option::is_none")]
     x_type: Option<String>,
-    #[serde(rename = "ref")]
+    #[serde(rename = "$ref")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    x_ref: Option<HashMap<String, String>>,
+    x_ref: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -88,15 +88,9 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
             }
 
             ArrayElement::Object(object_description) => {
-                let mut x_ref = HashMap::new();
-                x_ref.insert(
-                    "$ref".to_string(),
-                    format!("#/definitions/{}", object_description.struct_id),
-                );
-
                 let items = InParamSchemaItems {
                     x_type: None,
-                    x_ref: Some(x_ref),
+                    x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
                 };
 
                 let schema = InParamSchema {
