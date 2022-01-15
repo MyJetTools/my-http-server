@@ -1,12 +1,7 @@
-use super::{HttpObjectDescription, HttpParameterType};
-
-pub enum ArrayElement {
-    SimpleType(HttpParameterType),
-    Object(HttpObjectDescription),
-}
+use super::{ArrayElement, HttpObjectDescription, HttpSimpleType};
 
 pub enum HttpDataType {
-    SimpleType(HttpParameterType),
+    SimpleType(HttpSimpleType),
     Object(HttpObjectDescription),
     ArrayOf(ArrayElement),
     None,
@@ -14,39 +9,39 @@ pub enum HttpDataType {
 
 impl HttpDataType {
     pub fn as_string() -> Self {
-        Self::SimpleType(HttpParameterType::String)
+        Self::SimpleType(HttpSimpleType::String)
     }
 
     pub fn as_integer() -> Self {
-        Self::SimpleType(HttpParameterType::Integer)
+        Self::SimpleType(HttpSimpleType::Integer)
     }
 
     pub fn as_long() -> Self {
-        Self::SimpleType(HttpParameterType::Boolean)
+        Self::SimpleType(HttpSimpleType::Boolean)
     }
 
     pub fn as_float() -> Self {
-        Self::SimpleType(HttpParameterType::Float)
+        Self::SimpleType(HttpSimpleType::Float)
     }
 
     pub fn as_double() -> Self {
-        Self::SimpleType(HttpParameterType::Double)
+        Self::SimpleType(HttpSimpleType::Double)
     }
 
     pub fn as_binary() -> Self {
-        Self::SimpleType(HttpParameterType::Binary)
+        Self::SimpleType(HttpSimpleType::Binary)
     }
 
     pub fn as_date() -> Self {
-        Self::SimpleType(HttpParameterType::Date)
+        Self::SimpleType(HttpSimpleType::Date)
     }
 
     pub fn as_date_time() -> Self {
-        Self::SimpleType(HttpParameterType::DateTime)
+        Self::SimpleType(HttpSimpleType::DateTime)
     }
 
     pub fn as_password() -> Self {
-        Self::SimpleType(HttpParameterType::Password)
+        Self::SimpleType(HttpSimpleType::Password)
     }
 
     pub fn as_object(struct_id: &str) -> HttpObjectDescription {
