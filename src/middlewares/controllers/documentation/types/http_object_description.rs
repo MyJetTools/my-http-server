@@ -98,4 +98,8 @@ impl HttpObjectDescription {
         ));
         self
     }
+
+    pub fn build(self) -> HttpDataType {
+        HttpDataType::Object(self)
+    }
 }

@@ -43,7 +43,7 @@ impl HttpDataType {
         Self::SimpleType(HttpParameterType::Password)
     }
 
-    pub fn as_object(struct_id: &str) -> Self {
-        Self::Object(HttpObjectDescription::new(struct_id))
+    pub fn as_object(struct_id: &str) -> HttpObjectDescription {
+        HttpObjectDescription::new(struct_id)
     }
 }
