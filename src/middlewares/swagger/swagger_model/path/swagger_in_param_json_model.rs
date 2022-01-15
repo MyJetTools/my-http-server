@@ -91,7 +91,7 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
         }),
         HttpDataType::None => None,
         HttpDataType::ArrayOf(array_element) => {
-            let mut additional_properties = InParamSchemaAdditionalProps {
+            let additional_properties = InParamSchemaAdditionalProps {
                 x_type: "array".to_string(),
                 items: get_array_element_schema(array_element),
             };
