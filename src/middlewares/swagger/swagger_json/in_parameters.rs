@@ -48,6 +48,7 @@ fn get_param_format(data_type: &HttpDataType) -> Option<&str> {
         HttpDataType::ObjectId { struct_id: _ } => None,
         HttpDataType::None => None,
         HttpDataType::ArrayOf(_) => None,
+        HttpDataType::Object(_) => None,
     }
 }
 
@@ -57,5 +58,6 @@ fn get_param_type(data_type: &HttpDataType) -> Option<&str> {
         HttpDataType::ObjectId { struct_id: _ } => None,
         HttpDataType::None => None,
         HttpDataType::ArrayOf(_) => None,
+        HttpDataType::Object(_) => None,
     }
 }

@@ -1,6 +1,5 @@
 use crate::middlewares::controllers::documentation::data_types::HttpDataProperty;
 
-
 pub struct HttpInputParameter {
     pub data_property: HttpDataProperty,
     pub description: String,

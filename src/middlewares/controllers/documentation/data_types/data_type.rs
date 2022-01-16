@@ -1,7 +1,8 @@
-use super::{ArrayElement, HttpSimpleType};
+use super::{ArrayElement, HttpObjectType, HttpSimpleType};
 
 pub enum HttpDataType {
     SimpleType(HttpSimpleType),
+    Object(HttpObjectType),
     ObjectId { struct_id: String },
     ArrayOf(ArrayElement),
     None,

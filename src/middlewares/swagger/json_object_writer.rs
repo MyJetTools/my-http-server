@@ -15,6 +15,10 @@ impl JsonObjectWriter {
         }
     }
 
+    pub fn has_written(&self) -> bool {
+        !self.first_element
+    }
+
     pub fn as_array() -> Self {
         let mut raw = Vec::new();
         raw.push('[' as u8);

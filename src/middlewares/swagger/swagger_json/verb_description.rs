@@ -37,6 +37,7 @@ fn compile_produces(action_description: &HttpActionDescription) -> JsonObjectWri
         let produce_type = match http_result.data_type {
             HttpDataType::SimpleType(_) => Some(WebContentType::Text.as_str()),
             HttpDataType::ObjectId { struct_id: _ } => Some(WebContentType::Json.as_str()),
+            HttpDataType::Object(_) => Some(WebContentType::Json.as_str()),
             HttpDataType::None => None,
             HttpDataType::ArrayOf(_) => None,
         };

@@ -7,11 +7,13 @@ pub fn build(data_type: &HttpDataType) -> Option<JsonObjectWriter> {
     match data_type {
         HttpDataType::SimpleType(param_type) => Some(build_simple_type(param_type)),
         HttpDataType::ObjectId { struct_id } => Some(build_object_type(struct_id)),
+        HttpDataType::Object(object_type) => Some(build_object_type(&object_type.struct_id)),
         HttpDataType::None => None,
         HttpDataType::ArrayOf(array_element) => {
             let items = match array_element {
                 ArrayElement::SimpleType(param_type) => build_simple_type(param_type),
                 ArrayElement::ObjectId { struct_id } => build_object_type(struct_id),
+                ArrayElement::Object(object_type) => build_object_type(&object_type.struct_id),
             };
 
             let mut result = JsonObjectWriter::as_object();
