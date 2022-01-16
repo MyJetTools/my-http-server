@@ -26,7 +26,7 @@ pub fn build(data_type: &HttpDataType) -> Option<JsonObjectWriter> {
 
 fn build_simple_type(param_type: &HttpSimpleType) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
-    result.write_string_value("type", param_type.as_str());
+    result.write_string_value("type", param_type.as_swagger_type());
     result
 }
 
