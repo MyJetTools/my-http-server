@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::middlewares::{
     controllers::{
         documentation::{
-            data_types::{ArrayElement, HttpDataType, HttpObjectType},
+            data_types::{ArrayElement, HttpDataType, HttpObjectStructure},
             HttpActionDescription,
         },
         ControllersMiddleware,
@@ -74,7 +74,7 @@ fn populate_array_type(json_writer: &mut JsonObjectWriter, array_element: &Array
     }
 }
 
-fn write_object_type(json_writer: &mut JsonObjectWriter, object_type: &HttpObjectType) {
+fn write_object_type(json_writer: &mut JsonObjectWriter, object_type: &HttpObjectStructure) {
     json_writer.write_object(
         object_type.struct_id.as_ref(),
         super::http_object_type::build(object_type),

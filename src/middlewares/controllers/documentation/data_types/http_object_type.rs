@@ -1,11 +1,11 @@
 use super::{HttpDataType, HttpField};
 
-pub struct HttpObjectType {
+pub struct HttpObjectStructure {
     pub struct_id: String,
     pub fields: Vec<HttpField>,
 }
 
-impl HttpObjectType {
+impl HttpObjectStructure {
     pub fn new(struct_id: &str) -> Self {
         Self {
             struct_id: struct_id.to_string(),

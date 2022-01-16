@@ -1,9 +1,9 @@
 use crate::middlewares::{
-    controllers::documentation::data_types::HttpObjectType,
+    controllers::documentation::data_types::HttpObjectStructure,
     swagger::json_object_writer::JsonObjectWriter,
 };
 
-pub fn build(http_object: &HttpObjectType) -> JsonObjectWriter {
+pub fn build(http_object: &HttpObjectStructure) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
 
     result.write_string_value("type", "object");
@@ -13,7 +13,7 @@ pub fn build(http_object: &HttpObjectType) -> JsonObjectWriter {
     result
 }
 
-fn compile_required(src: &HttpObjectType) -> JsonObjectWriter {
+fn compile_required(src: &HttpObjectStructure) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_array();
 
     for field in &src.fields {
@@ -25,7 +25,7 @@ fn compile_required(src: &HttpObjectType) -> JsonObjectWriter {
     result
 }
 
-fn compile_properties(src: &HttpObjectType) -> JsonObjectWriter {
+fn compile_properties(src: &HttpObjectStructure) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
 
     for field in &src.fields {

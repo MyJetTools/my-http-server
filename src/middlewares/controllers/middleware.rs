@@ -6,7 +6,7 @@ use hyper::Method;
 
 use super::{
     actions::{DeleteAction, GetAction, PostAction, PutAction},
-    documentation::data_types::HttpObjectType,
+    documentation::data_types::HttpObjectStructure,
     http_vebs::delete::*,
     http_vebs::get::*,
     http_vebs::post::*,
@@ -18,7 +18,7 @@ pub struct ControllersMiddleware {
     pub post: PostRoute,
     pub put: PutRoute,
     pub delete: DeleteRoute,
-    pub http_objects: Vec<HttpObjectType>,
+    pub http_objects: Vec<HttpObjectStructure>,
 }
 
 impl ControllersMiddleware {
