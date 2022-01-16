@@ -16,9 +16,9 @@ pub fn build(http_object: &HttpObjectType) -> JsonObjectWriter {
 fn compile_required(src: &HttpObjectType) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_array();
 
-    for prop in &src.properties {
-        if prop.required {
-            result.write_string_element(prop.name.as_str());
+    for field in &src.fields {
+        if field.required {
+            result.write_string_element(field.name.as_str());
         }
     }
 
@@ -28,9 +28,9 @@ fn compile_required(src: &HttpObjectType) -> JsonObjectWriter {
 fn compile_properties(src: &HttpObjectType) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
 
-    for prop in &src.properties {
-        if let Some(json_object) = super::http_data_type::build(&prop.data_type) {
-            result.write_object(prop.name.as_str(), json_object);
+    for field in &src.fields {
+        if let Some(json_object) = super::http_data_type::build(&field.data_type) {
+            result.write_object(field.name.as_str(), json_object);
         }
     }
 

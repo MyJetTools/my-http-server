@@ -47,7 +47,7 @@ fn populate_from_actions(
 
     if let Some(input_parameters) = &action_description.input_params {
         for in_param in input_parameters {
-            populate_object_type(json_writer, &in_param.data_property.data_type);
+            populate_object_type(json_writer, &in_param.field.data_type);
         }
     }
 }
@@ -80,7 +80,7 @@ fn write_object_type(json_writer: &mut JsonObjectWriter, object_type: &HttpObjec
         super::http_object_type::build(object_type),
     );
 
-    for prop in &object_type.properties {
-        populate_object_type(json_writer, &prop.data_type);
+    for field in &object_type.fields {
+        populate_object_type(json_writer, &field.data_type);
     }
 }

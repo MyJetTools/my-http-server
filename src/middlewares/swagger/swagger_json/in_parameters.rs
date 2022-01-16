@@ -21,21 +21,21 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
 
     result.write_string_value("in", param.source.as_str());
-    result.write_string_value("name", param.data_property.name.as_str());
+    result.write_string_value("name", param.field.name.as_str());
 
-    if let Some(param_format) = get_param_format(&param.data_property.data_type) {
+    if let Some(param_format) = get_param_format(&param.field.data_type) {
         result.write_string_value("format", param_format);
     }
 
     result.write_bool_value("x-nullable", !param.required);
 
-    if let Some(param_type) = get_param_type(&param.data_property.data_type) {
+    if let Some(param_type) = get_param_type(&param.field.data_type) {
         result.write_string_value("type", param_type);
     }
 
     result.write_string_value("description", param.description.as_str());
 
-    if let Some(schema) = super::http_data_type::build(&param.data_property.data_type) {
+    if let Some(schema) = super::http_data_type::build(&param.field.data_type) {
         result.write_object("schema", schema);
     }
 

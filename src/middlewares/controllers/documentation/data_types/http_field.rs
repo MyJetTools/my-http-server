@@ -1,12 +1,12 @@
 use super::HttpDataType;
 
-pub struct HttpDataProperty {
+pub struct HttpField {
     pub name: String,
     pub data_type: HttpDataType,
     pub required: bool,
 }
 
-impl HttpDataProperty {
+impl HttpField {
     pub fn new(name: &str, data_type: HttpDataType, required: bool) -> Self {
         Self {
             name: name.to_string(),

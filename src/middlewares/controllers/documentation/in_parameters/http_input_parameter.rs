@@ -1,7 +1,7 @@
-use crate::middlewares::controllers::documentation::data_types::HttpDataProperty;
+use crate::middlewares::controllers::documentation::data_types::HttpField;
 
 pub struct HttpInputParameter {
-    pub data_property: HttpDataProperty,
+    pub field: HttpField,
     pub description: String,
     pub required: bool,
     pub source: HttpParameterInputSource,
