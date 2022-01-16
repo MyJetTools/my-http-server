@@ -1,15 +1,16 @@
 use async_trait::async_trait;
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use crate::{HttpContext, HttpFailResult, HttpServerMiddleware, MiddleWareResult};
 use hyper::Method;
 
 use super::{
-    actions::{DeleteAction, GetAction, PostAction, PutAction, HttpStructsProvider},
+    actions::{DeleteAction, GetAction, PostAction, PutAction},
+    documentation::data_types::HttpObjectType,
     http_vebs::delete::*,
     http_vebs::get::*,
     http_vebs::post::*,
-    http_vebs::put::*, documentation::data_types::HttpObjectType,
+    http_vebs::put::*,
 };
 
 pub struct ControllersMiddleware {
@@ -17,7 +18,7 @@ pub struct ControllersMiddleware {
     pub post: PostRoute,
     pub put: PutRoute,
     pub delete: DeleteRoute,
-    pub http_objects: Vec<HttpObjectType>
+    pub http_objects: Vec<HttpObjectType>,
 }
 
 impl ControllersMiddleware {
@@ -37,6 +38,10 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn GetAction + Send + Sync + 'static>,
     ) {
+        if let Some(description) = action.get_additional_types() {
+            self.http_objects.extend(description)
+        }
+
         self.get.register(route, action);
     }
 
@@ -45,6 +50,10 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn PostAction + Send + Sync + 'static>,
     ) {
+        if let Some(description) = action.get_additional_types() {
+            self.http_objects.extend(description)
+        }
+
         self.post.register(route, action);
     }
 
@@ -53,6 +62,10 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn PutAction + Send + Sync + 'static>,
     ) {
+        if let Some(description) = action.get_additional_types() {
+            self.http_objects.extend(description)
+        }
+
         self.put.register(route, action);
     }
 
@@ -61,11 +74,11 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn DeleteAction + Send + Sync + 'static>,
     ) {
-        self.delete.register(route, action);
-    }
+        if let Some(description) = action.get_additional_types() {
+            self.http_objects.extend(description)
+        }
 
-    pub fn register_http_objects(&mut self, objects_providers: Arc<dyn HttpStructsProvider + Send + Sync + 'static>){
-        self.http_objects.extend(objects_providers.get());
+        self.delete.register(route, action);
     }
 
     pub fn list_of_get_route_actions<'s>(&'s self) -> Vec<&'s GetRouteAction> {
