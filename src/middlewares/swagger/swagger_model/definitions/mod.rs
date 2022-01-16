@@ -1,4 +1,4 @@
 mod definition_model;
-mod definition_property;
+mod swagger_http_data_type;
 pub use definition_model::SwaggerDefinitionModel;
-pub use definition_property::SwaggerDefinitionProperty;
+pub use swagger_http_data_type::SwaggerHttpDataType;

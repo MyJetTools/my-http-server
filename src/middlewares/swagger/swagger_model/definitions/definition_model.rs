@@ -4,14 +4,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::middlewares::controllers::documentation::data_types::HttpObjectType;
 
-use super::SwaggerDefinitionProperty;
+use super::swagger_http_data_type::SwaggerHttpDataType;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SwaggerDefinitionModel {
     #[serde(rename = "type")]
     pub x_type: String,
     pub required: Vec<String>,
-    pub properties: BTreeMap<String, SwaggerDefinitionProperty>,
+    pub properties: BTreeMap<String, SwaggerHttpDataType>,
 }
 
 impl SwaggerDefinitionModel {
@@ -36,11 +37,11 @@ fn compile_required(src: &HttpObjectType) -> Vec<String> {
     result
 }
 
-fn compile_properties(src: &HttpObjectType) -> BTreeMap<String, SwaggerDefinitionProperty> {
+fn compile_properties(src: &HttpObjectType) -> BTreeMap<String, SwaggerHttpDataType> {
     let mut result = BTreeMap::new();
 
     for prop in &src.properties {
-        if let Some(swagger) = SwaggerDefinitionProperty::new(&prop.data_type) {
+        if let Some(swagger) = SwaggerHttpDataType::new(&prop.data_type) {
             result.insert(prop.name.to_string(), swagger);
         }
     }
