@@ -2,7 +2,7 @@ use super::{ArrayElement, HttpSimpleType};
 
 pub enum HttpDataType {
     SimpleType(HttpSimpleType),
-    Object { struct_id: String },
+    ObjectId { struct_id: String },
     ArrayOf(ArrayElement),
     None,
 }
@@ -45,13 +45,13 @@ impl HttpDataType {
     }
 
     pub fn as_object(struct_id: &str) -> Self {
-        Self::Object {
+        Self::ObjectId {
             struct_id: struct_id.to_string(),
         }
     }
 
     pub fn as_array_of_object(struct_id: &str) -> Self {
-        Self::ArrayOf(ArrayElement::Object {
+        Self::ArrayOf(ArrayElement::ObjectId {
             struct_id: struct_id.to_string(),
         })
     }
