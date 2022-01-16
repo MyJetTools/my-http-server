@@ -118,6 +118,11 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 json_object_writer.write_object("definitions", definitions);
             }
 
+            json_object_writer.write_object(
+                "paths",
+                super::swagger_json::paths::build(self.controllers.as_ref()),
+            );
+
             *write_access = Some(HttpOkResult::Content {
                 content_type: Some(WebContentType::Json),
                 content: json_object_writer.build(),
