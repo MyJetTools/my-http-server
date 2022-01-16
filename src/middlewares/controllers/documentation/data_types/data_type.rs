@@ -44,4 +44,9 @@ impl HttpDataType {
         Self::SimpleType(HttpSimpleType::Password)
     }
 
+    pub fn as_object(struct_id:&str) -> Self {
+        Self::Object{struct_id:struct_id.to_string()}
+    }
+
+
 }
