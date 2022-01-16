@@ -1,8 +1,8 @@
-use super::{ArrayElement, HttpObjectType, HttpSimpleType};
+use super::{ArrayElement,  HttpSimpleType};
 
 pub enum HttpDataType {
     SimpleType(HttpSimpleType),
-    Object(String),
+    Object{struct_id:String},
     ArrayOf(ArrayElement),
     None,
 }
@@ -44,7 +44,4 @@ impl HttpDataType {
         Self::SimpleType(HttpSimpleType::Password)
     }
 
-    pub fn as_object(struct_id: &str) -> HttpObjectType {
-        HttpObjectType::new(struct_id)
-    }
 }

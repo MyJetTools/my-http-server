@@ -61,7 +61,7 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
 fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
     match data_type {
         HttpDataType::SimpleType(_) => None,
-        HttpDataType::Object(struct_id) => Some(InParamSchema {
+        HttpDataType::Object{struct_id} => Some(InParamSchema {
             x_ref: Some(format!("#/definitions/{}", struct_id)),
 
             x_type: None,
@@ -105,7 +105,7 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
 fn get_param_format(data_type: &HttpDataType) -> Option<String> {
     match data_type {
         HttpDataType::SimpleType(param_type) => Some(param_type.as_str().to_string()),
-        HttpDataType::Object(_) => None,
+        HttpDataType::Object{struct_id:_} => None,
         HttpDataType::None => None,
         HttpDataType::ArrayOf(_) => None,
     }
@@ -114,7 +114,7 @@ fn get_param_format(data_type: &HttpDataType) -> Option<String> {
 fn get_param_type(data_type: &HttpDataType) -> Option<String> {
     match data_type {
         HttpDataType::SimpleType(param_type) => Some(param_type.as_swagger_type().to_string()),
-        HttpDataType::Object(_) => None,
+        HttpDataType::Object{struct_id:_} => None,
         HttpDataType::None => None,
         HttpDataType::ArrayOf(_) => None,
     }

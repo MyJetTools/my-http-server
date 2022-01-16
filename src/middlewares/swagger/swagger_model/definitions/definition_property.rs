@@ -20,7 +20,7 @@ impl SwaggerDefinitionProperty {
                 x_type: Some(param_type.as_str().to_string()),
             }
             .into(),
-            HttpDataType::Object(struct_id) => Self {
+            HttpDataType::Object{struct_id} => Self {
                 x_ref: Some(struct_id.to_string()),
                 x_type: None,
             }

@@ -37,7 +37,7 @@ fn get_schema(src: &HttpResult) -> OutSchemaJsonModel {
             x_type: Some(param_type.as_str().to_string()),
             x_ref: None,
         },
-        HttpDataType::Object(struct_id) => OutSchemaJsonModel {
+        HttpDataType::Object{struct_id} => OutSchemaJsonModel {
             x_type: None,
             x_ref: Some(format!("#/definitions/{}", struct_id)),
         },
