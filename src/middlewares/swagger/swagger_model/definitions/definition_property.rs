@@ -21,7 +21,7 @@ impl SwaggerDefinitionProperty {
             }
             .into(),
             HttpDataType::Object{struct_id} => Self {
-                x_ref: Some(struct_id.to_string()),
+                x_ref: Some(format!("#/definitions/{}",struct_id)),
                 x_type: None,
             }
             .into(),
@@ -35,7 +35,7 @@ impl SwaggerDefinitionProperty {
                     }
                     .into(),
                     ArrayElement::Object { struct_id } => Self {
-                        x_ref: Some(struct_id.to_string()),
+                        x_ref: Some(format!("#/definitions/{}",struct_id)),
                         x_type: None,
                     }
                     .into(),
