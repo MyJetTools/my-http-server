@@ -7,7 +7,7 @@ use crate::{
 use async_trait::async_trait;
 use tokio::sync::Mutex;
 
-use super::{super::controllers::ControllersMiddleware, swagger_model::SwaggerJsonModel};
+use super::{super::controllers::ControllersMiddleware, json_object_writer::JsonObjectWriter};
 
 pub struct SwaggerMiddleware {
     controllers: Arc<ControllersMiddleware>,
@@ -101,16 +101,26 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 return Ok(MiddleWareResult::Ok(result.clone()));
             }
 
-            let mut json_model = SwaggerJsonModel::new(
-                self.title.clone(),
-                self.version.clone(),
-                host.to_string(),
-                scheme.to_string(),
+            let mut json_object_writer = JsonObjectWriter::as_object();
+
+            super::swagger_json::title::write(
+                &mut json_object_writer,
+                host,
+                self.title.as_str(),
+                self.version.as_str(),
             );
+            json_object_writer.write_object("scheme", super::swagger_json::hosts::get(host));
 
-            json_model.populate_operations(self.controllers.as_ref());
+            if let Some(definitions) =
+                super::swagger_json::definitions::build(self.controllers.as_ref())
+            {
+                json_object_writer.write_object("definitions", definitions);
+            }
 
-            *write_access = Some(HttpOkResult::create_json_response(json_model));
+            *write_access = Some(HttpOkResult::Content {
+                content_type: Some(WebContentType::Json),
+                content: json_object_writer.build(),
+            });
 
             return Ok(MiddleWareResult::Ok(write_access.as_ref().unwrap().clone()));
         }

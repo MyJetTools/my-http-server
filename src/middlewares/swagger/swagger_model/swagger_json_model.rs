@@ -1,10 +1,8 @@
-use std::collections::{BTreeMap};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::controllers::{
-    ControllersMiddleware,
-};
+use crate::middlewares::controllers::ControllersMiddleware;
 
 use super::{
     definitions::SwaggerDefinitionModel,
@@ -47,11 +45,8 @@ impl SwaggerJsonModel {
     }
 
     pub fn populate_operations(&mut self, controllers: &ControllersMiddleware) {
-
-
         for route_action in controllers.list_of_get_route_actions() {
             if let Some(action_description) = route_action.action.get_description() {
- 
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.get = Some(SwaggerVerbDescription::new(action_description));
             }
@@ -59,7 +54,6 @@ impl SwaggerJsonModel {
 
         for route_action in controllers.list_of_post_route_actions() {
             if let Some(action_description) = route_action.action.get_description() {
-              
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.post = Some(SwaggerVerbDescription::new(action_description));
             }
@@ -67,7 +61,6 @@ impl SwaggerJsonModel {
 
         for route_action in controllers.list_of_put_route_actions() {
             if let Some(action_description) = route_action.action.get_description() {
-
                 let path_model = self.get_or_create(route_action.route.path.as_str());
                 path_model.put = Some(SwaggerVerbDescription::new(action_description));
             }
@@ -80,23 +73,15 @@ impl SwaggerJsonModel {
             }
         }
 
-
-
-        if controllers.http_objects.len()>0{
+        if controllers.http_objects.len() > 0 {
             let mut definitions = BTreeMap::new();
 
-            for http_object in &controllers.http_objects{
+            for http_object in &controllers.http_objects {
                 let swagger_definition_model = SwaggerDefinitionModel::from_object(http_object);
                 definitions.insert(http_object.struct_id.to_string(), swagger_definition_model);
             }
 
-
             self.definitions = Some(definitions);
         }
-        
-        
     }
 }
-
-
-
