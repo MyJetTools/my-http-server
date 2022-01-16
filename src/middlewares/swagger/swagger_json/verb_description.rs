@@ -26,7 +26,7 @@ pub fn build(action_description: &HttpActionDescription) -> JsonObjectWriter {
 
 fn compile_tags(action_description: &HttpActionDescription) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_array();
-    result.write_string_element(action_description.name);
+    result.write_string_element(action_description.controller_name);
     result
 }
 
