@@ -109,7 +109,8 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 self.title.as_str(),
                 self.version.as_str(),
             );
-            json_object_writer.write_object("scheme", super::swagger_json::hosts::get(host));
+            json_object_writer
+                .write_object("scheme", super::swagger_json::schemes::get(scheme.as_str()));
 
             if let Some(definitions) =
                 super::swagger_json::definitions::build(self.controllers.as_ref())
