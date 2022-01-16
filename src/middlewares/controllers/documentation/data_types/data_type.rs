@@ -18,7 +18,7 @@ impl HttpDataType {
     }
 
     pub fn as_long() -> Self {
-        Self::SimpleType(HttpSimpleType::Boolean)
+        Self::SimpleType(HttpSimpleType::Long)
     }
 
     pub fn as_float() -> Self {
