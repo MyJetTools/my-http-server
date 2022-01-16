@@ -1,6 +1,6 @@
-use super::{HttpSimpleType};
+use super::HttpSimpleType;
 
 pub enum ArrayElement {
     SimpleType(HttpSimpleType),
-    Object{struct_id:String},
+    Object { struct_id: String },
 }
