@@ -1,8 +1,8 @@
-use super::types::HttpDataType;
+use crate::middlewares::controllers::documentation::data_types::HttpDataProperty;
+
 
 pub struct HttpInputParameter {
-    pub name: String,
-    pub data_type: HttpDataType,
+    pub data_property: HttpDataProperty,
     pub description: String,
     pub required: bool,
     pub source: HttpParameterInputSource,

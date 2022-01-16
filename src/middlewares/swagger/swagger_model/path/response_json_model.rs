@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::controllers::documentation::{types::HttpDataType, HttpResult};
+use crate::middlewares::controllers::documentation::{data_types::HttpDataType, out_results::HttpResult};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OutSchemaJsonModel {
@@ -37,9 +37,9 @@ fn get_schema(src: &HttpResult) -> OutSchemaJsonModel {
             x_type: Some(param_type.as_str().to_string()),
             x_ref: None,
         },
-        HttpDataType::Object(object_description) => OutSchemaJsonModel {
+        HttpDataType::Object(struct_id) => OutSchemaJsonModel {
             x_type: None,
-            x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
+            x_ref: Some(format!("#/definitions/{}", struct_id)),
         },
         HttpDataType::None => OutSchemaJsonModel {
             x_type: None,

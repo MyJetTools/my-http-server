@@ -1,10 +1,7 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use crate::middlewares::controllers::documentation::{
-    types::{ArrayElement, HttpDataType},
-    HttpInputParameter,
+    data_types::{ArrayElement, HttpDataType}, in_parameters::HttpInputParameter,
 };
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InParamSchemaItems {
@@ -51,12 +48,12 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
     fn into(self) -> SwaggerInParamJsonModel {
         SwaggerInParamJsonModel {
             p_in: self.source.as_str().to_string(),
-            name: self.name,
-            format: get_param_format(&self.data_type),
+            name: self.data_property.name,
+            format: get_param_format(&self.data_property.data_type),
             nullable: !self.required,
-            p_type: get_param_type(&self.data_type),
+            p_type: get_param_type(&self.data_property.data_type),
             description: self.description,
-            schema: get_schema(&self.data_type),
+            schema: get_schema(&self.data_property.data_type),
         }
     }
 }
@@ -64,8 +61,8 @@ impl Into<SwaggerInParamJsonModel> for HttpInputParameter {
 fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
     match data_type {
         HttpDataType::SimpleType(_) => None,
-        HttpDataType::Object(object_description) => Some(InParamSchema {
-            x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
+        HttpDataType::Object(struct_id) => Some(InParamSchema {
+            x_ref: Some(format!("#/definitions/{}", struct_id)),
 
             x_type: None,
             items: None,
@@ -87,10 +84,10 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
                 Some(result)
             }
 
-            ArrayElement::Object(object_description) => {
+            ArrayElement::Object(struct_id) => {
                 let items = InParamSchemaItems {
                     x_type: None,
-                    x_ref: Some(format!("#/definitions/{}", object_description.struct_id)),
+                    x_ref: Some(format!("#/definitions/{}", struct_id)),
                 };
 
                 let schema = InParamSchema {

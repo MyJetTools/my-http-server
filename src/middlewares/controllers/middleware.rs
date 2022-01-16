@@ -1,15 +1,15 @@
 use async_trait::async_trait;
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use crate::{HttpContext, HttpFailResult, HttpServerMiddleware, MiddleWareResult};
 use hyper::Method;
 
 use super::{
-    actions::{DeleteAction, GetAction, PostAction, PutAction},
+    actions::{DeleteAction, GetAction, PostAction, PutAction, HttpStructsProvider},
     http_vebs::delete::*,
     http_vebs::get::*,
     http_vebs::post::*,
-    http_vebs::put::*,
+    http_vebs::put::*, documentation::data_types::HttpObjectType,
 };
 
 pub struct ControllersMiddleware {
@@ -17,6 +17,7 @@ pub struct ControllersMiddleware {
     pub post: PostRoute,
     pub put: PutRoute,
     pub delete: DeleteRoute,
+    pub http_objects: Vec<HttpObjectType>
 }
 
 impl ControllersMiddleware {
@@ -26,6 +27,7 @@ impl ControllersMiddleware {
             post: PostRoute::new(),
             put: PutRoute::new(),
             delete: DeleteRoute::new(),
+            http_objects: Vec::new(),
         }
     }
 
@@ -60,6 +62,10 @@ impl ControllersMiddleware {
         action: Arc<dyn DeleteAction + Send + Sync + 'static>,
     ) {
         self.delete.register(route, action);
+    }
+
+    pub fn register_http_objects(&mut self, objects_providers: Arc<dyn HttpStructsProvider + Send + Sync + 'static>){
+        self.http_objects.extend(objects_providers.get());
     }
 
     pub fn list_of_get_route_actions<'s>(&'s self) -> Vec<&'s GetRouteAction> {

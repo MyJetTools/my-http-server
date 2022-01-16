@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::middlewares::controllers::documentation::types::HttpObjectDescription;
+use crate::middlewares::controllers::documentation::data_types::HttpObjectType;
 
 use super::SwaggerDefinitionProperty;
 
@@ -15,7 +15,7 @@ pub struct SwaggerDefinitionModel {
 }
 
 impl SwaggerDefinitionModel {
-    pub fn from_object(src: &HttpObjectDescription) -> Self {
+    pub fn from_object(src: &HttpObjectType) -> Self {
         Self {
             x_type: "object".to_string(),
             required: compile_required(src),
@@ -24,7 +24,7 @@ impl SwaggerDefinitionModel {
     }
 }
 
-fn compile_required(src: &HttpObjectDescription) -> Vec<String> {
+fn compile_required(src: &HttpObjectType) -> Vec<String> {
     let mut result = Vec::new();
 
     for prop in &src.properties {
@@ -36,11 +36,11 @@ fn compile_required(src: &HttpObjectDescription) -> Vec<String> {
     result
 }
 
-fn compile_properties(src: &HttpObjectDescription) -> BTreeMap<String, SwaggerDefinitionProperty> {
+fn compile_properties(src: &HttpObjectType) -> BTreeMap<String, SwaggerDefinitionProperty> {
     let mut result = BTreeMap::new();
 
     for prop in &src.properties {
-        if let Some(swagger) = SwaggerDefinitionProperty::new(&prop.prop_type) {
+        if let Some(swagger) = SwaggerDefinitionProperty::new(&prop.data_type) {
             result.insert(prop.name.to_string(), swagger);
         }
     }

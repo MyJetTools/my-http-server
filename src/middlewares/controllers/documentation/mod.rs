@@ -1,9 +1,9 @@
 mod action_description_provider;
-mod http_result;
-mod in_parameter;
-pub mod types;
+
+pub mod out_results;
+pub mod in_parameters;
+pub mod data_types;
 
 pub use action_description_provider::{HttpActionDescription, HttpActionDescriptionProvider};
-pub use in_parameter::{HttpInputParameter, HttpParameterInputSource};
 
-pub use http_result::HttpResult;
+

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     middlewares::controllers::documentation::{
-        types::HttpDataType, HttpActionDescription, HttpInputParameter, HttpResult,
+        data_types::HttpDataType, HttpActionDescription,   in_parameters::HttpInputParameter, out_results::HttpResult,
     },
     WebContentType,
 };

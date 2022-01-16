@@ -1,7 +1,7 @@
 use crate::{HttpContext, HttpFailResult, HttpOkResult};
 use async_trait::async_trait;
 
-use super::documentation::HttpActionDescription;
+use super::documentation::{HttpActionDescription, data_types::HttpObjectType};
 
 #[async_trait]
 pub trait GetAction {
@@ -25,4 +25,9 @@ pub trait PutAction {
 pub trait DeleteAction {
     async fn handle_request(&self, ctx: HttpContext) -> Result<HttpOkResult, HttpFailResult>;
     fn get_description(&self) -> Option<HttpActionDescription>;
+}
+
+
+pub trait HttpStructsProvider{
+    fn get(&self)->Vec<HttpObjectType>;
 }

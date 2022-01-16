@@ -1,4 +1,4 @@
-use super::{HttpInputParameter, HttpResult};
+use super::{in_parameters::HttpInputParameter, out_results::HttpResult};
 
 pub struct HttpActionDescription<'s> {
     pub name: &'s str,
