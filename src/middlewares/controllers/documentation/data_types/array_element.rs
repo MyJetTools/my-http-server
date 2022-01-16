@@ -2,5 +2,5 @@ use super::{HttpSimpleType};
 
 pub enum ArrayElement {
     SimpleType(HttpSimpleType),
-    Object(String),
+    Object{struct_id:String},
 }

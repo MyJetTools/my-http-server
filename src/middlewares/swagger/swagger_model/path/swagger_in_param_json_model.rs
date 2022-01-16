@@ -84,7 +84,7 @@ fn get_schema(data_type: &HttpDataType) -> Option<InParamSchema> {
                 Some(result)
             }
 
-            ArrayElement::Object(struct_id) => {
+            ArrayElement::Object{struct_id} => {
                 let items = InParamSchemaItems {
                     x_type: None,
                     x_ref: Some(format!("#/definitions/{}", struct_id)),
