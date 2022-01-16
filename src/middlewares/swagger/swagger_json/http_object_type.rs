@@ -6,7 +6,7 @@ use crate::middlewares::{
 pub fn build(http_object: &HttpObjectType) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
 
-    result.write_string_value("key", "object");
+    result.write_string_value("type", "object");
     result.write_object("required", compile_required(http_object));
     result.write_object("properties", compile_properties(http_object));
 
