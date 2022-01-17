@@ -41,6 +41,14 @@ impl HttpDataType {
         Self::SimpleType(HttpSimpleType::DateTime)
     }
 
+    pub fn as_bool() -> Self {
+        Self::SimpleType(HttpSimpleType::Boolean)
+    }
+
+    pub fn as_boolean() -> Self {
+        Self::SimpleType(HttpSimpleType::Boolean)
+    }
+
     pub fn as_password() -> Self {
         Self::SimpleType(HttpSimpleType::Password)
     }
