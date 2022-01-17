@@ -3,7 +3,6 @@ use crate::middlewares::controllers::documentation::data_types::HttpField;
 pub struct HttpInputParameter {
     pub field: HttpField,
     pub description: String,
-    pub required: bool,
     pub source: HttpParameterInputSource,
 }
 
