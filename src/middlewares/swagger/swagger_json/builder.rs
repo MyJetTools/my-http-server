@@ -33,58 +33,58 @@ pub fn build(
 
 fn build_paths_descriptions(
     controllers: &ControllersMiddleware,
-) -> BTreeMap<String, Vec<(String, HttpActionDescription)>> {
+) -> BTreeMap<String, BTreeMap<String, HttpActionDescription>> {
     let mut result = BTreeMap::new();
 
     for route_action in controllers.list_of_get_route_actions() {
         if let Some(description) = route_action.get_description() {
             if !result.contains_key(route_action.route.path.as_str()) {
-                result.insert(route_action.route.path.to_string(), Vec::new());
+                result.insert(route_action.route.path.to_string(), BTreeMap::new());
             }
 
             result
                 .get_mut(route_action.route.path.as_str())
                 .unwrap()
-                .push(("get".to_string(), description));
+                .insert("get".to_string(), description);
         }
     }
 
     for route_action in controllers.list_of_post_route_actions() {
         if let Some(description) = route_action.get_description() {
             if !result.contains_key(route_action.route.path.as_str()) {
-                result.insert(route_action.route.path.to_string(), Vec::new());
+                result.insert(route_action.route.path.to_string(), BTreeMap::new());
             }
 
             result
                 .get_mut(route_action.route.path.as_str())
                 .unwrap()
-                .push(("post".to_string(), description));
+                .insert("post".to_string(), description);
         }
     }
 
     for route_action in controllers.list_of_put_route_actions() {
         if let Some(description) = route_action.get_description() {
             if !result.contains_key(route_action.route.path.as_str()) {
-                result.insert(route_action.route.path.to_string(), Vec::new());
+                result.insert(route_action.route.path.to_string(), BTreeMap::new());
             }
 
             result
                 .get_mut(route_action.route.path.as_str())
                 .unwrap()
-                .push(("put".to_string(), description));
+                .insert("put".to_string(), description);
         }
     }
 
     for route_action in controllers.list_of_delete_route_actions() {
         if let Some(description) = route_action.get_description() {
             if !result.contains_key(route_action.route.path.as_str()) {
-                result.insert(route_action.route.path.to_string(), Vec::new());
+                result.insert(route_action.route.path.to_string(), BTreeMap::new());
             }
 
             result
                 .get_mut(route_action.route.path.as_str())
                 .unwrap()
-                .push(("delete".to_string(), description));
+                .insert("delete".to_string(), description);
         }
     }
 

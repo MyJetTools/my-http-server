@@ -13,7 +13,7 @@ use crate::middlewares::{
 
 pub fn build(
     controllers: &ControllersMiddleware,
-    path_descriptions: &BTreeMap<String, Vec<(String, HttpActionDescription)>>,
+    path_descriptions: &BTreeMap<String, BTreeMap<String, HttpActionDescription>>,
 ) -> Option<JsonObjectWriter> {
     let mut result = JsonObjectWriter::as_object();
 

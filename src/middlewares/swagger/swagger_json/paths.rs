@@ -5,7 +5,9 @@ use crate::middlewares::{
     swagger::json_object_writer::JsonObjectWriter,
 };
 
-pub fn build(actions: &BTreeMap<String, Vec<(String, HttpActionDescription)>>) -> JsonObjectWriter {
+pub fn build(
+    actions: &BTreeMap<String, BTreeMap<String, HttpActionDescription>>,
+) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
     for (path, actions) in actions {
         let mut path_object = JsonObjectWriter::as_object();
