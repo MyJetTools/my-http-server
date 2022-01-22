@@ -29,13 +29,13 @@ fn compile_description(enum_structure: &HttpEnumStructure) -> String {
     let mut first = true;
 
     for case in &enum_structure.cases {
-        result.push_str(format!("{} = {}", case.id, case.description).as_str());
-
         if first {
             first = false;
         } else {
             result.push_str("\\n");
         }
+
+        result.push_str(format!("{} = {}", case.id, case.description).as_str());
     }
 
     result

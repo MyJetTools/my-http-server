@@ -1,6 +1,8 @@
 use crate::middlewares::{
     controllers::documentation::{
-        data_types::HttpDataType, in_parameters::HttpInputParameter, HttpActionDescription,
+        data_types::{EnumType, HttpDataType},
+        in_parameters::HttpInputParameter,
+        HttpActionDescription,
     },
     swagger::json_object_writer::JsonObjectWriter,
 };
@@ -22,12 +24,11 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
 
     result.write_string_value("in", param.source.as_str());
     result.write_string_value("name", param.field.name.as_str());
+    result.write_bool_value("x-nullable", !param.field.required);
 
     if let Some(param_format) = get_param_format(&param.field.data_type) {
         result.write_string_value("format", param_format);
     }
-
-    result.write_bool_value("x-nullable", !param.field.required);
 
     if let Some(param_type) = get_param_type(&param.field.data_type) {
         result.write_string_value("type", param_type);
@@ -60,6 +61,9 @@ fn get_param_type(data_type: &HttpDataType) -> Option<&str> {
         HttpDataType::None => None,
         HttpDataType::ArrayOf(_) => None,
         HttpDataType::Object(_) => None,
-        HttpDataType::Enum(_) => Some("integer"),
+        HttpDataType::Enum(data) => match &data.enum_type {
+            EnumType::Integer => Some("integer"),
+            EnumType::String => Some("string"),
+        },
     }
 }

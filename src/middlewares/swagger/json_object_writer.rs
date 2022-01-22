@@ -62,7 +62,7 @@ impl JsonObjectWriter {
 
     pub fn write_bool_value(&mut self, key: &str, value: bool) {
         self.add_delimetr();
-        let data_to_add = format!("\"{}\":\"{}\"", key, value);
+        let data_to_add = format!("\"{}\":{}", key, value);
         self.raw.extend(data_to_add.into_bytes());
     }
 
