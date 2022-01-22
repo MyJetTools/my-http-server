@@ -8,6 +8,7 @@ pub fn build(data_type: &HttpDataType) -> Option<JsonObjectWriter> {
         HttpDataType::SimpleType(param_type) => Some(build_simple_type(param_type)),
         HttpDataType::ObjectId { struct_id } => Some(build_object_type(struct_id)),
         HttpDataType::Object(object_type) => Some(build_object_type(&object_type.struct_id)),
+        HttpDataType::Enum(enum_type) => Some(build_object_type(&enum_type.struct_id)),
         HttpDataType::None => None,
         HttpDataType::ArrayOf(array_element) => {
             let items = match array_element {

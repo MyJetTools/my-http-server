@@ -49,6 +49,7 @@ fn get_param_format(data_type: &HttpDataType) -> Option<&str> {
         HttpDataType::None => None,
         HttpDataType::ArrayOf(_) => None,
         HttpDataType::Object(_) => None,
+        HttpDataType::Enum(_) => None,
     }
 }
 
@@ -59,5 +60,6 @@ fn get_param_type(data_type: &HttpDataType) -> Option<&str> {
         HttpDataType::None => None,
         HttpDataType::ArrayOf(_) => None,
         HttpDataType::Object(_) => None,
+        HttpDataType::Enum(_) => Some("integer"),
     }
 }

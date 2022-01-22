@@ -40,6 +40,7 @@ fn compile_produces(action_description: &HttpActionDescription) -> JsonObjectWri
             HttpDataType::Object(_) => Some(WebContentType::Json.as_str()),
             HttpDataType::None => None,
             HttpDataType::ArrayOf(_) => None,
+            HttpDataType::Enum(_) => None,
         };
 
         if let Some(produce_type) = produce_type {

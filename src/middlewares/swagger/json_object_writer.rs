@@ -43,6 +43,12 @@ impl JsonObjectWriter {
         self.raw.extend(data_to_add.into_bytes());
     }
 
+    pub fn write_number_element(&mut self, value: String) {
+        self.add_delimetr();
+
+        self.raw.extend(value.into_bytes());
+    }
+
     pub fn write_array_object_element(&mut self, object: JsonObjectWriter) {
         self.add_delimetr();
         self.raw.extend(object.build());

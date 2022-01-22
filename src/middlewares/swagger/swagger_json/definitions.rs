@@ -71,6 +71,9 @@ fn populate_object_type(
         HttpDataType::ArrayOf(array_element) => {
             populate_array_type(json_writer, definitions, array_element);
         }
+        HttpDataType::Enum(enum_structure) => {
+            write_enum_type(json_writer, definitions, enum_structure);
+        }
         HttpDataType::None => {}
     }
 }
@@ -106,4 +109,21 @@ fn write_object_type(
     for field in &object_type.fields {
         populate_object_type(json_writer, definitions, &field.data_type);
     }
+}
+
+fn write_enum_type(
+    json_writer: &mut JsonObjectWriter,
+    definitions: &mut HashMap<String, ()>,
+    enum_structure: &crate::middlewares::controllers::documentation::data_types::HttpEnumStructure,
+) {
+    if definitions.contains_key(enum_structure.struct_id.as_str()) {
+        return;
+    };
+
+    json_writer.write_object(
+        enum_structure.struct_id.as_ref(),
+        super::http_enum_type::build(enum_structure),
+    );
+
+    definitions.insert(enum_structure.struct_id.to_string(), ());
 }
