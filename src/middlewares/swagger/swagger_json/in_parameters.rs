@@ -37,7 +37,7 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
     result.write_string_value("description", param.description.as_str());
 
     if let Some(schema) = super::http_data_type::build(&param.field.data_type) {
-        result.write_object("schema", schema);
+        result.write_object("x-schema", schema);
     }
 
     result
