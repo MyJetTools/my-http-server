@@ -34,7 +34,7 @@ fn compile_description(enum_structure: &HttpEnumStructure) -> String {
         if first {
             first = false;
         } else {
-            result.push_str("\n");
+            result.push_str("\\n");
         }
     }
 
