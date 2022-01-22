@@ -22,6 +22,10 @@ pub fn build(action_description: &HttpActionDescription) -> JsonObjectWriter {
 fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
 
+    if let Some(enum_object) = build_enum_field(&param.field.data_type) {
+        result.write_object("enum", enum_object);
+    }
+
     result.write_string_value("in", param.source.as_str());
     result.write_string_value("name", param.field.name.as_str());
     result.write_bool_value("x-nullable", !param.field.required);
@@ -66,4 +70,18 @@ fn get_param_type(data_type: &HttpDataType) -> Option<&str> {
             EnumType::String => Some("string"),
         },
     }
+}
+
+fn build_enum_field(data_type: &HttpDataType) -> Option<JsonObjectWriter> {
+    if let HttpDataType::Enum(enum_struct) = data_type {
+        let mut result = JsonObjectWriter::as_array();
+
+        for case in &enum_struct.cases {
+            result.write_string_element(case.value.as_str());
+        }
+
+        return Some(result);
+    }
+
+    None
 }
