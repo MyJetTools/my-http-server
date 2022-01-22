@@ -8,7 +8,7 @@ mod http_simple_type;
 pub use array_element::ArrayElement;
 pub use data_type::HttpDataType;
 
-pub use http_enum_struct::{EnumType, HttpEnumStructure};
+pub use http_enum_struct::{EnumType, HttpEnumCase, HttpEnumStructure};
 pub use http_field::HttpField;
 pub use http_object_type::HttpObjectStructure;
 pub use http_simple_type::HttpSimpleType;
