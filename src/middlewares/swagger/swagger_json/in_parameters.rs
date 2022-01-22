@@ -30,6 +30,10 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
     result.write_string_value("name", param.field.name.as_str());
     result.write_bool_value("x-nullable", !param.field.required);
 
+    if param.field.required {
+        result.write_bool_value("required", true);
+    }
+
     if let Some(param_format) = get_param_format(&param.field.data_type) {
         result.write_string_value("format", param_format);
     }
