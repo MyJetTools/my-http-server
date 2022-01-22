@@ -28,8 +28,8 @@ fn compile_description(enum_structure: &HttpEnumStructure) -> String {
 
     let mut first = true;
 
-    for (id, case) in &enum_structure.cases {
-        result.push_str(format!("{} = {}", id, case.description).as_str());
+    for case in &enum_structure.cases {
+        result.push_str(format!("{} = {}", case.id, case.description).as_str());
 
         if first {
             first = false;
@@ -44,8 +44,8 @@ fn compile_description(enum_structure: &HttpEnumStructure) -> String {
 fn compile_enum(enum_structure: &HttpEnumStructure) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_array();
 
-    for key in enum_structure.cases.keys() {
-        result.write_number_element(key.to_string());
+    for case in &enum_structure.cases {
+        result.write_number_element(case.id.to_string());
     }
 
     result
@@ -54,7 +54,7 @@ fn compile_enum(enum_structure: &HttpEnumStructure) -> JsonObjectWriter {
 fn compile_enum_names(enum_structure: &HttpEnumStructure) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_array();
 
-    for case in enum_structure.cases.values() {
+    for case in &enum_structure.cases {
         result.write_string_element(case.value.as_str());
     }
 
