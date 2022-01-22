@@ -133,6 +133,17 @@ impl HttpContext {
         return Err(HttpFailResult::as_header_parameter_required(header_name));
     }
 
+    pub fn get_optional_header(&self, header_name: &str) -> Option<&str> {
+        for (http_header, value) in self.req.headers() {
+            let http_header = http_header.as_str();
+            if http_header == header_name {
+                return Some(value.to_str().unwrap());
+            }
+        }
+
+        return None;
+    }
+
     pub async fn get_form_data(self) -> Result<QueryString, HttpFailResult> {
         let body = self.req.into_body();
         let full_body = hyper::body::to_bytes(body).await.unwrap();
