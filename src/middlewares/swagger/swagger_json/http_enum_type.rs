@@ -1,12 +1,20 @@
 use crate::middlewares::{
-    controllers::documentation::data_types::HttpEnumStructure,
+    controllers::documentation::data_types::{EnumType, HttpEnumStructure},
     swagger::json_object_writer::JsonObjectWriter,
 };
 
 pub fn build(enum_structure: &HttpEnumStructure) -> JsonObjectWriter {
     let mut result = JsonObjectWriter::as_object();
 
-    result.write_string_value("type", "integer");
+    match enum_structure.enum_type {
+        EnumType::Integer => {
+            result.write_string_value("type", "integer");
+        }
+        EnumType::String => {
+            result.write_string_value("type", "string");
+        }
+    }
+
     result.write_string_value("description", compile_description(enum_structure).as_str());
 
     result.write_object("enum", compile_enum(enum_structure));

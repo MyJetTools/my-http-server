@@ -5,7 +5,13 @@ pub struct HttpEnumCase {
     pub description: String,
 }
 
+pub enum EnumType {
+    Integer,
+    String,
+}
+
 pub struct HttpEnumStructure {
     pub struct_id: String,
+    pub enum_type: EnumType,
     pub cases: BTreeMap<usize, HttpEnumCase>,
 }
