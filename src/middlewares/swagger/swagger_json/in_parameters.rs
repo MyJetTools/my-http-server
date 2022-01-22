@@ -30,7 +30,7 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
     result.write_string_value("name", param.field.name.as_str());
     result.write_bool_value("x-nullable", !param.field.required);
 
-    if param.field.required || param.field.default_value.is_none() {
+    if param.field.required && param.field.default_value.is_none() {
         result.write_bool_value("required", true);
     }
 
