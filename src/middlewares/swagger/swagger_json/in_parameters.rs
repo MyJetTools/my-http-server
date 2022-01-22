@@ -30,7 +30,7 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
     result.write_string_value("name", param.field.name.as_str());
     result.write_bool_value("x-nullable", !param.field.required);
 
-    if param.field.required {
+    if param.field.required || param.field.default_value.is_none() {
         result.write_bool_value("required", true);
     }
 
@@ -42,7 +42,11 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
         result.write_string_value("type", param_type);
     }
 
-    result.write_string_value("description", param.description.as_str());
+    if let Some(default_value) = &param.field.default_value {
+        let line_to_add = format!("{}. Default value: {}", param.description, default_value);
+        result.write_string_value("description", line_to_add.as_str());
+    } else {
+    }
 
     if let Some(schema) = super::http_data_type::build(&param.field.data_type) {
         result.write_object("x-schema", schema);

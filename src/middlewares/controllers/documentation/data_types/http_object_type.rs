@@ -19,56 +19,92 @@ impl HttpObjectStructure {
     }
 
     pub fn with_string_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_string(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_string(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_integer_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_integer(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_integer(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_long_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_long(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_long(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_float_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_float(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_float(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_double_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_double(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_double(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_binary_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_binary(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_binary(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_date_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_date(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_date(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_date_time_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_date_time(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_date_time(),
+            required,
+            None,
+        ));
         self
     }
 
     pub fn with_password_field(mut self, name: &str, required: bool) -> Self {
-        self.fields
-            .push(HttpField::new(name, HttpDataType::as_password(), required));
+        self.fields.push(HttpField::new(
+            name,
+            HttpDataType::as_password(),
+            required,
+            None,
+        ));
         self
     }
 }
