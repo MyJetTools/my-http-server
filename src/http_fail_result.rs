@@ -9,22 +9,8 @@ pub struct HttpFailResult {
 }
 
 impl HttpFailResult {
-    pub fn as_query_parameter_required(param_name: &str) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: format!("Query parameter '{}' is required", param_name).into_bytes(),
-            status_code: 400,
-            write_telemetry: true,
-        }
-    }
-
-    pub fn as_header_parameter_required(param_name: &str) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: format!("Header '{}' is required", param_name).into_bytes(),
-            status_code: 400,
-            write_telemetry: true,
-        }
+    pub fn into_err<T>(self) -> Result<T, HttpFailResult> {
+        Result::Err(self)
     }
 
     pub fn as_path_parameter_required(param_name: &str) -> Self {
@@ -67,6 +53,27 @@ impl HttpFailResult {
                 format!("Forbidden").into_bytes()
             },
             status_code: 403,
+            write_telemetry: true,
+        }
+    }
+
+    pub fn invalid_value_to_parse(reason: String) -> Self {
+        Self {
+            content_type: WebContentType::Text,
+            content: reason.into_bytes(),
+            status_code: 400,
+            write_telemetry: true,
+        }
+    }
+
+    pub fn required_parameter_is_missing(param_name: &str, where_is_parameter: &str) -> Self {
+        Self {
+            content_type: WebContentType::Text,
+            content: format!(
+                "Required parameter [{param_name}] is missing in {where_is_parameter}"
+            )
+            .into_bytes(),
+            status_code: 400,
             write_telemetry: true,
         }
     }

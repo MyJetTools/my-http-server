@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 
 use crate::{
     http_path::{GetPathValueResult, PathSegments},
-    HttpFailResult, QueryString, RequestIp, WebContentType,
+    HttpFailResult, QueryString, QueryStringDataSource, RequestIp, WebContentType,
 };
 use hyper::{Body, Method, Request};
 
@@ -130,7 +130,10 @@ impl HttpContext {
             }
         }
 
-        return Err(HttpFailResult::as_header_parameter_required(header_name));
+        return Err(HttpFailResult::required_parameter_is_missing(
+            header_name,
+            QueryStringDataSource::QueryString.as_str(),
+        ));
     }
 
     pub fn get_optional_header(&self, header_name: &str) -> Option<&str> {
@@ -151,7 +154,7 @@ impl HttpContext {
         let result = full_body.iter().cloned().collect::<Vec<u8>>();
         let a = String::from_utf8(result).unwrap();
 
-        match QueryString::new(a.as_str()) {
+        match QueryString::new(a.as_str(), QueryStringDataSource::FormData) {
             Ok(result) => return Ok(result),
             Err(err) => {
                 let result = HttpFailResult {
@@ -174,7 +177,7 @@ impl HttpContext {
         let query = self.req.uri().query();
 
         match query {
-            Some(query) => Ok(QueryString::new(query)?),
+            Some(query) => Ok(QueryString::new(query, QueryStringDataSource::QueryString)?),
             None => Err(HttpFailResult::as_forbidden(Some(
                 "No query string found".to_string(),
             ))),
