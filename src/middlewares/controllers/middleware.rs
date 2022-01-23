@@ -38,10 +38,6 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn GetAction + Send + Sync + 'static>,
     ) {
-        if let Some(description) = action.get_additional_types() {
-            self.http_objects.extend(description)
-        }
-
         self.get.register(route, action);
     }
 
@@ -50,10 +46,6 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn PostAction + Send + Sync + 'static>,
     ) {
-        if let Some(description) = action.get_additional_types() {
-            self.http_objects.extend(description)
-        }
-
         self.post.register(route, action);
     }
 
@@ -62,10 +54,6 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn PutAction + Send + Sync + 'static>,
     ) {
-        if let Some(description) = action.get_additional_types() {
-            self.http_objects.extend(description)
-        }
-
         self.put.register(route, action);
     }
 
@@ -74,10 +62,6 @@ impl ControllersMiddleware {
         route: &str,
         action: Arc<dyn DeleteAction + Send + Sync + 'static>,
     ) {
-        if let Some(description) = action.get_additional_types() {
-            self.http_objects.extend(description)
-        }
-
         self.delete.register(route, action);
     }
 
