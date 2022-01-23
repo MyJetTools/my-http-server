@@ -31,7 +31,9 @@ impl GetRoute {
         }
     }
 
-    pub fn register(&mut self, route: &str, action: Arc<dyn GetAction + Send + Sync + 'static>) {
+    pub fn register(&mut self, action: Arc<dyn GetAction + Send + Sync + 'static>) {
+        let route = action.get_route();
+
         let route = PathSegments::new(route);
 
         let action = GetRouteAction { route, action };

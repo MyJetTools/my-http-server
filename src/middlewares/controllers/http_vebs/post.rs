@@ -31,7 +31,8 @@ impl PostRoute {
         }
     }
 
-    pub fn register(&mut self, route: &str, action: Arc<dyn PostAction + Send + Sync + 'static>) {
+    pub fn register(&mut self, action: Arc<dyn PostAction + Send + Sync + 'static>) {
+        let route = action.get_route();
         let route = PathSegments::new(route);
 
         let action = PostRouteAction { route, action };

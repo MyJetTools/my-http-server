@@ -32,37 +32,23 @@ impl ControllersMiddleware {
         }
     }
 
-    pub fn register_get_action(
-        &mut self,
-
-        route: &str,
-        action: Arc<dyn GetAction + Send + Sync + 'static>,
-    ) {
-        self.get.register(route, action);
+    pub fn register_get_action(&mut self, action: Arc<dyn GetAction + Send + Sync + 'static>) {
+        self.get.register(action);
     }
 
-    pub fn register_post_action(
-        &mut self,
-        route: &str,
-        action: Arc<dyn PostAction + Send + Sync + 'static>,
-    ) {
-        self.post.register(route, action);
+    pub fn register_post_action(&mut self, action: Arc<dyn PostAction + Send + Sync + 'static>) {
+        self.post.register(action);
     }
 
-    pub fn register_put_action(
-        &mut self,
-        route: &str,
-        action: Arc<dyn PutAction + Send + Sync + 'static>,
-    ) {
-        self.put.register(route, action);
+    pub fn register_put_action(&mut self, action: Arc<dyn PutAction + Send + Sync + 'static>) {
+        self.put.register(action);
     }
 
     pub fn register_delete_action(
         &mut self,
-        route: &str,
         action: Arc<dyn DeleteAction + Send + Sync + 'static>,
     ) {
-        self.delete.register(route, action);
+        self.delete.register(action);
     }
 
     pub fn list_of_get_route_actions<'s>(&'s self) -> Vec<&'s GetRouteAction> {

@@ -7,22 +7,26 @@ use super::documentation::HttpActionDescription;
 pub trait GetAction {
     async fn handle_request(&self, ctx: HttpContext) -> Result<HttpOkResult, HttpFailResult>;
     fn get_description(&self) -> Option<HttpActionDescription>;
+    fn get_route(&self) -> &str;
 }
 
 #[async_trait]
 pub trait PostAction {
     async fn handle_request(&self, ctx: HttpContext) -> Result<HttpOkResult, HttpFailResult>;
     fn get_description(&self) -> Option<HttpActionDescription>;
+    fn get_route(&self) -> &str;
 }
 
 #[async_trait]
 pub trait PutAction {
     async fn handle_request(&self, ctx: HttpContext) -> Result<HttpOkResult, HttpFailResult>;
     fn get_description(&self) -> Option<HttpActionDescription>;
+    fn get_route(&self) -> &str;
 }
 
 #[async_trait]
 pub trait DeleteAction {
     async fn handle_request(&self, ctx: HttpContext) -> Result<HttpOkResult, HttpFailResult>;
     fn get_description(&self) -> Option<HttpActionDescription>;
+    fn get_route(&self) -> &str;
 }
