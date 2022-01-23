@@ -6,11 +6,11 @@ pub struct HttpObjectStructure {
 }
 
 impl HttpObjectStructure {
-    pub fn as_http_data_type_object(self) -> HttpDataType {
+    pub fn into_http_data_type_object(self) -> HttpDataType {
         HttpDataType::Object(self)
     }
 
-    pub fn as_http_data_type_array(self) -> HttpDataType {
+    pub fn into_http_data_type_array(self) -> HttpDataType {
         HttpDataType::ArrayOf(ArrayElement::Object(self))
     }
 
