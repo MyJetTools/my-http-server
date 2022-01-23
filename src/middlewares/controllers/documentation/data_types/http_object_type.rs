@@ -1,4 +1,4 @@
-use super::{HttpDataType, HttpField};
+use super::{ArrayElement, HttpDataType, HttpField};
 
 pub struct HttpObjectStructure {
     pub struct_id: String,
@@ -6,6 +6,14 @@ pub struct HttpObjectStructure {
 }
 
 impl HttpObjectStructure {
+    pub fn as_http_data_type_object(self) -> HttpDataType {
+        HttpDataType::Object(self)
+    }
+
+    pub fn as_http_data_type_array(self) -> HttpDataType {
+        HttpDataType::ArrayOf(ArrayElement::Object(self))
+    }
+
     pub fn new(struct_id: &str) -> Self {
         Self {
             struct_id: struct_id.to_string(),
