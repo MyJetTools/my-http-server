@@ -60,9 +60,7 @@ impl HttpDataType {
         }
     }
 
-    pub fn as_array_of_object(struct_id: &str) -> Self {
-        Self::ArrayOf(ArrayElement::ObjectId {
-            struct_id: struct_id.to_string(),
-        })
+    pub fn as_array_of_object(object: HttpObjectStructure) -> Self {
+        Self::ArrayOf(ArrayElement::Object(object))
     }
 }
