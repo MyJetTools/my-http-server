@@ -18,7 +18,7 @@ pub mod middlewares;
 pub use http_ctx::HttpContext;
 pub use http_fail_result::HttpFailResult;
 pub use http_headers::HttpHeaders;
-pub use http_ok_result::HttpOkResult;
+pub use http_ok_result::{HttpOkResult, IntoHttpOkResult};
 pub use http_server::MyHttpServer;
 pub use http_server_middleware::{HttpServerMiddleware, MiddleWareResult};
 pub use query_string::{QueryString, QueryStringDataSource};
