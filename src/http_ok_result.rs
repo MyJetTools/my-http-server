@@ -58,7 +58,7 @@ impl HttpOkResult {
 }
 
 pub trait IntoHttpOkResult {
-    fn into_http_ok_result(&self) -> HttpOkResult;
+    fn into_http_ok_result(self) -> HttpOkResult;
 }
 
 impl Into<HttpOkResult> for String {
