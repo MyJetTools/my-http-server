@@ -1,7 +1,7 @@
 use super::HttpDataType;
 
 pub struct HttpEnumCase {
-    pub id: usize,
+    pub id: i16,
     pub value: String,
     pub description: String,
 }
