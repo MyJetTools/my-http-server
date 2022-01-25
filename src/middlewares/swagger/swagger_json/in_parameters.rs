@@ -24,6 +24,14 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
 
     if let Some(enum_object) = build_enum_field(&param.field.data_type) {
         result.write_object("enum", enum_object);
+
+        if let Some(schema) = super::http_data_type::build(&param.field.data_type) {
+            result.write_object("x-schema", schema);
+        }
+    } else {
+        if let Some(schema) = super::http_data_type::build(&param.field.data_type) {
+            result.write_object("schema", schema);
+        }
     }
 
     result.write_string_value("in", param.source.as_str());
@@ -46,10 +54,6 @@ fn build_parameter(param: &HttpInputParameter) -> JsonObjectWriter {
         let line_to_add = format!("{}. Default value: {}", param.description, default_value);
         result.write_string_value("description", line_to_add.as_str());
     } else {
-    }
-
-    if let Some(schema) = super::http_data_type::build(&param.field.data_type) {
-        result.write_object("x-schema", schema);
     }
 
     result
