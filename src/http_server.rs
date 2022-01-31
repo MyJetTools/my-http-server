@@ -9,7 +9,10 @@ use std::{net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
 
-use crate::{HttpContext, HttpFailResult, HttpServerMiddleware};
+use crate::{
+    metrics::{MyMetrics, MyMetricsFactory},
+    HttpContext, HttpFailResult, HttpServerMiddleware,
+};
 
 pub struct HttpServerData {
     middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
@@ -113,7 +116,7 @@ pub async fn handle_requests(
     addr: SocketAddr,
 ) -> hyper::Result<Response<Body>> {
     let mut ctx = HttpContext::new(req, addr);
-
+    let metrics = MyMetrics {};
     let my_telemetry = if let Some(telemetry) = &http_server_data.telemetry {
         let mut sw = StopWatch::new();
 
@@ -129,6 +132,8 @@ pub async fn handle_requests(
         None
     };
 
+    let histogram = metrics.create_duration_timer(ctx.get_method().as_ref(), ctx.req.uri().path());
+
     for middleware in &http_server_data.middlewares {
         match middleware.handle_request(ctx).await {
             Ok(result) => match result {
@@ -142,7 +147,7 @@ pub async fn handle_requests(
                             my_telemetry.sw.duration(),
                         );
                     }
-
+                    histogram.observe_duration();
                     return Ok(ok_result.into());
                 }
                 crate::MiddleWareResult::Next(next_ctx) => {
@@ -161,6 +166,7 @@ pub async fn handle_requests(
                         );
                     }
                 }
+                histogram.observe_duration();
 
                 return Ok(fail_result.into());
             }

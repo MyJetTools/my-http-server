@@ -6,6 +6,7 @@ mod http_ok_result;
 pub mod http_path;
 mod http_server;
 mod http_server_middleware;
+pub mod metrics;
 mod query_string;
 mod request_ip;
 pub mod url_decoder;
