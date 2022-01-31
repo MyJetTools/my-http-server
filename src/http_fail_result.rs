@@ -70,7 +70,8 @@ impl HttpFailResult {
         Self {
             content_type: WebContentType::Text,
             content: format!(
-                "Required parameter [{param_name}] is missing in {where_is_parameter}"
+                "Required parameter [{}] is missing in {}",
+                param_name, where_is_parameter
             )
             .into_bytes(),
             status_code: 400,
