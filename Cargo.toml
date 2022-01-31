@@ -16,3 +16,6 @@ hyper = { version = "*", features = ["full"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 async-trait = "*"
+
+[build-dependencies]
+cargo-lock = {version = "7.0.1"}
