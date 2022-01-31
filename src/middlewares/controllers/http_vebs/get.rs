@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{http_path::PathSegments, HttpContext, HttpFailResult, MiddleWareResult};
+use crate::HttpOkResult;
+use crate::{http_path::PathSegments, HttpContext, HttpFailResult};
 
 use crate::middlewares::controllers::{
     actions::GetAction,
@@ -48,22 +49,25 @@ impl GetRoute {
 
     pub async fn handle_request(
         &self,
-        mut ctx: HttpContext,
-    ) -> Result<MiddleWareResult, HttpFailResult> {
-        let path = ctx.get_path_lower_case();
+        ctx: &mut HttpContext,
+    ) -> Result<Option<HttpOkResult>, HttpFailResult> {
+        let path = ctx.request.get_path_lower_case();
         if let Some(route_action) = self.no_keys.get(path) {
             let result = route_action.action.handle_request(ctx).await?;
-            return Ok(MiddleWareResult::Ok(result));
+            return Ok(Some(result));
         }
 
         for route_action in &self.with_keys {
-            if route_action.route.is_my_path(ctx.get_path_lower_case()) {
-                ctx.route = Some(route_action.route.clone());
+            if route_action
+                .route
+                .is_my_path(ctx.request.get_path_lower_case())
+            {
+                ctx.request.route = Some(route_action.route.clone());
                 let result = route_action.action.handle_request(ctx).await?;
-                return Ok(MiddleWareResult::Ok(result));
+                return Ok(Some(result));
             }
         }
 
-        Ok(MiddleWareResult::Next(ctx))
+        Ok(None)
     }
 }

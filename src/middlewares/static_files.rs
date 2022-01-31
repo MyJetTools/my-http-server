@@ -1,4 +1,7 @@
-use crate::{HttpContext, HttpFailResult, HttpOkResult, HttpServerMiddleware, MiddleWareResult};
+use crate::{
+    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult,
+    HttpServerMiddleware,
+};
 use async_trait::async_trait;
 
 pub struct StaticFilesMiddleware {
@@ -20,8 +23,12 @@ impl StaticFilesMiddleware {
 #[async_trait]
 
 impl HttpServerMiddleware for StaticFilesMiddleware {
-    async fn handle_request(&self, ctx: HttpContext) -> Result<MiddleWareResult, HttpFailResult> {
-        let file = format!("{}{}", self.file_folder, ctx.get_path_lower_case());
+    async fn handle_request(
+        &self,
+        ctx: &mut HttpContext,
+        get_next: &mut HttpServerRequestFlow,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let file = format!("{}{}", self.file_folder, ctx.request.get_path_lower_case());
 
         match super::files::get(file.as_str()).await {
             Ok(file_content) => {
@@ -30,10 +37,10 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
                     content: file_content,
                 };
 
-                return Ok(MiddleWareResult::Ok(result));
+                return Ok(result);
             }
             Err(_) => {
-                return Ok(MiddleWareResult::Next(ctx));
+                return get_next.next(ctx).await;
             }
         }
     }

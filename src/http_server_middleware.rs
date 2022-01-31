@@ -1,10 +1,11 @@
-use crate::{HttpContext, HttpFailResult, HttpOkResult};
+use crate::{request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult};
 use async_trait::async_trait;
-pub enum MiddleWareResult {
-    Ok(HttpOkResult),
-    Next(HttpContext),
-}
+
 #[async_trait]
 pub trait HttpServerMiddleware {
-    async fn handle_request(&self, ctx: HttpContext) -> Result<MiddleWareResult, HttpFailResult>;
+    async fn handle_request(
+        &self,
+        ctx: &mut HttpContext,
+        get_next: &mut HttpServerRequestFlow,
+    ) -> Result<HttpOkResult, HttpFailResult>;
 }

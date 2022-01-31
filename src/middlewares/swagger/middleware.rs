@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    HttpContext, HttpFailResult, HttpOkResult, HttpServerMiddleware, MiddleWareResult,
-    WebContentType,
+    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult,
+    HttpServerMiddleware, WebContentType,
 };
 use async_trait::async_trait;
 use tokio::sync::Mutex;
@@ -29,11 +29,15 @@ impl SwaggerMiddleware {
 
 #[async_trait]
 impl HttpServerMiddleware for SwaggerMiddleware {
-    async fn handle_request(&self, ctx: HttpContext) -> Result<MiddleWareResult, HttpFailResult> {
-        let path = ctx.get_path_lower_case();
+    async fn handle_request(
+        &self,
+        ctx: &mut HttpContext,
+        get_next: &mut HttpServerRequestFlow,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let path = ctx.request.get_path_lower_case();
 
         if !path.starts_with("/swagger") {
-            return Ok(MiddleWareResult::Next(ctx));
+            return get_next.next(ctx).await;
         }
 
         if path == "/swagger/index.html" {
@@ -41,7 +45,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Html),
                 content: super::resources::INDEX_PAGE.to_vec(),
             };
-            return Ok(MiddleWareResult::Ok(result));
+            return Ok(result);
         }
 
         if path == "/swagger/swagger-ui.css" {
@@ -49,7 +53,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Css),
                 content: super::resources::SWAGGER_UI_CSS.to_vec(),
             };
-            return Ok(MiddleWareResult::Ok(result));
+            return Ok(result);
         }
 
         if path == "/swagger/swagger-ui-bundle.js" {
@@ -57,7 +61,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_BUNDLE_JS.to_vec(),
             };
-            return Ok(MiddleWareResult::Ok(result));
+            return Ok(result);
         }
 
         if path == "/swagger/swagger-ui-standalone-preset.js" {
@@ -65,7 +69,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_STANDALONE_PRESET_JS.to_vec(),
             };
-            return Ok(MiddleWareResult::Ok(result));
+            return Ok(result);
         }
 
         if path == "/swagger/favicon-32x32.png" {
@@ -73,7 +77,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_32.to_vec(),
             };
-            return Ok(MiddleWareResult::Ok(result));
+            return Ok(result);
         }
 
         if path == "/swagger/favicon-16x16.png" {
@@ -81,24 +85,22 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_16.to_vec(),
             };
-            return Ok(MiddleWareResult::Ok(result));
+            return Ok(result);
         }
 
-        let scheme = ctx.get_scheme();
+        let scheme = ctx.request.get_scheme();
 
-        let host = ctx.get_host();
+        let host = ctx.request.get_host();
 
         if path == "/swagger" {
             let new_url = format!("{}://{}/swagger/index.html", scheme, host);
-            return Ok(MiddleWareResult::Ok(HttpOkResult::Redirect {
-                url: new_url,
-            }));
+            return Ok(HttpOkResult::Redirect { url: new_url });
         }
 
         if path == "/swagger/v1/swagger.json" {
             let mut write_access = self.swagger_json_ok_result.lock().await;
             if let Some(result) = &*write_access {
-                return Ok(MiddleWareResult::Ok(result.clone()));
+                return Ok(result.clone());
             }
 
             *write_access = Some(HttpOkResult::Content {
@@ -112,7 +114,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 ),
             });
 
-            return Ok(MiddleWareResult::Ok(write_access.as_ref().unwrap().clone()));
+            return Ok(write_access.as_ref().unwrap().clone());
         }
 
         let result = super::super::files::get(format!("./wwwroot{}", path).as_str()).await;
@@ -123,13 +125,11 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                     content_type: None,
                     content,
                 };
-                return Ok(MiddleWareResult::Ok(result));
+                return Ok(result);
             }
             _ => {
                 let new_url = format!("{}://{}/swagger/index.html", scheme, host);
-                return Ok(MiddleWareResult::Ok(HttpOkResult::Redirect {
-                    url: new_url,
-                }));
+                return Ok(HttpOkResult::Redirect { url: new_url });
             }
         }
     }

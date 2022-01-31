@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use crate::{HttpContext, HttpFailResult, HttpServerMiddleware, MiddleWareResult};
+use crate::{
+    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult,
+    HttpServerMiddleware,
+};
 use hyper::Method;
 
 use super::{
@@ -91,24 +94,44 @@ impl ControllersMiddleware {
 
 #[async_trait]
 impl HttpServerMiddleware for ControllersMiddleware {
-    async fn handle_request(&self, ctx: HttpContext) -> Result<MiddleWareResult, HttpFailResult> {
-        let ref method = *ctx.get_method();
+    async fn handle_request(
+        &self,
+        ctx: &mut HttpContext,
+        get_next: &mut HttpServerRequestFlow,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let ref method = *ctx.request.get_method();
         match method {
             &Method::GET => {
-                return self.get.handle_request(ctx).await;
+                if let Some(result) = self.get.handle_request(ctx).await? {
+                    return Ok(result);
+                } else {
+                    return get_next.next(ctx).await;
+                }
             }
             &Method::POST => {
-                return self.post.handle_request(ctx).await;
+                if let Some(result) = self.post.handle_request(ctx).await? {
+                    return Ok(result);
+                } else {
+                    return get_next.next(ctx).await;
+                }
             }
             &Method::PUT => {
-                return self.put.handle_request(ctx).await;
+                if let Some(result) = self.put.handle_request(ctx).await? {
+                    return Ok(result);
+                } else {
+                    return get_next.next(ctx).await;
+                }
             }
             &Method::DELETE => {
-                return self.delete.handle_request(ctx).await;
+                if let Some(result) = self.delete.handle_request(ctx).await? {
+                    return Ok(result);
+                } else {
+                    return get_next.next(ctx).await;
+                }
             }
             _ => {}
         }
 
-        return Ok(MiddleWareResult::Next(ctx));
+        return get_next.next(ctx).await;
     }
 }

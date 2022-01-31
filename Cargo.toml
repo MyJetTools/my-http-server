@@ -1,13 +1,12 @@
 [package]
 name = "my-http-server"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 rust-extensions = { branch = "main", git = "https://github.com/MyJetTools/rust-extensions.git" }
-my-telemetry = { branch = "main", git = "https://github.com/MyJetTools/my-telemetry.git" }
 
 tokio = { version = "*", features = ["full"] }
 
