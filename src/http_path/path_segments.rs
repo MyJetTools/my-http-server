@@ -57,7 +57,9 @@ impl PathSegments {
             segments.push(path_segment);
         }
 
-        mark_last(&mut segments);
+        if segments.len() > 0 {
+            mark_last(&mut segments);
+        }
 
         Self {
             segments,

@@ -2,14 +2,31 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::{url_decoder::UrlDecodeError, HttpFailResult};
 
+pub enum QueryStringDataSource {
+    Headers,
+    FormData,
+    QueryString,
+}
+impl QueryStringDataSource {
+    pub fn as_str(&self) -> &str {
+        match self {
+            QueryStringDataSource::Headers => "headers",
+            QueryStringDataSource::FormData => "from data",
+            QueryStringDataSource::QueryString => "query string",
+        }
+    }
+}
+
 pub struct QueryString {
     query_string: HashMap<String, String>,
+    data_source: QueryStringDataSource,
 }
 
 impl QueryString {
-    pub fn new(src: &str) -> Result<Self, UrlDecodeError> {
+    pub fn new(src: &str, data_source: QueryStringDataSource) -> Result<Self, UrlDecodeError> {
         let result = Self {
             query_string: super::url_utils::parse_query_string(src)?,
+            data_source,
         };
 
         Ok(result)
@@ -23,7 +40,10 @@ impl QueryString {
 
         match result {
             Some(e) => Ok(e),
-            None => Err(HttpFailResult::as_query_parameter_required(name)),
+            None => Err(HttpFailResult::required_parameter_is_missing(
+                name,
+                self.data_source.as_str(),
+            )),
         }
     }
 
@@ -31,19 +51,40 @@ impl QueryString {
         return self.query_string.get(name);
     }
 
-    pub fn get_bool_parameter<'r, 't>(&'r self, name: &'t str, default_value: bool) -> bool {
+    pub fn get_optional_bool_parameter<'r, 't>(
+        &'r self,
+        name: &'t str,
+    ) -> Result<Option<bool>, HttpFailResult> {
         let result = self.query_string.get(name);
 
         match result {
             Some(value) => {
-                if value == "1" || value.to_lowercase() == "true" {
-                    return true;
-                }
-
-                return false;
+                let bool_value = parse_bool_value(value)?;
+                Ok(Some(bool_value))
             }
-            None => return default_value,
-        };
+            None => Ok(None),
+        }
+    }
+
+    pub fn get_required_bool_parameter<'r, 't>(
+        &'r self,
+        name: &'t str,
+    ) -> Result<bool, HttpFailResult> {
+        let result = self.query_string.get(name);
+
+        match result {
+            Some(value) => {
+                let bool_value = parse_bool_value(value)?;
+                Ok(bool_value)
+            }
+            None => {
+                return HttpFailResult::required_parameter_is_missing(
+                    name,
+                    self.data_source.as_str(),
+                )
+                .into_err()
+            }
+        }
     }
 
     pub fn get_optional_parameter<'r, 't, T: FromStr>(&'r self, name: &'t str) -> Option<T> {
@@ -74,23 +115,48 @@ impl QueryString {
 
                 return match result {
                     Ok(value) => Ok(value),
-                    _ => Err(HttpFailResult::as_query_parameter_required(name)),
+                    _ => Err(HttpFailResult::required_parameter_is_missing(
+                        name,
+                        self.data_source.as_str(),
+                    )),
                 };
             }
-            None => return Err(HttpFailResult::as_query_parameter_required(name)),
+            None => {
+                return Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    self.data_source.as_str(),
+                ))
+            }
         };
     }
 }
 
+fn parse_bool_value(value: &str) -> Result<bool, HttpFailResult> {
+    let value = value.to_lowercase();
+    if value == "1" || value.to_lowercase() == "true" {
+        return Ok(true);
+    }
+
+    if value == "0" || value.to_lowercase() == "false" {
+        return Ok(false);
+    }
+
+    let err =
+        HttpFailResult::invalid_value_to_parse(format!("Can not parse [{}] as boolean", value));
+
+    return Err(err);
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::QueryString;
+    use super::*;
 
     #[test]
     pub fn test_basic() {
         let query_string = "tableName=deposit-restrictions&partitionKey=%2A&rowKey=1abfc";
 
-        let query_string = QueryString::new(query_string).unwrap();
+        let query_string =
+            QueryString::new(query_string, QueryStringDataSource::QueryString).unwrap();
 
         let result = query_string
             .get_optional_string_parameter("partitionKey")

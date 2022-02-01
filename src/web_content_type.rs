@@ -10,7 +10,7 @@ pub enum WebContentType {
 }
 
 impl WebContentType {
-    pub fn to_string(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             WebContentType::Html => "text/html",
             WebContentType::Css => "text/css",
