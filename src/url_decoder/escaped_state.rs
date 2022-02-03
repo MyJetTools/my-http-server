@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use super::UrlDecodeError;
-use lazy_static::lazy_static;
 
 pub struct EscapedState {
     buffer: [u8; 3],
@@ -22,46 +19,43 @@ impl EscapedState {
 
         if self.pos == 3 {
             let esc_string_as_slice = &self.buffer;
-            let esc_string = std::str::from_utf8(esc_string_as_slice)?;
 
-            let result = URL_DECODE_SYMBOLS.get(esc_string);
+            let result = decode_escaped(esc_string_as_slice)?;
 
-            if let Some(result) = result {
-                return Ok(Some(*result));
-            }
-
-            return Err(UrlDecodeError {
-                msg: format!("Invalid escape string {}", esc_string),
-            });
+            return Ok(Some(result));
         }
 
         return Ok(None);
     }
 }
 
-lazy_static! {
-    static ref URL_DECODE_SYMBOLS: HashMap<&'static str, u8> = [
-        ("%21", b'!'),
-        ("%23", b'#'),
-        ("%24", b'$'),
-        ("%25", b'%'),
-        ("%26", b'&'),
-        ("%27", b'\''),
-        ("%28", b'('),
-        ("%29", b')'),
-        ("%2A", b'*'),
-        ("%2B", b'+'),
-        ("%2C", b','),
-        ("%2F", b'/'),
-        ("%3A", b':'),
-        ("%3B", b';'),
-        ("%3D", b'='),
-        ("%3F", b'?'),
-        ("%40", b'@'),
-        ("%5B", b'['),
-        ("%5D", b']'),
-    ]
-    .iter()
-    .copied()
-    .collect();
+pub fn decode_escaped(encoded: &[u8]) -> Result<u8, UrlDecodeError> {
+    let b0 = decode_hex_symbol(encoded[1])?;
+    let b1 = decode_hex_symbol(encoded[2])?;
+
+    let symbol = b1 + b0 * 16;
+
+    Ok(symbol)
+}
+
+const ZERO: u8 = '0' as u8;
+const A_LOWER: u8 = 'a' as u8 - 10;
+const A_CAPITAL: u8 = 'A' as u8 - 10;
+
+fn decode_hex_symbol(c: u8) -> Result<u8, UrlDecodeError> {
+    if c >= '0' as u8 && c <= '9' as u8 {
+        return Ok(c - ZERO);
+    }
+
+    if c >= 'a' as u8 && c <= 'f' as u8 {
+        return Ok(c - A_LOWER);
+    }
+
+    if c >= 'A' as u8 && c <= 'F' as u8 {
+        return Ok(c - A_CAPITAL);
+    }
+
+    return Err(UrlDecodeError {
+        msg: format!("Invalid escape char {}", c),
+    });
 }
