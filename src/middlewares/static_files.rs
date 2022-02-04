@@ -33,6 +33,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         match super::files::get(file.as_str()).await {
             Ok(file_content) => {
                 let result = HttpOkResult::Content {
+                    headers: None,
                     content_type: None,
                     content: file_content,
                 };

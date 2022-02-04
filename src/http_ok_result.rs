@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{HttpFailResult, WebContentType};
 use hyper::{Body, Response};
 use serde::Serialize;
@@ -9,6 +11,7 @@ pub enum HttpOkResult {
     Empty,
 
     Content {
+        headers: Option<HashMap<String, String>>,
         content_type: Option<WebContentType>,
         content: Vec<u8>,
     },
@@ -25,6 +28,7 @@ impl HttpOkResult {
     pub fn create_json_response<T: Serialize>(model: T) -> HttpOkResult {
         let json = serde_json::to_vec(&model).unwrap();
         HttpOkResult::Content {
+            headers: None,
             content_type: Some(WebContentType::Json),
             content: json,
         }
@@ -32,6 +36,7 @@ impl HttpOkResult {
 
     pub fn create_as_usize(number: usize) -> HttpOkResult {
         HttpOkResult::Content {
+            headers: None,
             content_type: Some(WebContentType::Text),
             content: number.to_string().into_bytes(),
         }
@@ -48,6 +53,7 @@ impl HttpOkResult {
             HttpOkResult::Ok => 200,
             HttpOkResult::Empty => 202,
             HttpOkResult::Content {
+                headers: _,
                 content_type: _,
                 content: _,
             } => 200,
@@ -64,6 +70,7 @@ pub trait IntoHttpOkResult {
 impl Into<HttpOkResult> for String {
     fn into(self) -> HttpOkResult {
         HttpOkResult::Content {
+            headers: None,
             content_type: Some(WebContentType::Text),
             content: self.into_bytes(),
         }
@@ -87,14 +94,25 @@ impl Into<Response<Body>> for HttpOkResult {
                 .body(Body::from("OK"))
                 .unwrap(),
             HttpOkResult::Content {
+                headers,
                 content_type,
                 content,
             } => match content_type {
-                Some(content_type) => Response::builder()
-                    .header("Content-Type", content_type.as_str())
-                    .status(status_code)
-                    .body(Body::from(content))
-                    .unwrap(),
+                Some(content_type) => {
+                    let mut builder =
+                        Response::builder().header("Content-Type", content_type.as_str());
+
+                    if let Some(headers) = headers {
+                        for (key, value) in headers {
+                            builder = builder.header(key, value);
+                        }
+                    }
+
+                    builder
+                        .status(status_code)
+                        .body(Body::from(content))
+                        .unwrap()
+                }
                 None => Response::builder()
                     .status(status_code)
                     .body(Body::from(content))
