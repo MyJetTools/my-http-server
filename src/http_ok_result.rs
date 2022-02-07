@@ -5,7 +5,7 @@ use hyper::{Body, Response};
 use serde::Serialize;
 
 #[derive(Clone)]
-pub enum HttpOkResult {
+pub enum HttpContent {
     Ok,
 
     Empty,
@@ -24,41 +24,57 @@ pub enum HttpOkResult {
     },
 }
 
+#[derive(Clone)]
+pub struct HttpOkResult {
+    pub write_telemetry: bool,
+    pub content: HttpContent,
+}
+
 impl HttpOkResult {
     pub fn create_json_response<T: Serialize>(model: T) -> HttpOkResult {
         let json = serde_json::to_vec(&model).unwrap();
-        HttpOkResult::Content {
-            headers: None,
-            content_type: Some(WebContentType::Json),
-            content: json,
+
+        HttpOkResult {
+            write_telemetry: true,
+            content: HttpContent::Content {
+                headers: None,
+                content_type: Some(WebContentType::Json),
+                content: json,
+            },
         }
     }
 
     pub fn create_as_usize(number: usize) -> HttpOkResult {
-        HttpOkResult::Content {
-            headers: None,
-            content_type: Some(WebContentType::Text),
-            content: number.to_string().into_bytes(),
+        HttpOkResult {
+            write_telemetry: true,
+            content: HttpContent::Content {
+                headers: None,
+                content_type: Some(WebContentType::Text),
+                content: number.to_string().into_bytes(),
+            },
         }
     }
 
     pub fn redirect(src: &str) -> HttpOkResult {
-        HttpOkResult::Redirect {
-            url: src.to_string(),
+        HttpOkResult {
+            write_telemetry: true,
+            content: HttpContent::Redirect {
+                url: src.to_string(),
+            },
         }
     }
 
     pub fn get_status_code(&self) -> u16 {
-        match self {
-            HttpOkResult::Ok => 200,
-            HttpOkResult::Empty => 202,
-            HttpOkResult::Content {
+        match &self.content {
+            HttpContent::Ok => 200,
+            HttpContent::Empty => 202,
+            HttpContent::Content {
                 headers: _,
                 content_type: _,
                 content: _,
             } => 200,
-            HttpOkResult::Text { text: _ } => 200,
-            HttpOkResult::Redirect { url: _ } => 308,
+            HttpContent::Text { text: _ } => 200,
+            HttpContent::Redirect { url: _ } => 308,
         }
     }
 }
@@ -69,10 +85,13 @@ pub trait IntoHttpOkResult {
 
 impl Into<HttpOkResult> for String {
     fn into(self) -> HttpOkResult {
-        HttpOkResult::Content {
-            headers: None,
-            content_type: Some(WebContentType::Text),
-            content: self.into_bytes(),
+        HttpOkResult {
+            write_telemetry: true,
+            content: HttpContent::Content {
+                headers: None,
+                content_type: Some(WebContentType::Text),
+                content: self.into_bytes(),
+            },
         }
     }
 }
@@ -87,13 +106,13 @@ impl Into<Response<Body>> for HttpOkResult {
     fn into(self) -> Response<Body> {
         let status_code = self.get_status_code();
 
-        return match self {
-            HttpOkResult::Ok => Response::builder()
+        return match self.content {
+            HttpContent::Ok => Response::builder()
                 .header("Content-Type", WebContentType::Text.as_str())
                 .status(status_code)
                 .body(Body::from("OK"))
                 .unwrap(),
-            HttpOkResult::Content {
+            HttpContent::Content {
                 headers,
                 content_type,
                 content,
@@ -118,17 +137,17 @@ impl Into<Response<Body>> for HttpOkResult {
                     .body(Body::from(content))
                     .unwrap(),
             },
-            HttpOkResult::Text { text } => Response::builder()
+            HttpContent::Text { text } => Response::builder()
                 .header("Content-Type", WebContentType::Text.as_str())
                 .status(status_code)
                 .body(Body::from(text))
                 .unwrap(),
-            HttpOkResult::Redirect { url } => Response::builder()
+            HttpContent::Redirect { url } => Response::builder()
                 .status(status_code)
                 .header("Location", url)
                 .body(Body::empty())
                 .unwrap(),
-            HttpOkResult::Empty => Response::builder()
+            HttpContent::Empty => Response::builder()
                 .status(status_code)
                 .body(Body::empty())
                 .unwrap(),
