@@ -22,8 +22,52 @@ pub enum HttpOutput {
 impl HttpOutput {
     pub fn into_ok_result(self, write_telemetry: bool) -> HttpOkResult {
         HttpOkResult {
-            write_telemetry: true,
+            write_telemetry,
             output: self,
+        }
+    }
+
+    pub fn as_text(text: String) -> Self {
+        Self::Content {
+            headers: None,
+            content_type: Some(WebContentType::Text),
+            content: text.into_bytes(),
+        }
+    }
+
+    pub fn as_json<T: Serialize>(model: T) -> Self {
+        let json = serde_json::to_vec(&model).unwrap();
+
+        Self::Content {
+            headers: None,
+            content_type: Some(WebContentType::Json),
+            content: json,
+        }
+    }
+
+    pub fn as_redirect(src: &str) -> Self {
+        Self::Redirect {
+            url: src.to_string(),
+        }
+    }
+
+    pub fn as_usize(number: usize) -> Self {
+        Self::Content {
+            headers: None,
+            content_type: Some(WebContentType::Text),
+            content: number.to_string().into_bytes(),
+        }
+    }
+
+    pub fn get_status_code(&self) -> u16 {
+        match self {
+            Self::Empty => 202,
+            Self::Content {
+                headers: _,
+                content_type: _,
+                content: _,
+            } => 200,
+            Self::Redirect { url: _ } => 308,
         }
     }
 }
@@ -35,60 +79,8 @@ pub struct HttpOkResult {
 }
 
 impl HttpOkResult {
-    pub fn create_json_response<T: Serialize>(model: T) -> HttpOkResult {
-        let json = serde_json::to_vec(&model).unwrap();
-
-        HttpOkResult {
-            write_telemetry: true,
-            output: HttpOutput::Content {
-                headers: None,
-                content_type: Some(WebContentType::Json),
-                content: json,
-            },
-        }
-    }
-
-    pub fn create_text_response(text: String) -> HttpOkResult {
-        HttpOkResult {
-            write_telemetry: true,
-            output: HttpOutput::Content {
-                headers: None,
-                content_type: Some(WebContentType::Text),
-                content: text.into_bytes(),
-            },
-        }
-    }
-
-    pub fn create_as_usize(number: usize) -> HttpOkResult {
-        HttpOkResult {
-            write_telemetry: true,
-            output: HttpOutput::Content {
-                headers: None,
-                content_type: Some(WebContentType::Text),
-                content: number.to_string().into_bytes(),
-            },
-        }
-    }
-
-    pub fn redirect(src: &str) -> HttpOkResult {
-        HttpOkResult {
-            write_telemetry: true,
-            output: HttpOutput::Redirect {
-                url: src.to_string(),
-            },
-        }
-    }
-
     pub fn get_status_code(&self) -> u16 {
-        match &self.output {
-            HttpOutput::Empty => 202,
-            HttpOutput::Content {
-                headers: _,
-                content_type: _,
-                content: _,
-            } => 200,
-            HttpOutput::Redirect { url: _ } => 308,
-        }
+        self.output.get_status_code()
     }
 }
 
