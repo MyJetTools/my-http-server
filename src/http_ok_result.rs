@@ -19,6 +19,15 @@ pub enum HttpOutput {
     },
 }
 
+impl HttpOutput {
+    pub fn into_ok_result(self, write_telemetry: bool) -> HttpOkResult {
+        HttpOkResult {
+            write_telemetry: true,
+            output: self,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct HttpOkResult {
     pub write_telemetry: bool,
