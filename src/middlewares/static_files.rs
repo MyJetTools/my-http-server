@@ -1,6 +1,6 @@
 use crate::{
-    http_ok_result::HttpContent, request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult,
-    HttpOkResult, HttpServerMiddleware,
+    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult, HttpOutput,
+    HttpServerMiddleware,
 };
 use async_trait::async_trait;
 
@@ -32,15 +32,15 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
 
         match super::files::get(file.as_str()).await {
             Ok(file_content) => {
-                let content = HttpContent::Content {
+                let output = HttpOutput::Content {
                     headers: None,
                     content_type: None,
                     content: file_content,
                 };
 
                 return Ok(HttpOkResult {
-                    write_telemetry: true,
-                    content,
+                    write_telemetry: false,
+                    output,
                 });
             }
             Err(_) => {
