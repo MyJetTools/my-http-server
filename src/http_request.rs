@@ -80,6 +80,18 @@ impl HttpRequest {
         }
     }
 
+    pub fn get_value_from_path_optional_as_string(
+        &self,
+        key: &str,
+    ) -> Result<Option<String>, HttpFailResult> {
+        let result = self.get_value_from_path_optional(key)?;
+
+        match result {
+            Some(value) => Ok(Some(value.to_owned())),
+            None => Ok(None),
+        }
+    }
+
     pub async fn get_body_raw(&mut self) -> Result<Vec<u8>, HttpFailResult> {
         let mut req = None;
 
