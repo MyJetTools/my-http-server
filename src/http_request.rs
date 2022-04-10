@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 
 use crate::{
     http_path::{GetPathValueResult, PathSegments},
-    url_decoder::UrlDecodeError,
     HttpFailResult, QueryString, QueryStringDataSource, RequestIp, WebContentType,
 };
 use hyper::{Body, Method, Request, Uri};
@@ -15,7 +14,9 @@ pub struct HttpRequest {
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
-    query_string: Option<Result<QueryString, UrlDecodeError>>,
+    query_string: Option<QueryString>,
+    form_data: Option<QueryString>,
+    raw_body: Option<Vec<u8>>,
 }
 
 impl HttpRequest {
@@ -25,13 +26,6 @@ impl HttpRequest {
         let path_lower_case = req.uri().path().to_lowercase();
         let method = req.method().clone();
 
-        let query_string = if let Some(query) = uri.query() {
-            let query_string = QueryString::new(query, QueryStringDataSource::QueryString);
-            Some(query_string)
-        } else {
-            None
-        };
-
         Self {
             req: Some(req),
             path_lower_case,
@@ -39,8 +33,33 @@ impl HttpRequest {
             route: None,
             uri,
             method,
-            query_string,
+            query_string: None,
+            form_data: None,
+            raw_body: None,
         }
+    }
+
+    pub fn init_query_string(&mut self) -> Result<(), HttpFailResult> {
+        match self.uri.query() {
+            Some(src) => {
+                let query_string = QueryString::new(src, QueryStringDataSource::QueryString)?;
+                self.query_string = Some(query_string);
+                Ok(())
+            }
+            None => Err(HttpFailResult::as_forbidden(Some(
+                "No query string found".to_string(),
+            ))),
+        }
+    }
+
+    pub async fn init_form_data(&mut self) -> Result<(), HttpFailResult> {
+        if self.raw_body.is_none() {
+            self.init_body().await?;
+        }
+
+        let form_data = self.extract_form_data_from_body().await?;
+        self.form_data = Some(form_data);
+        Ok(())
     }
 
     pub fn get_value_from_path(&self, key: &str) -> Result<&str, HttpFailResult> {
@@ -102,7 +121,7 @@ impl HttpRequest {
         }
     }
 
-    pub async fn get_body_raw(&mut self) -> Result<Vec<u8>, HttpFailResult> {
+    pub async fn init_body(&mut self) -> Result<(), HttpFailResult> {
         let mut req = None;
 
         std::mem::swap(&mut self.req, &mut req);
@@ -114,22 +133,37 @@ impl HttpRequest {
         let body = req.unwrap().into_body();
         let full_body = hyper::body::to_bytes(body).await?;
 
-        Ok(full_body.iter().cloned().collect::<Vec<u8>>())
+        self.raw_body = Some(full_body.into_iter().collect::<Vec<u8>>());
+
+        Ok(())
     }
 
-    pub async fn get_body_as_string(&mut self) -> Result<String, HttpFailResult> {
-        let body = self.get_body_raw().await?;
-        let result = String::from_utf8(body)?;
-        Ok(result)
+    pub fn get_body(&self) -> Result<&[u8], HttpFailResult> {
+        if let Some(body) = &self.raw_body {
+            return Ok(body.as_slice());
+        }
+
+        Err(HttpFailResult::as_fatal_error(
+            "You are trying to get access to body. You have to init_body first".to_string(),
+        ))
     }
 
-    pub async fn get_body_as_json<T>(&mut self) -> Result<T, HttpFailResult>
+    pub fn get_body_as_str(&mut self) -> Result<&str, HttpFailResult> {
+        let body_as_bytes = self.get_body()?;
+
+        match std::str::from_utf8(body_as_bytes) {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_fatal_error(format!("{}", err))),
+        }
+    }
+
+    pub fn get_body_as_json<T>(&mut self) -> Result<T, HttpFailResult>
     where
         T: DeserializeOwned,
     {
-        let body = self.get_body_raw().await?;
+        let body_as_bytes = self.get_body()?;
 
-        match serde_json::from_slice(body.as_slice()) {
+        match serde_json::from_slice(body_as_bytes) {
             Ok(result) => {
                 return Ok(result);
             }
@@ -193,12 +227,10 @@ impl HttpRequest {
         return None;
     }
 
-    pub async fn get_form_data(&mut self) -> Result<QueryString, HttpFailResult> {
-        let body = self.get_body_raw().await?;
+    async fn extract_form_data_from_body(&mut self) -> Result<QueryString, HttpFailResult> {
+        let body_as_str = self.get_body_as_str()?;
 
-        let a = String::from_utf8(body).unwrap();
-
-        match QueryString::new(a.as_str(), QueryStringDataSource::FormData) {
+        match QueryString::new(body_as_str, QueryStringDataSource::FormData) {
             Ok(result) => return Ok(result),
             Err(err) => {
                 let result = HttpFailResult {
@@ -218,19 +250,23 @@ impl HttpRequest {
     }
 
     pub fn get_query_string(&self) -> Result<&QueryString, HttpFailResult> {
-        if self.query_string.is_some() {
-            let result = self.query_string.as_ref().unwrap();
-
-            if let Err(err) = result {
-                return Err(HttpFailResult::as_fatal_error(format!("{:?}", err)));
-            }
-
-            return Ok(result.as_ref().unwrap());
+        if let Some(query_string) = self.query_string.as_ref() {
+            return Ok(query_string);
         }
 
-        return Err(HttpFailResult::as_forbidden(Some(
-            "No query string found".to_string(),
-        )));
+        Err(HttpFailResult::as_fatal_error(
+            "Query String is not initialized".to_owned(),
+        ))
+    }
+
+    pub fn get_form_data(&self) -> Result<&QueryString, HttpFailResult> {
+        if let Some(query_string) = self.form_data.as_ref() {
+            return Ok(query_string);
+        }
+
+        Err(HttpFailResult::as_fatal_error(
+            "Form Data is not initialized".to_owned(),
+        ))
     }
 
     pub fn get_optional_value_from_query(&self, key: &str) -> Result<Option<&str>, HttpFailResult> {
@@ -245,6 +281,25 @@ impl HttpRequest {
 
     pub fn get_required_value_from_query(&self, key: &str) -> Result<&str, HttpFailResult> {
         let query_string = self.get_query_string()?;
+        let result = query_string.get_required_string_parameter(key)?;
+        Ok(result)
+    }
+
+    pub fn get_optional_value_from_form_data(
+        &self,
+        key: &str,
+    ) -> Result<Option<&str>, HttpFailResult> {
+        let query_string = self.get_form_data()?;
+        let result = match query_string.get_optional_string_parameter(key) {
+            Some(result) => Some(result.as_str()),
+            None => None,
+        };
+
+        Ok(result)
+    }
+
+    pub fn get_required_value_from_form_data(&self, key: &str) -> Result<&str, HttpFailResult> {
+        let query_string = self.get_form_data()?;
         let result = query_string.get_required_string_parameter(key)?;
         Ok(result)
     }
