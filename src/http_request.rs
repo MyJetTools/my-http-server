@@ -233,9 +233,19 @@ impl HttpRequest {
         )));
     }
 
-    pub fn get_optional_query_value(&self, key: &str) -> Result<Option<&String>, HttpFailResult> {
+    pub fn get_optional_query_value(&self, key: &str) -> Result<Option<&str>, HttpFailResult> {
         let query_string = self.get_query_string()?;
-        let result = query_string.get_optional_string_parameter(key);
+        let result = match query_string.get_optional_string_parameter(key) {
+            Some(result) => Some(result.as_str()),
+            None => None,
+        };
+
+        Ok(result)
+    }
+
+    pub fn get_required_query_value(&self, key: &str) -> Result<&str, HttpFailResult> {
+        let query_string = self.get_query_string()?;
+        let result = query_string.get_required_string_parameter(key)?;
         Ok(result)
     }
 
