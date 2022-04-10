@@ -269,41 +269,6 @@ impl HttpRequest {
         ))
     }
 
-    pub fn get_optional_value_from_query(&self, key: &str) -> Result<Option<&str>, HttpFailResult> {
-        let query_string = self.get_query_string()?;
-        let result = match query_string.get_optional_string_parameter(key) {
-            Some(result) => Some(result.as_str()),
-            None => None,
-        };
-
-        Ok(result)
-    }
-
-    pub fn get_required_value_from_query(&self, key: &str) -> Result<&str, HttpFailResult> {
-        let query_string = self.get_query_string()?;
-        let result = query_string.get_required_string_parameter(key)?;
-        Ok(result)
-    }
-
-    pub fn get_optional_value_from_form_data(
-        &self,
-        key: &str,
-    ) -> Result<Option<&str>, HttpFailResult> {
-        let query_string = self.get_form_data()?;
-        let result = match query_string.get_optional_string_parameter(key) {
-            Some(result) => Some(result.as_str()),
-            None => None,
-        };
-
-        Ok(result)
-    }
-
-    pub fn get_required_value_from_form_data(&self, key: &str) -> Result<&str, HttpFailResult> {
-        let query_string = self.get_form_data()?;
-        let result = query_string.get_required_string_parameter(key)?;
-        Ok(result)
-    }
-
     pub fn get_host(&self) -> &str {
         std::str::from_utf8(&self.get_headers().get("host").unwrap().as_bytes()).unwrap()
     }

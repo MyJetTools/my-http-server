@@ -35,7 +35,7 @@ impl QueryString {
     pub fn get_required_string_parameter<'r, 't>(
         &'r self,
         name: &'t str,
-    ) -> Result<&'r String, HttpFailResult> {
+    ) -> Result<&'r str, HttpFailResult> {
         let result = self.query_string.get(name);
 
         match result {
@@ -47,8 +47,9 @@ impl QueryString {
         }
     }
 
-    pub fn get_optional_string_parameter<'r, 't>(&'r self, name: &'t str) -> Option<&'r String> {
-        return self.query_string.get(name);
+    pub fn get_optional_string_parameter<'r, 't>(&'r self, name: &'t str) -> Option<&'r str> {
+        let result = self.query_string.get(name)?;
+        Some(result.as_str())
     }
 
     pub fn get_optional_bool_parameter<'r, 't>(
