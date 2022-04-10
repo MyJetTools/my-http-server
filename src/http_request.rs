@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 
 use crate::{
     http_path::{GetPathValueResult, PathSegments},
+    url_decoder::UrlDecodeError,
     HttpFailResult, QueryString, QueryStringDataSource, RequestIp, WebContentType,
 };
 use hyper::{Body, Method, Request, Uri};
@@ -14,7 +15,7 @@ pub struct HttpRequest {
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
-    query_string: Option<QueryString>,
+    query_string: Option<Result<QueryString, UrlDecodeError>>,
 }
 
 impl HttpRequest {
@@ -24,6 +25,13 @@ impl HttpRequest {
         let path_lower_case = req.uri().path().to_lowercase();
         let method = req.method().clone();
 
+        let query_string = if let Some(query) = uri.query() {
+            let query_string = QueryString::new(query, QueryStringDataSource::QueryString);
+            Some(query_string)
+        } else {
+            None
+        };
+
         Self {
             req: Some(req),
             path_lower_case,
@@ -31,7 +39,7 @@ impl HttpRequest {
             route: None,
             uri,
             method,
-            query_string: None,
+            query_string,
         }
     }
 
@@ -209,24 +217,26 @@ impl HttpRequest {
         &self.method
     }
 
-    pub fn get_query_string(&mut self) -> Result<&QueryString, HttpFailResult> {
+    pub fn get_query_string(&self) -> Result<&QueryString, HttpFailResult> {
         if self.query_string.is_some() {
-            return Ok(self.query_string.as_ref().unwrap());
-        }
+            let result = self.query_string.as_ref().unwrap();
 
-        let query = self.uri.query();
-
-        match query {
-            Some(query) => {
-                self.query_string =
-                    Some(QueryString::new(query, QueryStringDataSource::QueryString)?);
-
-                Ok(self.query_string.as_ref().unwrap())
+            if let Err(err) = result {
+                return Err(HttpFailResult::as_fatal_error(format!("{:?}", err)));
             }
-            None => Err(HttpFailResult::as_forbidden(Some(
-                "No query string found".to_string(),
-            ))),
+
+            return Ok(result.as_ref().unwrap());
         }
+
+        return Err(HttpFailResult::as_forbidden(Some(
+            "No query string found".to_string(),
+        )));
+    }
+
+    pub fn get_optional_query_value(&self, key: &str) -> Result<Option<&String>, HttpFailResult> {
+        let query_string = self.get_query_string()?;
+        let result = query_string.get_optional_string_parameter(key);
+        Ok(result)
     }
 
     pub fn get_host(&self) -> &str {
