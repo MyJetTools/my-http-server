@@ -148,6 +148,17 @@ impl HttpRequest {
         ))
     }
 
+    pub fn get_form_data(&self) -> Result<&QueryString, HttpFailResult> {
+        if let Some(body) = &self.form_data {
+            return Ok(body.as_slice());
+        }
+
+        Err(HttpFailResult::as_fatal_error(
+            "You are trying to get access to form_data. You have to init_form_data first"
+                .to_string(),
+        ))
+    }
+
     pub fn get_body_as_str(&mut self) -> Result<&str, HttpFailResult> {
         let body_as_bytes = self.get_body()?;
 
