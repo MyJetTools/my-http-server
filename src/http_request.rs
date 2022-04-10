@@ -148,7 +148,7 @@ impl HttpRequest {
         ))
     }
 
-    pub fn get_body_as_str(&mut self) -> Result<&str, HttpFailResult> {
+    pub fn get_body_as_str(&self) -> Result<&str, HttpFailResult> {
         let body_as_bytes = self.get_body()?;
 
         match std::str::from_utf8(body_as_bytes) {
@@ -157,7 +157,7 @@ impl HttpRequest {
         }
     }
 
-    pub fn get_body_as_json<T>(&mut self) -> Result<T, HttpFailResult>
+    pub fn get_body_as_json<T>(&self) -> Result<T, HttpFailResult>
     where
         T: DeserializeOwned,
     {
