@@ -14,6 +14,7 @@ pub struct HttpRequest {
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
+    query_string: Option<QueryString>,
 }
 
 impl HttpRequest {
@@ -30,6 +31,7 @@ impl HttpRequest {
             route: None,
             uri,
             method,
+            query_string: None,
         }
     }
 
@@ -207,11 +209,20 @@ impl HttpRequest {
         &self.method
     }
 
-    pub fn get_query_string(&self) -> Result<QueryString, HttpFailResult> {
+    pub fn get_query_string(&mut self) -> Result<&QueryString, HttpFailResult> {
+        if self.query_string.is_some() {
+            return Ok(self.query_string.as_ref().unwrap());
+        }
+
         let query = self.uri.query();
 
         match query {
-            Some(query) => Ok(QueryString::new(query, QueryStringDataSource::QueryString)?),
+            Some(query) => {
+                self.query_string =
+                    Some(QueryString::new(query, QueryStringDataSource::QueryString)?);
+
+                Ok(self.query_string.as_ref().unwrap())
+            }
             None => Err(HttpFailResult::as_forbidden(Some(
                 "No query string found".to_string(),
             ))),
