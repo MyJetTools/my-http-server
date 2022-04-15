@@ -138,9 +138,9 @@ impl HttpRequest {
         Ok(())
     }
 
-    pub fn get_body(&self) -> Result<&[u8], HttpFailResult> {
+    pub fn get_body_as_slice(&self) -> Result<&[u8], HttpFailResult> {
         if let Some(body) = &self.raw_body {
-            return Ok(body.as_slice());
+            return Ok(body);
         }
 
         Err(HttpFailResult::as_fatal_error(
@@ -148,8 +148,22 @@ impl HttpRequest {
         ))
     }
 
+    pub fn get_body(&mut self) -> Result<Vec<u8>, HttpFailResult> {
+        let mut result = None;
+
+        std::mem::swap(&mut self.raw_body, &mut result);
+
+        if let Some(body) = result {
+            return Ok(body);
+        }
+
+        Err(HttpFailResult::as_fatal_error(
+            "You are trying to get access to body. You have to init_body first. Or body is already taken".to_string(),
+        ))
+    }
+
     pub fn get_body_as_str(&self) -> Result<&str, HttpFailResult> {
-        let body_as_bytes = self.get_body()?;
+        let body_as_bytes = self.get_body_as_slice()?;
 
         match std::str::from_utf8(body_as_bytes) {
             Ok(result) => Ok(result),
@@ -161,7 +175,7 @@ impl HttpRequest {
     where
         T: DeserializeOwned,
     {
-        let body_as_bytes = self.get_body()?;
+        let body_as_bytes = self.get_body_as_slice()?;
 
         match serde_json::from_slice(body_as_bytes) {
             Ok(result) => {
