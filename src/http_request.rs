@@ -1,22 +1,32 @@
-use serde::de::DeserializeOwned;
 use std::net::SocketAddr;
 
 use crate::{
     http_path::{GetPathValueResult, PathSegments},
-    HttpFailResult, QueryString, QueryStringDataSource, RequestIp, WebContentType,
+    HttpFailResult, HttpRequestBody, QueryString, QueryStringDataSource, RequestIp,
 };
 use hyper::{Body, Method, Request, Uri};
 
+pub enum RequestData {
+    AsRaw(Request<Body>),
+    AsHttpBody(HttpRequestBody),
+    None,
+}
+
+impl RequestData {
+    pub fn is_none(&self) -> bool {
+        match self {
+            RequestData::None => true,
+            _ => false,
+        }
+    }
+}
 pub struct HttpRequest {
     pub method: Method,
     pub uri: Uri,
-    pub req: Option<Request<Body>>,
+    pub req: RequestData,
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
-    query_string: Option<QueryString>,
-    form_data: Option<QueryString>,
-    raw_body: Option<Vec<u8>>,
 }
 
 impl HttpRequest {
@@ -27,39 +37,25 @@ impl HttpRequest {
         let method = req.method().clone();
 
         Self {
-            req: Some(req),
+            req: RequestData::AsRaw(req),
             path_lower_case,
             addr,
             route: None,
             uri,
             method,
-            query_string: None,
-            form_data: None,
-            raw_body: None,
         }
     }
 
-    pub fn init_query_string(&mut self) -> Result<(), HttpFailResult> {
+    pub fn get_query_string(&self) -> Result<QueryString, HttpFailResult> {
         match self.uri.query() {
             Some(src) => {
                 let query_string = QueryString::new(src, QueryStringDataSource::QueryString)?;
-                self.query_string = Some(query_string);
-                Ok(())
+                Ok(query_string)
             }
             None => Err(HttpFailResult::as_forbidden(Some(
                 "No query string found".to_string(),
             ))),
         }
-    }
-
-    pub async fn init_form_data(&mut self) -> Result<(), HttpFailResult> {
-        if self.raw_body.is_none() {
-            self.init_body().await?;
-        }
-
-        let form_data = self.extract_form_data_from_body().await?;
-        self.form_data = Some(form_data);
-        Ok(())
     }
 
     pub fn get_value_from_path(&self, key: &str) -> Result<&str, HttpFailResult> {
@@ -121,67 +117,28 @@ impl HttpRequest {
         }
     }
 
-    pub async fn init_body(&mut self) -> Result<(), HttpFailResult> {
-        let mut req = None;
+    pub async fn get_body(&mut self) -> Result<HttpRequestBody, HttpFailResult> {
+        let mut req = RequestData::None;
 
         std::mem::swap(&mut self.req, &mut req);
 
-        if req.is_none() {
-            panic!("You are trying to get access to body for a second time which is not allowed");
-        }
+        match req {
+            RequestData::AsRaw(req) => {
+                let body = req.into_body();
+                let full_body = hyper::body::to_bytes(body).await?;
 
-        let body = req.unwrap().into_body();
-        let full_body = hyper::body::to_bytes(body).await?;
+                let body = full_body.into_iter().collect::<Vec<u8>>();
 
-        self.raw_body = Some(full_body.into_iter().collect::<Vec<u8>>());
-
-        Ok(())
-    }
-
-    pub fn get_body_as_slice(&self) -> Result<&[u8], HttpFailResult> {
-        if let Some(body) = &self.raw_body {
-            return Ok(body);
-        }
-
-        Err(HttpFailResult::as_fatal_error(
-            "You are trying to get access to body. You have to init_body first".to_string(),
-        ))
-    }
-
-    pub fn get_body(&mut self) -> Result<Vec<u8>, HttpFailResult> {
-        let mut result = None;
-
-        std::mem::swap(&mut self.raw_body, &mut result);
-
-        if let Some(body) = result {
-            return Ok(body);
-        }
-
-        Err(HttpFailResult::as_fatal_error(
-            "You are trying to get access to body. You have to init_body first. Or body is already taken".to_string(),
-        ))
-    }
-
-    pub fn get_body_as_str(&self) -> Result<&str, HttpFailResult> {
-        let body_as_bytes = self.get_body_as_slice()?;
-
-        match std::str::from_utf8(body_as_bytes) {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_fatal_error(format!("{}", err))),
-        }
-    }
-
-    pub fn get_body_as_json<T>(&self) -> Result<T, HttpFailResult>
-    where
-        T: DeserializeOwned,
-    {
-        let body_as_bytes = self.get_body_as_slice()?;
-
-        match serde_json::from_slice(body_as_bytes) {
-            Ok(result) => {
+                return Ok(HttpRequestBody::new(body));
+            }
+            RequestData::AsHttpBody(result) => {
                 return Ok(result);
             }
-            Err(err) => return Err(HttpFailResult::as_fatal_error(format!("{}", err))),
+            RequestData::None => {
+                panic!(
+                    "You are trying to get access to body for a second time which is not allowed"
+                );
+            }
         }
     }
 
@@ -194,7 +151,7 @@ impl HttpRequest {
     }
 
     pub fn get_headers(&self) -> &hyper::HeaderMap<hyper::header::HeaderValue> {
-        if let Some(req) = &self.req {
+        if let RequestData::AsRaw(req) = &self.req {
             return req.headers();
         }
 
@@ -241,46 +198,8 @@ impl HttpRequest {
         return None;
     }
 
-    async fn extract_form_data_from_body(&mut self) -> Result<QueryString, HttpFailResult> {
-        let body_as_str = self.get_body_as_str()?;
-
-        match QueryString::new(body_as_str, QueryStringDataSource::FormData) {
-            Ok(result) => return Ok(result),
-            Err(err) => {
-                let result = HttpFailResult {
-                    write_telemetry: true,
-                    content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
-                    content_type: WebContentType::Text,
-                    status_code: 412,
-                };
-
-                return Err(result);
-            }
-        }
-    }
-
     pub fn get_method(&self) -> &Method {
         &self.method
-    }
-
-    pub fn get_query_string(&self) -> Result<&QueryString, HttpFailResult> {
-        if let Some(query_string) = self.query_string.as_ref() {
-            return Ok(query_string);
-        }
-
-        Err(HttpFailResult::as_fatal_error(
-            "Query String is not initialized".to_owned(),
-        ))
-    }
-
-    pub fn get_form_data(&self) -> Result<&QueryString, HttpFailResult> {
-        if let Some(query_string) = self.form_data.as_ref() {
-            return Ok(query_string);
-        }
-
-        Err(HttpFailResult::as_fatal_error(
-            "Form Data is not initialized".to_owned(),
-        ))
     }
 
     pub fn get_host(&self) -> &str {
