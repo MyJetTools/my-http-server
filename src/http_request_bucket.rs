@@ -37,4 +37,27 @@ impl HttpRequestBucket {
     pub fn populate_body(&mut self, body: Option<HttpRequestBody>) {
         self.body = body;
     }
+
+    pub fn get_query_string(&self) -> &QueryString {
+        if let Some(ref query_string) = self.query_string {
+            query_string
+        } else {
+            panic!("HttpRequestBucket::get_query_string() called when query_string is None");
+        }
+    }
+
+    pub fn get_header_value(&self, key: &str) -> Option<&str> {
+        if let Some(ref headers) = self.headers {
+            let result = headers.get(key)?;
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_body(&mut self) -> Option<HttpRequestBody> {
+        let mut result = None;
+        std::mem::swap(&mut self.body, &mut result);
+        result
+    }
 }
