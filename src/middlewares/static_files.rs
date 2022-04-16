@@ -28,11 +28,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let file = format!(
-            "{}{}",
-            self.file_folder,
-            ctx.get_request().get_path_lower_case()
-        );
+        let file = format!("{}{}", self.file_folder, ctx.request.get_path_lower_case());
 
         match super::files::get(file.as_str()).await {
             Ok(file_content) => {
