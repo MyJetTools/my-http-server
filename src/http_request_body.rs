@@ -41,7 +41,7 @@ impl HttpRequestBody {
         }
     }
 
-    pub fn get_form_data(self) -> Result<QueryString, HttpFailResult> {
+    pub fn get_form_data(&self) -> Result<QueryString, HttpFailResult> {
         let body_as_str = self.as_str()?;
 
         match QueryString::new(body_as_str, QueryStringDataSource::FormData) {

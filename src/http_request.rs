@@ -19,17 +19,24 @@ impl RequestData {
             _ => false,
         }
     }
+    pub fn is_http_body(&self) -> bool {
+        match self {
+            RequestData::AsHttpBody(_) => true,
+            _ => false,
+        }
+    }
 }
-pub struct HttpRequest {
+pub struct HttpRequest<'s> {
     pub method: Method,
     pub uri: Uri,
     pub req: RequestData,
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
+    query_string: Option<QueryString<'s>>,
 }
 
-impl HttpRequest {
+impl<'s> HttpRequest<'s> {
     pub fn new(req: Request<Body>, addr: SocketAddr) -> Self {
         let uri = req.uri().clone();
 
@@ -43,19 +50,29 @@ impl HttpRequest {
             route: None,
             uri,
             method,
+            query_string: None,
         }
     }
 
-    pub fn get_query_string(&self) -> Result<QueryString, HttpFailResult> {
+    pub fn init_query_string(&'s mut self) -> Result<(), HttpFailResult> {
+        if self.query_string.is_some() {
+            return Ok(());
+        }
         match self.uri.query() {
             Some(src) => {
                 let query_string = QueryString::new(src, QueryStringDataSource::QueryString)?;
-                Ok(query_string)
+                self.query_string = query_string.into();
+                Ok(())
             }
             None => Err(HttpFailResult::as_forbidden(Some(
                 "No query string found".to_string(),
             ))),
         }
+    }
+
+    pub fn get_query_string(&'s self) -> Result<&QueryString<'s>, HttpFailResult> {
+        if self.query_string.is_none() {}
+        Ok(self.query_string.as_ref().unwrap())
     }
 
     pub fn get_value_from_path(&self, key: &str) -> Result<&str, HttpFailResult> {
@@ -117,19 +134,36 @@ impl HttpRequest {
         }
     }
 
-    pub async fn get_body(&mut self) -> Result<HttpRequestBody, HttpFailResult> {
-        let mut req = RequestData::None;
+    async fn init_body(&mut self) -> Result<(), HttpFailResult> {
+        if self.req.is_http_body() {
+            return Ok(());
+        }
 
-        std::mem::swap(&mut self.req, &mut req);
+        if self.req.is_none() {
+            return Ok(());
+        }
 
-        match req {
-            RequestData::AsRaw(req) => {
-                let body = req.into_body();
-                let full_body = hyper::body::to_bytes(body).await?;
+        let mut result = RequestData::None;
+        std::mem::swap(&mut self.req, &mut result);
 
-                let body = full_body.into_iter().collect::<Vec<u8>>();
+        if let RequestData::AsRaw(req) = result {
+            let body = req.into_body();
+            let full_body = hyper::body::to_bytes(body).await?;
 
-                return Ok(HttpRequestBody::new(body));
+            let body = full_body.into_iter().collect::<Vec<u8>>();
+
+            self.req = RequestData::AsHttpBody(HttpRequestBody::new(body));
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_body(&'s mut self) -> Result<&'s HttpRequestBody, HttpFailResult> {
+        self.init_body().await?;
+
+        match &self.req {
+            RequestData::AsRaw(_) => {
+                panic!("Somehow we are here");
             }
             RequestData::AsHttpBody(result) => {
                 return Ok(result);
@@ -140,6 +174,31 @@ impl HttpRequest {
                 );
             }
         }
+    }
+
+    pub async fn receive_body(&'s mut self) -> Result<HttpRequestBody, HttpFailResult> {
+        self.init_body().await?;
+
+        let mut result = RequestData::None;
+        std::mem::swap(&mut self.req, &mut result);
+
+        match result {
+            RequestData::AsRaw(_) => {
+                panic!("Somehow we are here");
+            }
+            RequestData::AsHttpBody(result) => {
+                return Ok(result);
+            }
+            RequestData::None => {
+                panic!(
+                    "You are trying to get access to body for a second time which is not allowed"
+                );
+            }
+        }
+    }
+
+    pub fn set_body(&mut self, body: HttpRequestBody) {
+        self.req = RequestData::AsHttpBody(body);
     }
 
     pub fn get_path(&self) -> &str {

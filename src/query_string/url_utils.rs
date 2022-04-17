@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use crate::url_decoder::UrlDecodeError;
 
-pub fn parse_query_string(query_string: &str) -> Result<HashMap<String, String>, UrlDecodeError> {
+use super::QueryStringValue;
+
+pub fn parse_query_string<'s>(
+    query_string: &'s str,
+) -> Result<HashMap<String, QueryStringValue<'s>>, UrlDecodeError> {
     let mut result = HashMap::new();
     let elements = query_string.split("&");
 
@@ -10,8 +14,8 @@ pub fn parse_query_string(query_string: &str) -> Result<HashMap<String, String>,
         let kv = el.find('=');
 
         if let Some(index) = kv {
-            let key = super::url_decoder::decode_from_url_query_string(&el[..index])?;
-            let value = super::url_decoder::decode_from_url_query_string(&el[index + 1..])?;
+            let key = crate::url_decoder::decode_from_url_query_string(&el[..index])?;
+            let value = QueryStringValue::new(&el[index + 1..]);
             result.insert(key, value);
         }
     }

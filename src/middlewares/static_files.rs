@@ -23,10 +23,10 @@ impl StaticFilesMiddleware {
 #[async_trait]
 
 impl HttpServerMiddleware for StaticFilesMiddleware {
-    async fn handle_request(
-        &self,
-        ctx: &mut HttpContext,
-        get_next: &mut HttpServerRequestFlow,
+    async fn handle_request<'s, 'c>(
+        &'s self,
+        ctx: &'c mut HttpContext<'c>,
+        get_next: &'s mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
         let file = format!("{}{}", self.file_folder, ctx.request.get_path_lower_case());
 

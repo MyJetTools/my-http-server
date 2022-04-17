@@ -6,7 +6,6 @@ mod http_ok_result;
 pub mod http_path;
 mod http_request;
 mod http_request_body;
-mod http_request_bucket;
 mod http_server;
 mod http_server_middleware;
 mod query_string;
@@ -14,7 +13,7 @@ mod request_flow;
 mod request_ip;
 pub mod url_decoder;
 mod url_decoder_encoder;
-mod url_utils;
+
 mod web_content_type;
 
 pub mod middlewares;
@@ -25,7 +24,6 @@ pub use http_headers::HttpHeaders;
 pub use http_ok_result::{HttpOkResult, HttpOutput, IntoHttpOkResult};
 pub use http_request::HttpRequest;
 pub use http_request_body::HttpRequestBody;
-pub use http_request_bucket::HttpRequestBucket;
 pub use http_server::MyHttpServer;
 pub use http_server_middleware::HttpServerMiddleware;
 pub use query_string::{QueryString, QueryStringDataSource};

@@ -1,11 +1,11 @@
 use crate::HttpRequest;
 
-pub struct HttpContext {
-    pub request: HttpRequest,
+pub struct HttpContext<'s> {
+    pub request: HttpRequest<'s>,
 }
 
-impl HttpContext {
-    pub fn new(request: HttpRequest) -> Self {
+impl<'s> HttpContext<'s> {
+    pub fn new(request: HttpRequest<'s>) -> Self {
         Self { request }
     }
 }

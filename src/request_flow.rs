@@ -10,7 +10,10 @@ impl HttpServerRequestFlow {
     pub fn new(middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>) -> Self {
         Self { middlewares }
     }
-    pub async fn next(&mut self, ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
+    pub async fn next<'s, 'c>(
+        &'s mut self,
+        ctx: &'c mut HttpContext<'c>,
+    ) -> Result<HttpOkResult, HttpFailResult> {
         if self.middlewares.is_empty() {
             let not_found = HttpFailResult::as_not_found("Page not found".to_string(), false);
 
@@ -18,6 +21,7 @@ impl HttpServerRequestFlow {
         }
 
         let middleware = self.middlewares.remove(0);
-        return middleware.handle_request(ctx, self).await;
+        let result = middleware.handle_request(ctx, self).await;
+        result
     }
 }
