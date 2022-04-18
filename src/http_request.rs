@@ -54,17 +54,17 @@ impl RequestData {
         }
     }
 }
-pub struct HttpRequest<'s> {
+pub struct HttpRequest {
     pub method: HttpMethod,
     pub uri: Uri,
     pub req: RequestData,
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
-    query_string: Option<QueryString<'s>>,
+    query_string: Option<QueryString>,
 }
 
-impl<'s> HttpRequest<'s> {
+impl HttpRequest {
     pub fn new(req: Request<Body>, addr: SocketAddr) -> Self {
         let uri = req.uri().clone();
 
@@ -82,7 +82,7 @@ impl<'s> HttpRequest<'s> {
         }
     }
 
-    pub fn init_query_string(&'s mut self) -> Result<(), HttpFailResult> {
+    pub fn init_query_string(&mut self) -> Result<(), HttpFailResult> {
         if self.query_string.is_some() {
             return Ok(());
         }
@@ -98,7 +98,7 @@ impl<'s> HttpRequest<'s> {
         }
     }
 
-    pub fn get_query_string(&'s self) -> Result<&QueryString<'s>, HttpFailResult> {
+    pub fn get_query_string(&self) -> Result<&QueryString, HttpFailResult> {
         if self.query_string.is_none() {}
         Ok(self.query_string.as_ref().unwrap())
     }
@@ -186,7 +186,7 @@ impl<'s> HttpRequest<'s> {
         Ok(())
     }
 
-    pub async fn get_body(&'s mut self) -> Result<&'s HttpRequestBody, HttpFailResult> {
+    pub async fn get_body(&mut self) -> Result<&HttpRequestBody, HttpFailResult> {
         self.init_body().await?;
 
         match &self.req {
@@ -204,7 +204,7 @@ impl<'s> HttpRequest<'s> {
         }
     }
 
-    pub async fn receive_body(&'s mut self) -> Result<HttpRequestBody, HttpFailResult> {
+    pub async fn receive_body(&mut self) -> Result<HttpRequestBody, HttpFailResult> {
         self.init_body().await?;
 
         let mut result = RequestData::None;

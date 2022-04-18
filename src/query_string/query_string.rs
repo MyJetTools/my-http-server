@@ -2,8 +2,6 @@ use std::collections::HashMap;
 
 use crate::{url_decoder::UrlDecodeError, HttpFailResult};
 
-use super::QueryStringValue;
-
 pub enum QueryStringDataSource {
     Headers,
     FormData,
@@ -19,13 +17,13 @@ impl QueryStringDataSource {
     }
 }
 
-pub struct QueryString<'s> {
-    query_string: HashMap<String, QueryStringValue<'s>>,
+pub struct QueryString {
+    query_string: HashMap<String, String>,
     data_source: QueryStringDataSource,
 }
 
-impl<'s> QueryString<'s> {
-    pub fn new(src: &'s str, data_source: QueryStringDataSource) -> Result<Self, UrlDecodeError> {
+impl QueryString {
+    pub fn new(src: &str, data_source: QueryStringDataSource) -> Result<Self, UrlDecodeError> {
         let result = Self {
             query_string: super::url_utils::parse_query_string(src)?,
             data_source,
@@ -34,10 +32,7 @@ impl<'s> QueryString<'s> {
         Ok(result)
     }
 
-    pub fn get_required<'r, 't>(
-        &'r self,
-        name: &'t str,
-    ) -> Result<&QueryStringValue<'r>, HttpFailResult> {
+    pub fn get_required<'r, 't>(&'r self, name: &'t str) -> Result<&str, HttpFailResult> {
         let result = self.query_string.get(name);
 
         match result {
@@ -49,8 +44,9 @@ impl<'s> QueryString<'s> {
         }
     }
 
-    pub fn get_optional<'r, 't>(&'r self, name: &'t str) -> Option<&QueryStringValue<'r>> {
-        self.query_string.get(name)
+    pub fn get_optional(&self, name: &str) -> Option<&str> {
+        let result = self.query_string.get(name)?;
+        Some(result)
     }
 }
 
@@ -65,19 +61,12 @@ mod tests {
         let query_string =
             QueryString::new(query_string, QueryStringDataSource::QueryString).unwrap();
 
-        let result = query_string
-            .get_optional("partitionKey")
-            .unwrap()
-            .as_string()
-            .unwrap();
+        let result = query_string.get_optional("partitionKey").unwrap();
 
         assert_eq!("*", result);
 
-        let result = query_string
-            .get_optional("rowKey")
-            .unwrap()
-            .as_string()
-            .unwrap();
+        let result = query_string.get_optional("rowKey").unwrap();
+
         assert_eq!("1abfc", result);
     }
 }
