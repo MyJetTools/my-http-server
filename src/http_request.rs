@@ -6,6 +6,26 @@ use crate::{
 };
 use hyper::{Body, Method, Request, Uri};
 
+#[derive(Clone, Debug)]
+pub enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Delete,
+}
+
+impl HttpMethod {
+    pub fn new(hyper_method: &Method) -> Self {
+        match hyper_method {
+            &Method::GET => HttpMethod::Get,
+            &Method::POST => HttpMethod::Post,
+            &Method::PUT => HttpMethod::Put,
+            &Method::DELETE => HttpMethod::Delete,
+            _ => panic!("Unsupported method: {}", hyper_method),
+        }
+    }
+}
+
 pub enum RequestData {
     AsRaw(Request<Body>),
     AsHttpBody(HttpRequestBody),
@@ -27,7 +47,7 @@ impl RequestData {
     }
 }
 pub struct HttpRequest<'s> {
-    pub method: Method,
+    pub method: HttpMethod,
     pub uri: Uri,
     pub req: RequestData,
     path_lower_case: String,
@@ -41,7 +61,7 @@ impl<'s> HttpRequest<'s> {
         let uri = req.uri().clone();
 
         let path_lower_case = req.uri().path().to_lowercase();
-        let method = req.method().clone();
+        let method = HttpMethod::new(&req.method());
 
         Self {
             req: RequestData::AsRaw(req),
@@ -257,8 +277,8 @@ impl<'s> HttpRequest<'s> {
         return None;
     }
 
-    pub fn get_method(&self) -> &Method {
-        &self.method
+    pub fn get_method(&self) -> HttpMethod {
+        self.method.clone()
     }
 
     pub fn get_host(&self) -> &str {

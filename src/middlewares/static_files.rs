@@ -2,7 +2,6 @@ use crate::{
     request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult, HttpOutput,
     HttpServerMiddleware,
 };
-use async_trait::async_trait;
 
 pub struct StaticFilesMiddleware {
     pub file_folder: String,
@@ -20,8 +19,7 @@ impl StaticFilesMiddleware {
     }
 }
 
-#[async_trait]
-
+#[async_trait::async_trait]
 impl HttpServerMiddleware for StaticFilesMiddleware {
     async fn handle_request<'s, 'c>(
         &'s self,
