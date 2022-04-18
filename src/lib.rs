@@ -22,7 +22,7 @@ pub use http_ctx::HttpContext;
 pub use http_fail_result::HttpFailResult;
 pub use http_headers::HttpHeaders;
 pub use http_ok_result::{HttpOkResult, HttpOutput, IntoHttpOkResult};
-pub use http_request::{HttpMethod, HttpRequest};
+pub use http_request::HttpRequest;
 pub use http_request_body::HttpRequestBody;
 pub use http_server::MyHttpServer;
 pub use http_server_middleware::HttpServerMiddleware;
