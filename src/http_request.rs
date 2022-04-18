@@ -12,7 +12,10 @@ pub enum HttpMethod {
     Post,
     Put,
     Delete,
-    NotSupported,
+    Options,
+    Connect,
+    Trace,
+    Head,
 }
 
 impl HttpMethod {
@@ -22,7 +25,11 @@ impl HttpMethod {
             &Method::POST => HttpMethod::Post,
             &Method::PUT => HttpMethod::Put,
             &Method::DELETE => HttpMethod::Delete,
-            _ => HttpMethod::NotSupported,
+            &Method::OPTIONS => HttpMethod::Options,
+            &Method::CONNECT => HttpMethod::Connect,
+            &Method::TRACE => HttpMethod::Trace,
+            &Method::HEAD => HttpMethod::Head,
+            _ => panic!("Method {} is not supported", hyper_method),
         }
     }
 }
