@@ -61,7 +61,6 @@ pub struct HttpRequest {
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
-    query_string: Option<QueryString>,
 }
 
 impl HttpRequest {
@@ -78,29 +77,18 @@ impl HttpRequest {
             route: None,
             uri,
             method,
-            query_string: None,
         }
     }
 
-    pub fn init_query_string(&mut self) -> Result<(), HttpFailResult> {
-        if self.query_string.is_some() {
-            return Ok(());
-        }
-        match self.uri.query() {
-            Some(src) => {
-                let query_string = QueryString::new(src, QueryStringDataSource::QueryString)?;
-                self.query_string = query_string.into();
-                Ok(())
-            }
-            None => Err(HttpFailResult::as_forbidden(Some(
+    pub fn get_query_string(&self) -> Result<QueryString, HttpFailResult> {
+        if let Some(query) = self.uri.query() {
+            let result = QueryString::new(query, QueryStringDataSource::QueryString)?;
+            Ok(result)
+        } else {
+            Err(HttpFailResult::as_forbidden(Some(
                 "No query string found".to_string(),
-            ))),
+            )))
         }
-    }
-
-    pub fn get_query_string(&self) -> Result<&QueryString, HttpFailResult> {
-        if self.query_string.is_none() {}
-        Ok(self.query_string.as_ref().unwrap())
     }
 
     pub fn get_value_from_path(&self, key: &str) -> Result<&str, HttpFailResult> {
