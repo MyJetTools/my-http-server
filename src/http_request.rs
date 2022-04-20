@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
     http_path::{GetPathValueResult, PathSegments},
@@ -33,6 +33,7 @@ pub struct HttpRequest {
     path_lower_case: String,
     addr: SocketAddr,
     pub route: Option<PathSegments>,
+    key_values: Option<HashMap<String, Vec<u8>>>,
 }
 
 impl HttpRequest {
@@ -49,6 +50,7 @@ impl HttpRequest {
             route: None,
             uri,
             method,
+            key_values: None,
         }
     }
 
@@ -108,6 +110,20 @@ impl HttpRequest {
                 format!("Route [{}] does not have key[{}]", route.path, key),
             ))),
         }
+    }
+
+    pub fn set_key_value(&mut self, key: String, value: Vec<u8>) -> Option<Vec<u8>> {
+        if self.key_values.is_none() {
+            self.key_values = Some(HashMap::new());
+        }
+
+        self.key_values.as_mut().unwrap().insert(key, value)
+    }
+
+    pub fn get_key_value(&self, key: &str) -> Option<&[u8]> {
+        let result = self.key_values.as_ref()?.get(key)?;
+
+        Some(result)
     }
 
     pub fn get_value_from_path_optional_as_string(
