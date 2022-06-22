@@ -34,6 +34,8 @@ pub struct HttpRequest {
     addr: SocketAddr,
     pub route: Option<PathSegments>,
     key_values: Option<HashMap<String, Vec<u8>>>,
+    x_forwarded_proto: Option<String>,
+    x_forwarded_for: Option<String>,
 }
 
 impl HttpRequest {
@@ -43,6 +45,18 @@ impl HttpRequest {
         let path_lower_case = req.uri().path().to_lowercase();
         let method = req.method().clone();
 
+        let x_forwarded_for = if let Some(value) = req.headers().get("X-Forwarded-For") {
+            Some(value.to_str().unwrap().to_string())
+        } else {
+            None
+        };
+
+        let x_forwarded_proto = if let Some(value) = req.headers().get("X-Forwarded-Proto") {
+            Some(value.to_str().unwrap().to_string())
+        } else {
+            None
+        };
+
         Self {
             req: RequestData::AsRaw(req),
             path_lower_case,
@@ -51,6 +65,8 @@ impl HttpRequest {
             uri,
             method,
             key_values: None,
+            x_forwarded_proto,
+            x_forwarded_for,
         }
     }
 
@@ -222,14 +238,8 @@ impl HttpRequest {
     }
 
     pub fn get_ip(&self) -> RequestIp {
-        let headers = self.get_headers();
-        let ip_header = headers.get("X-Forwarded-For");
-
-        if let Some(ip_value) = ip_header {
-            let forwared_ip = std::str::from_utf8(ip_value.as_bytes()).unwrap();
-
-            let result: Vec<&str> = forwared_ip.split(",").map(|itm| itm.trim()).collect();
-
+        if let Some(x_forwared_for) = &self.x_forwarded_for {
+            let result: Vec<&str> = x_forwared_for.split(",").map(|itm| itm.trim()).collect();
             return RequestIp::Forwarded(result);
         }
 
@@ -269,22 +279,18 @@ impl HttpRequest {
         std::str::from_utf8(&self.get_headers().get("host").unwrap().as_bytes()).unwrap()
     }
 
-    pub fn get_scheme(&self) -> String {
-        let headers = self.get_headers();
-        let proto_header = headers.get("X-Forwarded-Proto");
-
-        if let Some(scheme) = proto_header {
-            let bytes = scheme.as_bytes();
-            return String::from_utf8(bytes.to_vec()).unwrap();
+    pub fn get_scheme(&self) -> &str {
+        if let Some(x_forwarded_proto) = &self.x_forwarded_proto {
+            return x_forwarded_proto;
         }
 
         let scheme = self.uri.scheme();
 
         match scheme {
             Some(scheme) => {
-                return scheme.to_string();
+                return scheme.as_str();
             }
-            None => "http".to_string(),
+            None => "http",
         }
     }
 }
