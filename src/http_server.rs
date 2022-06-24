@@ -108,46 +108,6 @@ pub async fn handle_requests(
         Ok(ok_result) => Ok(ok_result.into()),
         Err(err_result) => Ok(err_result.into()),
     }
-
-    /*/
-       for middleware in &http_server_data.middlewares {
-           match middleware.handle_request(&mut ctx).await {
-               Ok(result) => match result {
-                   crate::MiddleWareResult::Ok(ok_result) => {
-                       if let Some(mut my_telemetry) = my_telemetry {
-                           my_telemetry.sw.pause();
-                           my_telemetry.telemetry.track_url_duration(
-                               ctx.request.method.clone(),
-                               ctx.request.uri.clone(),
-                               ok_result.get_status_code(),
-                               my_telemetry.sw.duration(),
-                           );
-                       }
-
-                       return Ok(ok_result.into());
-                   }
-                   crate::MiddleWareResult::Next => {}
-               },
-               Err(fail_result) => {
-                   if fail_result.write_telemetry {
-                       if let Some(mut my_telemetry) = my_telemetry {
-                           my_telemetry.sw.pause();
-                           my_telemetry.telemetry.track_url_duration(
-                               ctx.request.method.clone(),
-                               ctx.request.uri.clone(),
-                               fail_result.status_code,
-                               my_telemetry.sw.duration(),
-                           );
-                       }
-                   }
-
-                   return Ok(fail_result.into());
-               }
-           }
-       }
-
-       let not_found = HttpFailResult::as_not_found("Page not found".to_string(), false);
-    */
 }
 
 async fn shutdown_signal<TAppStates: ApplicationStates>(app: Arc<TAppStates>) {
