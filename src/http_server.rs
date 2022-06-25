@@ -4,8 +4,8 @@ use hyper::{
     Body, Request, Response, Server,
 };
 
-use rust_extensions::ApplicationStates;
-use std::{net::SocketAddr, time::Duration};
+use rust_extensions::{ApplicationStates, Logger};
+use std::{fmt::format, net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
 
@@ -39,10 +39,11 @@ impl MyHttpServer {
         }
     }
 
-    pub fn start<TAppStates>(&mut self, app_states: Arc<TAppStates>)
-    where
-        TAppStates: ApplicationStates + Send + Sync + 'static,
-    {
+    pub fn start(
+        &mut self,
+        app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+        logger: Arc<dyn Logger + Send + Sync + 'static>,
+    ) {
         let mut middlewares = None;
 
         std::mem::swap(&mut middlewares, &mut self.middlewares);
@@ -50,6 +51,12 @@ impl MyHttpServer {
         if middlewares.is_none() {
             panic!("You can not start HTTP server two times");
         }
+
+        logger.write_info(
+            "Starting Http Server".to_string(),
+            format!("Http server starts at: {:?}", self.addr),
+            None,
+        );
 
         let http_server_data = HttpServerData {
             middlewares: middlewares.unwrap(),
@@ -63,13 +70,11 @@ impl MyHttpServer {
     }
 }
 
-pub async fn start<TAppStates>(
+pub async fn start(
     addr: SocketAddr,
     http_server_data: Arc<HttpServerData>,
-    app_states: Arc<TAppStates>,
-) where
-    TAppStates: ApplicationStates + Send + Sync + 'static,
-{
+    app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+) {
     let http_server_data_spawned = http_server_data.clone();
 
     let make_service = make_service_fn(move |conn: &AddrStream| {
@@ -77,8 +82,8 @@ pub async fn start<TAppStates>(
         let addr = conn.remote_addr();
 
         async move {
-            Ok::<_, hyper::Error>(service_fn(move |_req| {
-                handle_requests(_req, http_server_data.clone(), addr)
+            Ok::<_, hyper::Error>(service_fn(move |req| {
+                handle_requests(req, http_server_data.clone(), addr)
             }))
         }
     });
@@ -110,7 +115,7 @@ pub async fn handle_requests(
     }
 }
 
-async fn shutdown_signal<TAppStates: ApplicationStates>(app: Arc<TAppStates>) {
+async fn shutdown_signal(app: Arc<dyn ApplicationStates + Send + Sync + 'static>) {
     let duration = Duration::from_secs(1);
     while !app.is_shutting_down() {
         tokio::time::sleep(duration).await;
