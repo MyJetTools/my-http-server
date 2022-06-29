@@ -86,4 +86,13 @@ impl HttpFailResult {
             write_telemetry: true,
         }
     }
+
+    pub fn as_not_supported_content_type(text: String) -> Self {
+        Self {
+            content_type: WebContentType::Text,
+            content: text.into_bytes(),
+            status_code: 415,
+            write_telemetry: true,
+        }
+    }
 }

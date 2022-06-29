@@ -5,7 +5,7 @@ use hyper::{
 };
 
 use rust_extensions::{ApplicationStates, Logger};
-use std::{fmt::format, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
 

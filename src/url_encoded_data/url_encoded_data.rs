@@ -2,30 +2,30 @@ use std::collections::HashMap;
 
 use crate::{url_decoder::UrlDecodeError, HttpFailResult};
 
-use super::QueryStringValue;
+use super::UrlEncodedValueAsString;
 
-pub enum QueryStringDataSource {
+pub enum UrlEncodedDataSource {
     Headers,
     FormData,
     QueryString,
 }
-impl QueryStringDataSource {
+impl UrlEncodedDataSource {
     pub fn as_str(&self) -> &str {
         match self {
-            QueryStringDataSource::Headers => "headers",
-            QueryStringDataSource::FormData => "from data",
-            QueryStringDataSource::QueryString => "query string",
+            UrlEncodedDataSource::Headers => "headers",
+            UrlEncodedDataSource::FormData => "from data",
+            UrlEncodedDataSource::QueryString => "query string",
         }
     }
 }
 
-pub struct QueryString<'s> {
-    query_string: HashMap<String, QueryStringValue<'s>>,
-    data_source: QueryStringDataSource,
+pub struct UrlEncodedData<'s> {
+    query_string: HashMap<String, UrlEncodedValueAsString<'s>>,
+    data_source: UrlEncodedDataSource,
 }
 
-impl<'s> QueryString<'s> {
-    pub fn new(src: &'s str, data_source: QueryStringDataSource) -> Result<Self, UrlDecodeError> {
+impl<'s> UrlEncodedData<'s> {
+    pub fn new(src: &'s str, data_source: UrlEncodedDataSource) -> Result<Self, UrlDecodeError> {
         let result = Self {
             query_string: super::url_utils::parse_query_string(src)?,
             data_source,
@@ -34,7 +34,10 @@ impl<'s> QueryString<'s> {
         Ok(result)
     }
 
-    pub fn get_required(&'s self, name: &str) -> Result<&'s QueryStringValue<'s>, HttpFailResult> {
+    pub fn get_required(
+        &'s self,
+        name: &str,
+    ) -> Result<&'s UrlEncodedValueAsString<'s>, HttpFailResult> {
         let result = self.query_string.get(name);
 
         match result {
@@ -46,7 +49,7 @@ impl<'s> QueryString<'s> {
         }
     }
 
-    pub fn get_optional(&'s self, name: &str) -> Option<&'s QueryStringValue<'s>> {
+    pub fn get_optional(&'s self, name: &str) -> Option<&'s UrlEncodedValueAsString<'s>> {
         self.query_string.get(name)
     }
 }
@@ -60,7 +63,7 @@ mod tests {
         let query_string = "tableName=deposit-restrictions&partitionKey=%2A&rowKey=1abfc";
 
         let query_string =
-            QueryString::new(query_string, QueryStringDataSource::QueryString).unwrap();
+            UrlEncodedData::new(query_string, UrlEncodedDataSource::QueryString).unwrap();
 
         let result = query_string
             .get_optional("partitionKey")

@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
     http_path::{GetPathValueResult, PathSegments},
-    HttpFailResult, HttpRequestBody, QueryString, QueryStringDataSource, RequestIp,
+    HttpFailResult, HttpRequestBody, RequestIp, UrlEncodedData, UrlEncodedDataSource,
 };
 use hyper::{Body, Method, Request, Uri};
 
@@ -70,9 +70,9 @@ impl HttpRequest {
         }
     }
 
-    pub fn get_query_string(&self) -> Result<QueryString, HttpFailResult> {
+    pub fn get_query_string(&self) -> Result<UrlEncodedData, HttpFailResult> {
         if let Some(query) = self.uri.query() {
-            let result = QueryString::new(query, QueryStringDataSource::QueryString)?;
+            let result = UrlEncodedData::new(query, UrlEncodedDataSource::QueryString)?;
             Ok(result)
         } else {
             Err(HttpFailResult::as_forbidden(Some(
@@ -256,7 +256,7 @@ impl HttpRequest {
 
         return Err(HttpFailResult::required_parameter_is_missing(
             header_name,
-            QueryStringDataSource::QueryString.as_str(),
+            UrlEncodedDataSource::QueryString.as_str(),
         ));
     }
 

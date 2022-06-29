@@ -1,14 +1,45 @@
 use serde::de::DeserializeOwned;
 
-use crate::{HttpFailResult, QueryString, QueryStringDataSource, WebContentType};
+use crate::{
+    form_data::FormData, HttpFailResult, JsonEncodedData, UrlEncodedData, UrlEncodedDataSource,
+    WebContentType,
+};
+
+pub enum BodyContentType {
+    Json,
+    UrlEncoded,
+    Unknown,
+}
+
+impl BodyContentType {
+    pub fn detect(raw_body: &[u8]) -> Self {
+        for b in raw_body {
+            if *b <= 32 {
+                continue;
+            }
+
+            if *b == '{' as u8 || *b == '[' as u8 {
+                return BodyContentType::Json;
+            } else {
+                return BodyContentType::UrlEncoded;
+            }
+        }
+        Self::Unknown
+    }
+}
 
 pub struct HttpRequestBody {
     raw_body: Vec<u8>,
+    body_content_type: BodyContentType,
 }
 
 impl HttpRequestBody {
     pub fn new(body: Vec<u8>) -> Self {
-        Self { raw_body: body }
+        let body_content_type = BodyContentType::detect(body.as_slice());
+        Self {
+            raw_body: body,
+            body_content_type,
+        }
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -41,21 +72,50 @@ impl HttpRequestBody {
         }
     }
 
-    pub fn get_form_data(&self) -> Result<QueryString, HttpFailResult> {
-        let body_as_str = self.as_str()?;
-
-        match QueryString::new(body_as_str, QueryStringDataSource::FormData) {
-            Ok(result) => return Ok(result),
-            Err(err) => {
-                let result = HttpFailResult {
-                    write_telemetry: true,
-                    content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
-                    content_type: WebContentType::Text,
-                    status_code: 412,
-                };
-
-                return Err(result);
+    pub fn get_form_data(&self) -> Result<FormData, HttpFailResult> {
+        match self.body_content_type {
+            BodyContentType::Json => get_form_data_as_json_encoded(self.raw_body.as_slice()),
+            BodyContentType::UrlEncoded => {
+                let body_as_str = self.as_str()?;
+                get_form_data_as_url_encoded(body_as_str)
             }
+            BodyContentType::Unknown => {
+                return Err(HttpFailResult::as_not_supported_content_type(
+                    "Unknown body content type".to_string(),
+                ))
+            }
+        }
+    }
+}
+
+fn get_form_data_as_url_encoded(body_as_str: &str) -> Result<FormData, HttpFailResult> {
+    match UrlEncodedData::new(body_as_str, UrlEncodedDataSource::FormData) {
+        Ok(result) => return Ok(FormData::crate_as_url_encoded_data(result)),
+        Err(err) => {
+            let result = HttpFailResult {
+                write_telemetry: true,
+                content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
+                content_type: WebContentType::Text,
+                status_code: 412,
+            };
+
+            return Err(result);
+        }
+    }
+}
+
+fn get_form_data_as_json_encoded(body: &[u8]) -> Result<FormData, HttpFailResult> {
+    match JsonEncodedData::new(body) {
+        Ok(result) => Ok(FormData::create_as_json_encoded_data(result)),
+        Err(err) => {
+            let result = HttpFailResult {
+                write_telemetry: true,
+                content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
+                content_type: WebContentType::Text,
+                status_code: 412,
+            };
+
+            return Err(result);
         }
     }
 }

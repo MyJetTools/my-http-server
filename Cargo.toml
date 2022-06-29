@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 rust-extensions = { branch = "0.1.0", git = "https://github.com/MyJetTools/rust-extensions.git" }
-
+my-json = { branch = "0.1.0", git = "https://github.com/MyJetTools/my-json.git" }
 tokio = { version = "*", features = ["full"] }
 
 lazy_static = "*"

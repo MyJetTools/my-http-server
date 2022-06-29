@@ -2,13 +2,13 @@ use std::str::FromStr;
 
 use crate::HttpFailResult;
 
-pub struct QueryStringValue<'s> {
+pub struct UrlEncodedValueAsString<'s> {
     value: &'s str,
 }
 
-impl<'s> QueryStringValue<'s> {
-    pub fn new(value: &'s str) -> Self {
-        Self { value }
+impl<'s> UrlEncodedValueAsString<'s> {
+    pub fn new(src: &'s str) -> Self {
+        Self { value: src }
     }
 
     pub fn as_string(&self) -> Result<String, HttpFailResult> {
@@ -21,7 +21,7 @@ impl<'s> QueryStringValue<'s> {
         Ok(bool_value)
     }
 
-    pub fn parse<'t, T: FromStr>(&'s self) -> Result<T, HttpFailResult> {
+    pub fn parse<T: FromStr>(&'s self) -> Result<T, HttpFailResult> {
         let result = self.value.parse::<T>();
         return match result {
             Ok(value) => Ok(value),
