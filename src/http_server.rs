@@ -4,7 +4,8 @@ use hyper::{
     Body, Request, Response, Server,
 };
 
-use rust_extensions::{ApplicationStates, Logger};
+use my_telemetry::TelemetryEvent;
+use rust_extensions::{date_time::DateTimeAsMicroseconds, ApplicationStates, Logger};
 use std::{net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
@@ -44,9 +45,7 @@ impl MyHttpServer {
         app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) {
-        let mut middlewares = None;
-
-        std::mem::swap(&mut middlewares, &mut self.middlewares);
+        let middlewares = self.middlewares.take();
 
         if middlewares.is_none() {
             panic!("You can not start HTTP server two times");
@@ -104,14 +103,78 @@ pub async fn handle_requests(
 ) -> hyper::Result<Response<Body>> {
     let req = HttpRequest::new(req, addr);
     let mut ctx = HttpContext::new(req);
+    let process_id = ctx.telemetry_context.process_id;
 
-    let mut flows = HttpServerRequestFlow::new(http_server_data.middlewares.clone());
+    let telemetry_data = if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
+        Some(format!(
+            "[{}]{}",
+            ctx.request.get_method(),
+            ctx.request.get_path()
+        ))
+    } else {
+        None
+    };
 
-    let result = flows.next(&mut ctx).await;
+    let started = DateTimeAsMicroseconds::now();
 
-    match result {
-        Ok(ok_result) => Ok(ok_result.into()),
-        Err(err_result) => Ok(err_result.into()),
+    let result = tokio::spawn(async move {
+        let mut flows = HttpServerRequestFlow::new(http_server_data.middlewares.clone());
+        flows.next(&mut ctx).await
+    });
+
+    match result.await {
+        Ok(not_paniced) => match not_paniced {
+            Ok(ok_result) => {
+                if let Some(telemetry_data) = telemetry_data {
+                    my_telemetry::TELEMETRY_INTERFACE
+                        .write_telemetry_event(TelemetryEvent {
+                            process_id: process_id,
+                            started: started.unix_microseconds,
+                            finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                            data: telemetry_data,
+                            success: Some(format!(
+                                "Status code: {}",
+                                ok_result.output.get_status_code()
+                            )),
+                            fail: None,
+                        })
+                        .await;
+                }
+                Ok(ok_result.into())
+            }
+            Err(err_result) => {
+                if let Some(telemetry_data) = telemetry_data {
+                    my_telemetry::TELEMETRY_INTERFACE
+                        .write_telemetry_event(TelemetryEvent {
+                            process_id: process_id,
+                            started: started.unix_microseconds,
+                            finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                            data: telemetry_data,
+                            success: None,
+
+                            fail: Some(format!("Status code: {}", err_result.status_code)),
+                        })
+                        .await;
+                }
+                Ok(err_result.into())
+            }
+        },
+        Err(err) => {
+            if let Some(telemetry_data) = telemetry_data {
+                my_telemetry::TELEMETRY_INTERFACE
+                    .write_telemetry_event(TelemetryEvent {
+                        process_id: process_id,
+                        started: started.unix_microseconds,
+                        finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                        data: telemetry_data,
+                        success: None,
+
+                        fail: Some(format!("Panic: {:?}", err)),
+                    })
+                    .await;
+            }
+            panic!("Http Server error");
+        }
     }
 }
 
