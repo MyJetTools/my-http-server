@@ -106,10 +106,9 @@ pub async fn handle_requests(
     let process_id = ctx.telemetry_context.process_id;
 
     let telemetry_data = if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
-        Some(format!(
-            "[{}]{}",
-            ctx.request.get_method(),
-            ctx.request.get_path()
+        Some((
+            format!("[{}]{}", ctx.request.get_method(), ctx.request.get_path()),
+            ctx.request.get_ip().to_string(),
         ))
     } else {
         None
@@ -132,12 +131,13 @@ pub async fn handle_requests(
                                 process_id: process_id,
                                 started: started.unix_microseconds,
                                 finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                                data: telemetry_data,
+                                data: telemetry_data.0,
                                 success: Some(format!(
                                     "Status code: {}",
                                     ok_result.output.get_status_code()
                                 )),
                                 fail: None,
+                                ip: Some(telemetry_data.1),
                             })
                             .await;
                     }
@@ -153,10 +153,11 @@ pub async fn handle_requests(
                                 process_id: process_id,
                                 started: started.unix_microseconds,
                                 finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                                data: telemetry_data,
+                                data: telemetry_data.0,
                                 success: None,
 
                                 fail: Some(format!("Status code: {}", err_result.status_code)),
+                                ip: Some(telemetry_data.1),
                             })
                             .await;
                     }
@@ -171,10 +172,10 @@ pub async fn handle_requests(
                         process_id: process_id,
                         started: started.unix_microseconds,
                         finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                        data: telemetry_data,
+                        data: telemetry_data.0,
                         success: None,
-
                         fail: Some(format!("Panic: {:?}", err)),
+                        ip: Some(telemetry_data.1),
                     })
                     .await;
             }

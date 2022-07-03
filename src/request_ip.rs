@@ -17,4 +17,20 @@ impl<'s> RequestIp<'s> {
             RequestIp::Forwarded(forwarded_ips) => forwarded_ips[0].to_string(),
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            RequestIp::Result(ip) => ip.to_string(),
+            RequestIp::Forwarded(forwarded_ips) => {
+                let mut result = String::new();
+                for ip in forwarded_ips {
+                    result.push_str(ip);
+                    result.push_str(", ");
+                }
+                result.pop();
+                result.pop();
+                result
+            }
+        }
+    }
 }
