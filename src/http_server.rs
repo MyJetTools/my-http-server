@@ -125,36 +125,41 @@ pub async fn handle_requests(
     match result.await {
         Ok(not_paniced) => match not_paniced {
             Ok(ok_result) => {
-                if let Some(telemetry_data) = telemetry_data {
-                    my_telemetry::TELEMETRY_INTERFACE
-                        .write_telemetry_event(TelemetryEvent {
-                            process_id: process_id,
-                            started: started.unix_microseconds,
-                            finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                            data: telemetry_data,
-                            success: Some(format!(
-                                "Status code: {}",
-                                ok_result.output.get_status_code()
-                            )),
-                            fail: None,
-                        })
-                        .await;
+                if ok_result.write_telemetry {
+                    if let Some(telemetry_data) = telemetry_data {
+                        my_telemetry::TELEMETRY_INTERFACE
+                            .write_telemetry_event(TelemetryEvent {
+                                process_id: process_id,
+                                started: started.unix_microseconds,
+                                finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                                data: telemetry_data,
+                                success: Some(format!(
+                                    "Status code: {}",
+                                    ok_result.output.get_status_code()
+                                )),
+                                fail: None,
+                            })
+                            .await;
+                    }
                 }
+
                 Ok(ok_result.into())
             }
             Err(err_result) => {
-                if let Some(telemetry_data) = telemetry_data {
-                    my_telemetry::TELEMETRY_INTERFACE
-                        .write_telemetry_event(TelemetryEvent {
-                            process_id: process_id,
-                            started: started.unix_microseconds,
-                            finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                            data: telemetry_data,
-                            success: None,
+                if err_result.write_telemetry {
+                    if let Some(telemetry_data) = telemetry_data {
+                        my_telemetry::TELEMETRY_INTERFACE
+                            .write_telemetry_event(TelemetryEvent {
+                                process_id: process_id,
+                                started: started.unix_microseconds,
+                                finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                                data: telemetry_data,
+                                success: None,
 
-                            fail: Some(format!("Status code: {}", err_result.status_code)),
-                        })
-                        .await;
+                                fail: Some(format!("Status code: {}", err_result.status_code)),
+                            })
+                            .await;
+                    }
                 }
                 Ok(err_result.into())
             }
