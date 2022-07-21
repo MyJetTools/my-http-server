@@ -119,3 +119,35 @@ fn get_form_data_as_json_encoded(body: &[u8]) -> Result<FormData, HttpFailResult
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let body = r#"{"processId":"8269e2ac-fa3b-419a-8e65-1a606ba07942","sellAmount":0.4,"buyAmount":null,"sellAsset":"ETH","buyAsset":"USDT"}"#;
+
+        let body = HttpRequestBody::new(body.as_bytes().to_vec());
+
+        let form_data = body.get_form_data().unwrap();
+
+        assert_eq!(
+            "8269e2ac-fa3b-419a-8e65-1a606ba07942",
+            form_data
+                .get_required("processId")
+                .unwrap()
+                .as_string()
+                .unwrap()
+        );
+
+        assert_eq!(
+            "0.4",
+            form_data
+                .get_required("sellAmount")
+                .unwrap()
+                .as_string()
+                .unwrap()
+        );
+    }
+}
