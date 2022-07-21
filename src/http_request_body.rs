@@ -149,5 +149,8 @@ mod test {
                 .as_string()
                 .unwrap()
         );
+
+        let result = form_data.get_optional("buyAmount");
+        assert!(result.is_none());
     }
 }

@@ -22,9 +22,11 @@ impl<'s> JsonEncodedData<'s> {
 
             let value = line.get_value()?;
 
-            result
-                .values
-                .insert(name.to_string(), JsonEncodedValueAsString::new(name, value));
+            if !value.is_null() {
+                result
+                    .values
+                    .insert(name.to_string(), JsonEncodedValueAsString::new(name, value));
+            }
         }
 
         Ok(result)
