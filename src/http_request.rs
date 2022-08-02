@@ -36,6 +36,7 @@ pub struct HttpRequest {
     key_values: Option<HashMap<String, Vec<u8>>>,
     x_forwarded_proto: Option<String>,
     x_forwarded_for: Option<String>,
+    host: Option<String>,
 }
 
 impl HttpRequest {
@@ -57,6 +58,12 @@ impl HttpRequest {
             None
         };
 
+        let host = if let Some(value) = req.headers().get("host") {
+            Some(value.to_str().unwrap().to_string())
+        } else {
+            None
+        };
+
         Self {
             req: RequestData::AsRaw(req),
             path_lower_case,
@@ -67,6 +74,7 @@ impl HttpRequest {
             key_values: None,
             x_forwarded_proto,
             x_forwarded_for,
+            host,
         }
     }
 
@@ -276,7 +284,11 @@ impl HttpRequest {
     }
 
     pub fn get_host(&self) -> &str {
-        std::str::from_utf8(&self.get_headers().get("host").unwrap().as_bytes()).unwrap()
+        if let Some(host) = &self.host {
+            return host;
+        }
+
+        panic!("Host is not set");
     }
 
     pub fn get_scheme(&self) -> &str {
