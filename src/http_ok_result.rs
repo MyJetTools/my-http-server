@@ -16,6 +16,7 @@ pub enum HttpOutput {
 
     Redirect {
         url: String,
+        permanent: bool,
     },
 }
 
@@ -45,9 +46,10 @@ impl HttpOutput {
         }
     }
 
-    pub fn as_redirect(src: &str) -> Self {
+    pub fn as_redirect(src: &str, permanent: bool) -> Self {
         Self::Redirect {
             url: src.to_string(),
+            permanent,
         }
     }
 
@@ -67,7 +69,13 @@ impl HttpOutput {
                 content_type: _,
                 content: _,
             } => 200,
-            Self::Redirect { url: _ } => 308,
+            Self::Redirect { url: _, permanent } => {
+                if *permanent {
+                    301
+                } else {
+                    302
+                }
+            }
         }
     }
 }
@@ -137,7 +145,7 @@ impl Into<Response<Body>> for HttpOkResult {
                     .body(Body::from(content))
                     .unwrap(),
             },
-            HttpOutput::Redirect { url } => Response::builder()
+            HttpOutput::Redirect { url, permanent: _ } => Response::builder()
                 .status(status_code)
                 .header("Location", url)
                 .body(Body::empty())
