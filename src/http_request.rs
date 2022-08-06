@@ -41,7 +41,7 @@ pub struct HttpRequest {
 
 impl HttpRequest {
     pub fn new(req: Request<Body>, addr: SocketAddr) -> Self {
-        println!("Schemen{:?}; Uri{:?}", req.uri().scheme_str(), req.uri());
+        println!("Scheme:{:?}; Uri:{:?}", req.uri().scheme(), req.uri());
 
         let uri = req.uri().clone();
 
