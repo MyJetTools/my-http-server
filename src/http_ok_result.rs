@@ -4,7 +4,6 @@ use crate::{HttpFailResult, WebContentType};
 use hyper::{Body, Response};
 use serde::Serialize;
 
-#[derive(Clone)]
 pub enum HttpOutput {
     Empty,
 
@@ -18,6 +17,8 @@ pub enum HttpOutput {
         url: String,
         permanent: bool,
     },
+
+    Raw(Response<Body>),
 }
 
 impl HttpOutput {
@@ -76,11 +77,12 @@ impl HttpOutput {
                     302
                 }
             }
+
+            HttpOutput::Raw(body) => body.status().as_u16(),
         }
     }
 }
 
-#[derive(Clone)]
 pub struct HttpOkResult {
     pub write_telemetry: bool,
     pub output: HttpOutput,
@@ -154,6 +156,8 @@ impl Into<Response<Body>> for HttpOkResult {
                 .status(status_code)
                 .body(Body::empty())
                 .unwrap(),
+
+            HttpOutput::Raw(body) => body,
         };
     }
 }
