@@ -31,7 +31,7 @@ pub struct HttpRequest {
     pub uri: Uri,
     pub req: RequestData,
     path_lower_case: String,
-    addr: SocketAddr,
+    pub addr: SocketAddr,
     pub route: Option<PathSegments>,
     key_values: Option<HashMap<String, Vec<u8>>>,
     x_forwarded_proto: Option<String>,
