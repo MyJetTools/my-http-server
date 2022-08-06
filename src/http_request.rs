@@ -41,6 +41,12 @@ pub struct HttpRequest {
 
 impl HttpRequest {
     pub fn new(req: Request<Body>, addr: SocketAddr) -> Self {
+        if let Some(scheme) = req.uri().scheme_str() {
+            if !scheme.starts_with("http") {
+                println!("{:?}", req.uri());
+            }
+        }
+
         let uri = req.uri().clone();
 
         let path_lower_case = req.uri().path().to_lowercase();
