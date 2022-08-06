@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::HttpFailResult;
 
 pub struct UrlEncodedValueAsString<'s> {
-    value: &'s str,
+    pub value: &'s str,
 }
 
 impl<'s> UrlEncodedValueAsString<'s> {
