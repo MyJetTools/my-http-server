@@ -47,7 +47,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
 
         let file = format!("{}{}", self.file_folder, path);
 
-        match static_files_middleware::files::get(file.as_str()).await {
+        match super::files::get(file.as_str()).await {
             Ok(file_content) => {
                 let output = HttpOutput::Content {
                     headers: None,

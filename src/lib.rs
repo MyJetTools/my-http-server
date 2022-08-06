@@ -18,14 +18,14 @@ mod url_encoded_data;
 mod web_content_type;
 
 pub mod form_data;
-#[cfg(static_files)]
+#[cfg(feature = "static_files")]
 mod static_files_middleware;
-#[cfg(static_files)]
+#[cfg(feature = "static_files")]
 pub use static_files_middleware::*;
 
-#[cfg(full)]
+#[cfg(feature = "full")]
 mod static_files_middleware;
-#[cfg(full)]
+#[cfg(feature = "full")]
 pub use static_files_middleware::*;
 
 pub use http_ctx::HttpContext;
