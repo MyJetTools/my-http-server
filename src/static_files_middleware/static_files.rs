@@ -30,22 +30,29 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let path = {
-            let mut path = ctx.request.get_path_lower_case();
+        let path = ctx.request.get_path_lower_case();
 
-            if path == "/" {
-                if let Some(index_files) = &self.index_files {
-                    for index_file in index_files {
-                        path = index_file.as_str();
-                        break;
+        if path == "/" {
+            if let Some(index_files) = &self.index_files {
+                for index_file in index_files {
+                    let file_name = get_file_name(self.file_folder.as_str(), index_file);
+                    if let Ok(file_content) = super::files::get(file_name.as_str()).await {
+                        let output = HttpOutput::Content {
+                            headers: None,
+                            content_type: None,
+                            content: file_content,
+                        };
+
+                        return Ok(HttpOkResult {
+                            write_telemetry: false,
+                            output,
+                        });
                     }
                 }
             }
+        }
 
-            path
-        };
-
-        let file = format!("{}{}", self.file_folder, path);
+        let file = get_file_name(self.file_folder.as_str(), path);
 
         match super::files::get(file.as_str()).await {
             Ok(file_content) => {
@@ -65,4 +72,8 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
             }
         }
     }
+}
+
+fn get_file_name(file_folder: &str, path: &str) -> String {
+    format!("{}{}", file_folder, path)
 }
