@@ -12,7 +12,7 @@ impl HttpServerRequestFlow {
     }
     pub async fn next(&mut self, ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
         if self.middlewares.is_empty() {
-            let not_found = HttpFailResult::as_not_found("Page not found".to_string(), false);
+            let not_found = HttpFailResult::as_not_found("404 - Not Found".to_string(), false);
 
             return Err(not_found);
         }
