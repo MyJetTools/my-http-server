@@ -3,13 +3,25 @@ use crate::{
     HttpServerMiddleware, WebContentType,
 };
 
+pub struct FilesMapping {
+    pub uri_prefix: String,
+    pub folder_path: String,
+}
+
+impl FilesMapping {
+    pub fn to_lowercase(&mut self) {
+        self.uri_prefix = self.uri_prefix.to_lowercase();
+        self.folder_path = self.folder_path.to_lowercase();
+    }
+}
+
 pub struct StaticFilesMiddleware {
-    pub file_folders: Vec<String>,
+    pub file_folders: Option<Vec<FilesMapping>>,
     pub index_files: Option<Vec<String>>,
 }
 
 impl StaticFilesMiddleware {
-    pub fn new(file_folders: Option<Vec<String>>, index_files: Option<Vec<String>>) -> Self {
+    pub fn new(mappings: Option<Vec<FilesMapping>>, index_files: Option<Vec<String>>) -> Self {
         let index_files = if let Some(index_file_to_check) = index_files {
             let mut index_files_result = Vec::with_capacity(index_file_to_check.len());
 
@@ -26,11 +38,14 @@ impl StaticFilesMiddleware {
             None
         };
 
-        let file_folders = if let Some(mut file_folders) = file_folders {
-            file_folders.insert(0, super::files::DEFAULT_FOLDER.to_string());
-            file_folders
+        let file_folders = if let Some(mut mappings) = mappings {
+            for mapping in &mut mappings {
+                mapping.to_lowercase();
+            }
+
+            Some(mappings)
         } else {
-            vec![super::files::DEFAULT_FOLDER.to_string()]
+            None
         };
 
         Self {
@@ -95,10 +110,21 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
     ) -> Result<HttpOkResult, HttpFailResult> {
         let path = ctx.request.get_path_lower_case();
 
-        for file_folder in &self.file_folders {
-            if let Some(result) = self.handle_folder(file_folder, path).await {
-                return result;
+        if let Some(mappings) = &self.file_folders {
+            for mapping in mappings {
+                if path.starts_with(mapping.uri_prefix.as_str()) {
+                    if let Some(result) = self
+                        .handle_folder(&mapping.folder_path[mapping.uri_prefix.len()..], path)
+                        .await
+                    {
+                        return result;
+                    }
+                }
             }
+        }
+
+        if let Some(result) = self.handle_folder(super::files::DEFAULT_FOLDER, path).await {
+            return result;
         }
 
         get_next.next(ctx).await
