@@ -9,7 +9,6 @@ pub struct FilesMapping {
 }
 
 impl FilesMapping {
-
     pub fn new(uri_prefix: &str, folder_path: &str) -> Self {
         Self {
             uri_prefix: uri_prefix.to_string(),
@@ -121,9 +120,9 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         if let Some(mappings) = &self.file_folders {
             for mapping in mappings {
                 if path.starts_with(mapping.uri_prefix.as_str()) {
-                    if let Some(result) = self
-                        .handle_folder(&mapping.folder_path[mapping.uri_prefix.len()..], path)
-                        .await
+                    let path = &path[mapping.uri_prefix.len()..];
+                    if let Some(result) =
+                        self.handle_folder(mapping.folder_path.as_str(), path).await
                     {
                         return result;
                     }
