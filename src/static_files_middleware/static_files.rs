@@ -1,6 +1,6 @@
 use crate::{
     request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult, HttpOutput,
-    HttpServerMiddleware,
+    HttpServerMiddleware, WebContentType,
 };
 
 pub struct StaticFilesMiddleware {
@@ -55,7 +55,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
                     if let Ok(file_content) = super::files::get(file_name.as_str()).await {
                         let output = HttpOutput::Content {
                             headers: None,
-                            content_type: None,
+                            content_type: WebContentType::detect_by_extension(path),
                             content: file_content,
                         };
 
@@ -74,7 +74,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
             Ok(file_content) => {
                 let output = HttpOutput::Content {
                     headers: None,
-                    content_type: None,
+                    content_type: WebContentType::detect_by_extension(path),
                     content: file_content,
                 };
 
