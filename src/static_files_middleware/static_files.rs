@@ -9,6 +9,14 @@ pub struct FilesMapping {
 }
 
 impl FilesMapping {
+
+    pub fn new(uri_prefix: &str, folder_path: &str) -> Self {
+        Self {
+            uri_prefix: uri_prefix.to_string(),
+            folder_path: folder_path.to_string(),
+        }
+    }
+
     pub fn to_lowercase(&mut self) {
         self.uri_prefix = self.uri_prefix.to_lowercase();
         self.folder_path = self.folder_path.to_lowercase();
