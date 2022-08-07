@@ -26,7 +26,8 @@ impl StaticFilesMiddleware {
             None
         };
 
-        let file_folders = if let Some(file_folders) = file_folders {
+        let file_folders = if let Some(mut file_folders) = file_folders {
+            file_folders.push(super::files::DEFAULT_FOLDER.to_string());
             file_folders
         } else {
             vec![super::files::DEFAULT_FOLDER.to_string()]
