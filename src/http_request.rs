@@ -269,14 +269,12 @@ impl HttpRequest {
     }
 
     pub fn get_optional_header(&self, header_name: &str) -> Option<&str> {
-        for (http_header, value) in self.get_headers() {
-            let http_header = http_header.as_str();
-            if http_header == header_name {
-                return Some(value.to_str().unwrap());
-            }
-        }
+        let result = self.get_headers().get(header_name)?;
 
-        return None;
+        match result.to_str() {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        }
     }
 
     pub fn get_method(&self) -> &Method {
