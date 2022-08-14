@@ -40,18 +40,14 @@ impl MyHttpServer {
         }
     }
 
-    pub fn start(
-        &mut self,
-        app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
-        logger: Arc<dyn Logger + Send + Sync + 'static>,
-    ) {
+    pub fn start(&mut self, app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>) {
         let middlewares = self.middlewares.take();
 
         if middlewares.is_none() {
             panic!("You can not start HTTP server two times");
         }
 
-        logger.write_info(
+        my_logger::LOGGER.write_info(
             "Starting Http Server".to_string(),
             format!("Http server starts at: {:?}", self.addr),
             None,
