@@ -22,15 +22,19 @@ pub enum HttpOutput {
 }
 
 impl HttpOutput {
-    pub fn into_ok_result(self, write_telemetry: bool) -> HttpOkResult {
-        HttpOkResult {
+    pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpOkResult> {
+        Ok(HttpOkResult {
             write_telemetry,
             output: self,
-        }
+        })
     }
 
-    pub fn into_fail_result(self, status_code: u16, write_telemetry: bool) -> HttpFailResult {
-        match self {
+    pub fn into_fail_result(
+        self,
+        status_code: u16,
+        write_telemetry: bool,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let result = match self {
             HttpOutput::Empty => HttpFailResult {
                 content_type: WebContentType::Text,
                 status_code: status_code,
@@ -56,7 +60,9 @@ impl HttpOutput {
             HttpOutput::Raw(_) => {
                 panic!("Raw response can not be turned into Http Fail result")
             }
-        }
+        };
+
+        Err(result)
     }
 
     pub fn as_text(text: String) -> Self {
