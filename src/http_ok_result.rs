@@ -29,6 +29,36 @@ impl HttpOutput {
         }
     }
 
+    pub fn into_fail_result(self, status_code: u16, write_telemetry: bool) -> HttpFailResult {
+        match self {
+            HttpOutput::Empty => HttpFailResult {
+                content_type: WebContentType::Text,
+                status_code: status_code,
+                content: Vec::new(),
+                write_telemetry,
+            },
+            HttpOutput::Content {
+                headers: _,
+                content_type,
+                content,
+            } => HttpFailResult {
+                content_type: content_type.unwrap_or(WebContentType::Text),
+                status_code: status_code,
+                content,
+                write_telemetry,
+            },
+            HttpOutput::Redirect {
+                url: _,
+                permanent: _,
+            } => {
+                panic!("Redirect can not be turned into Http Fail result")
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Raw response can not be turned into Http Fail result")
+            }
+        }
+    }
+
     pub fn as_text(text: String) -> Self {
         Self::Content {
             headers: None,
