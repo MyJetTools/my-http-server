@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{HttpFailResult, WebContentType};
-use hyper::{server::conn::Http, Body, Response};
+use hyper::{Body, Response};
 use serde::Serialize;
 
 pub enum HttpOutput {
