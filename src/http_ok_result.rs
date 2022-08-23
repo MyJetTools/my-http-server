@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{HttpFailResult, WebContentType};
-use hyper::{Body, Response};
+use hyper::{server::conn::Http, Body, Response};
 use serde::Serialize;
 
 pub enum HttpOutput {
@@ -22,7 +22,7 @@ pub enum HttpOutput {
 }
 
 impl HttpOutput {
-    pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpOkResult> {
+    pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
         Ok(HttpOkResult {
             write_telemetry,
             output: self,
