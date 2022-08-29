@@ -1,9 +1,7 @@
 use super::{UrlDecodeError, UrlDecoder};
 
 pub fn decode_from_url_query_string(src: &str) -> Result<String, UrlDecodeError> {
-    let index_percent = src.find("%");
-
-    if index_percent.is_none() {
+    if !has_escape(src.as_bytes()) {
         return Ok(src.to_string());
     }
 
@@ -15,6 +13,20 @@ pub fn decode_from_url_query_string(src: &str) -> Result<String, UrlDecodeError>
     }
 
     return Ok(String::from_utf8(result).unwrap());
+}
+
+fn has_escape(src: &[u8]) -> bool {
+    for itm in src {
+        if *itm == b'%' {
+            return true;
+        }
+
+        if *itm == b'+' {
+            return true;
+        }
+    }
+
+    false
 }
 
 #[cfg(test)]

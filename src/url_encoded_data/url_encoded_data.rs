@@ -60,7 +60,8 @@ mod tests {
 
     #[test]
     pub fn test_basic() {
-        let query_string = "tableName=deposit-restrictions&partitionKey=%2A&rowKey=1abfc";
+        let query_string =
+            "tableName=deposit-restrictions&partitionKey=%2A&rowKey=1abfc&field=1a+bfc";
 
         let query_string =
             UrlEncodedData::new(query_string, UrlEncodedDataSource::QueryString).unwrap();
@@ -80,5 +81,13 @@ mod tests {
             .unwrap();
 
         assert_eq!("1abfc", result);
+
+        let result = query_string
+            .get_optional("field")
+            .unwrap()
+            .as_string()
+            .unwrap();
+
+        assert_eq!("1a bfc", result);
     }
 }

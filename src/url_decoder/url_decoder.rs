@@ -30,7 +30,11 @@ impl<'s> UrlDecoder<'s> {
             match &mut self.state {
                 UrlDecodeState::Normal(state) => {
                     if state.get_next(next_char) {
-                        return Ok(Some(next_char));
+                        if next_char == b'+' {
+                            return Ok(Some(32));
+                        } else {
+                            return Ok(Some(next_char));
+                        }
                     }
 
                     self.state = UrlDecodeState::Escaped(EscapedState::new(next_char));
