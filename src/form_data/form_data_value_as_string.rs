@@ -1,9 +1,8 @@
 use std::str::FromStr;
 
-use crate::{
-    json_encoded_data::JsonEncodedValueAsString, url_encoded_data::UrlEncodedValueAsString,
-    HttpFailResult,
-};
+use url_utils::url_encoded_data_reader::UrlEncodedValueAsString;
+
+use crate::{json_encoded_data::JsonEncodedValueAsString, HttpFailResult};
 
 pub enum FormDataValueAsString<'s> {
     UrlEncodedValueAsString(&'s UrlEncodedValueAsString<'s>),
@@ -13,7 +12,13 @@ pub enum FormDataValueAsString<'s> {
 impl<'s> FormDataValueAsString<'s> {
     pub fn as_string(&self) -> Result<String, HttpFailResult> {
         match self {
-            FormDataValueAsString::UrlEncodedValueAsString(result) => result.as_string(),
+            FormDataValueAsString::UrlEncodedValueAsString(result) => {
+                let result = result.as_string();
+                return crate::url_encoded_data::convert_error(
+                    result,
+                    crate::UrlEncodedDataSource::FormData,
+                );
+            }
 
             FormDataValueAsString::JsonEncodedData(result) => result.as_string(),
         }
@@ -21,7 +26,11 @@ impl<'s> FormDataValueAsString<'s> {
     pub fn as_bool(&self) -> Result<bool, HttpFailResult> {
         match self {
             FormDataValueAsString::UrlEncodedValueAsString(result) => {
-                return result.as_bool();
+                let result = result.as_bool();
+                return crate::url_encoded_data::convert_error(
+                    result,
+                    crate::UrlEncodedDataSource::FormData,
+                );
             }
             FormDataValueAsString::JsonEncodedData(result) => {
                 return result.as_bool();
@@ -30,7 +39,13 @@ impl<'s> FormDataValueAsString<'s> {
     }
     pub fn parse<T: FromStr>(&self) -> Result<T, HttpFailResult> {
         match self {
-            FormDataValueAsString::UrlEncodedValueAsString(result) => result.parse(),
+            FormDataValueAsString::UrlEncodedValueAsString(result) => {
+                let result = result.parse();
+                return crate::url_encoded_data::convert_error(
+                    result,
+                    crate::UrlEncodedDataSource::FormData,
+                );
+            }
             FormDataValueAsString::JsonEncodedData(result) => result.parse(),
         }
     }

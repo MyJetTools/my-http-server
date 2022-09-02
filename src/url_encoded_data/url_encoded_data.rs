@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use url_utils::{
+    url_decoder::UrlDecodeError,
+    url_encoded_data_reader::{UrlEncodedDataReader, UrlEncodedValueAsString},
+};
 
-use crate::{url_decoder::UrlDecodeError, HttpFailResult};
+use crate::HttpFailResult;
 
-use super::UrlEncodedValueAsString;
-
+#[derive(Debug, Clone, Copy)]
 pub enum UrlEncodedDataSource {
     Headers,
     FormData,
@@ -20,14 +22,14 @@ impl UrlEncodedDataSource {
 }
 
 pub struct UrlEncodedData<'s> {
-    query_string: HashMap<String, UrlEncodedValueAsString<'s>>,
+    data_reader: UrlEncodedDataReader<'s>,
     data_source: UrlEncodedDataSource,
 }
 
 impl<'s> UrlEncodedData<'s> {
     pub fn new(src: &'s str, data_source: UrlEncodedDataSource) -> Result<Self, UrlDecodeError> {
         let result = Self {
-            query_string: super::url_utils::parse_query_string(src)?,
+            data_reader: UrlEncodedDataReader::new(src)?,
             data_source,
         };
 
@@ -38,56 +40,17 @@ impl<'s> UrlEncodedData<'s> {
         &'s self,
         name: &str,
     ) -> Result<&'s UrlEncodedValueAsString<'s>, HttpFailResult> {
-        let result = self.query_string.get(name);
-
-        match result {
-            Some(e) => Ok(e),
-            None => Err(HttpFailResult::required_parameter_is_missing(
-                name,
-                self.data_source.as_str(),
-            )),
-        }
+        let result = self.data_reader.get_required(name);
+        return super::convert_error(result, self.data_source);
     }
 
     pub fn get_optional(&'s self, name: &str) -> Option<&'s UrlEncodedValueAsString<'s>> {
-        self.query_string.get(name)
+        return self.data_reader.get_optional(name);
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    pub fn test_basic() {
-        let query_string =
-            "tableName=deposit-restrictions&partitionKey=%2A&rowKey=1abfc&field=1a+bfc";
-
-        let query_string =
-            UrlEncodedData::new(query_string, UrlEncodedDataSource::QueryString).unwrap();
-
-        let result = query_string
-            .get_optional("partitionKey")
-            .unwrap()
-            .as_string()
-            .unwrap();
-
-        assert_eq!("*", result);
-
-        let result = query_string
-            .get_optional("rowKey")
-            .unwrap()
-            .as_string()
-            .unwrap();
-
-        assert_eq!("1abfc", result);
-
-        let result = query_string
-            .get_optional("field")
-            .unwrap()
-            .as_string()
-            .unwrap();
-
-        assert_eq!("1a bfc", result);
+impl From<UrlDecodeError> for HttpFailResult {
+    fn from(src: UrlDecodeError) -> Self {
+        Self::as_fatal_error(format!("{:?}", src))
     }
 }

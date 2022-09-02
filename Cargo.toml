@@ -15,6 +15,7 @@ rust-extensions = { branch = "0.1.1", git = "https://github.com/MyJetTools/rust-
 
 my-json = { branch = "0.1.1", git = "https://github.com/MyJetTools/my-json.git" }
 my-telemetry = { branch = "0.2.1", git = "https://github.com/MyJetTools/my-telemetry.git" }
+url-utils = {tag="0.1.0", git="https://github.com/MyJetTools/url-utils.git"}
 
 tokio = { version = "*", features = ["full"] }
 
