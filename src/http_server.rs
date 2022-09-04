@@ -4,8 +4,11 @@ use hyper::{
     Body, Request, Response, Server,
 };
 
+#[cfg(feature = "my-telemetry")]
 use my_telemetry::TelemetryEvent;
-use rust_extensions::{date_time::DateTimeAsMicroseconds, ApplicationStates, Logger};
+#[cfg(feature = "my-telemetry")]
+use rust_extensions::date_time::DateTimeAsMicroseconds;
+use rust_extensions::{ApplicationStates, Logger};
 use std::{net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
@@ -103,8 +106,10 @@ pub async fn handle_requests(
 ) -> hyper::Result<Response<Body>> {
     let req = HttpRequest::new(req, addr);
     let mut ctx = HttpContext::new(req);
+    #[cfg(feature = "my-telemetry")]
     let process_id = ctx.telemetry_context.process_id;
 
+    #[cfg(feature = "my-telemetry")]
     let telemetry_data = if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
         Some((
             format!("[{}]{}", ctx.request.get_method(), ctx.request.get_path()),
@@ -114,6 +119,7 @@ pub async fn handle_requests(
         None
     };
 
+    #[cfg(feature = "my-telemetry")]
     let started = DateTimeAsMicroseconds::now();
 
     let result = tokio::spawn(async move {
@@ -124,6 +130,7 @@ pub async fn handle_requests(
     match result.await {
         Ok(not_paniced) => match not_paniced {
             Ok(ok_result) => {
+                #[cfg(feature = "my-telemetry")]
                 if ok_result.write_telemetry {
                     if let Some(telemetry_data) = telemetry_data {
                         my_telemetry::TELEMETRY_INTERFACE
@@ -146,6 +153,7 @@ pub async fn handle_requests(
                 Ok(ok_result.into())
             }
             Err(err_result) => {
+                #[cfg(feature = "my-telemetry")]
                 if err_result.write_telemetry {
                     if let Some(telemetry_data) = telemetry_data {
                         my_telemetry::TELEMETRY_INTERFACE
@@ -165,7 +173,8 @@ pub async fn handle_requests(
                 Ok(err_result.into())
             }
         },
-        Err(err) => {
+        Err(_err) => {
+            #[cfg(feature = "my-telemetry")]
             if let Some(telemetry_data) = telemetry_data {
                 my_telemetry::TELEMETRY_INTERFACE
                     .write_telemetry_event(TelemetryEvent {
@@ -174,7 +183,7 @@ pub async fn handle_requests(
                         finished: DateTimeAsMicroseconds::now().unix_microseconds,
                         data: telemetry_data.0,
                         success: None,
-                        fail: Some(format!("Panic: {:?}", err)),
+                        fail: Some(format!("Panic: {:?}", _err)),
                         ip: Some(telemetry_data.1),
                     })
                     .await;
