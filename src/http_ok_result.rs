@@ -1,59 +1,132 @@
+use std::collections::HashMap;
+
 use crate::{HttpFailResult, WebContentType};
 use hyper::{Body, Response};
 use serde::Serialize;
 
-#[derive(Clone)]
-pub enum HttpOkResult {
-    Ok,
-
+pub enum HttpOutput {
     Empty,
 
     Content {
+        headers: Option<HashMap<String, String>>,
         content_type: Option<WebContentType>,
         content: Vec<u8>,
-    },
-    Text {
-        text: String,
     },
 
     Redirect {
         url: String,
+        permanent: bool,
     },
+
+    Raw(Response<Body>),
 }
 
-impl HttpOkResult {
-    pub fn create_json_response<T: Serialize>(model: T) -> HttpOkResult {
+impl HttpOutput {
+    pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
+        Ok(HttpOkResult {
+            write_telemetry,
+            output: self,
+        })
+    }
+
+    pub fn into_fail_result(
+        self,
+        status_code: u16,
+        write_telemetry: bool,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let result = match self {
+            HttpOutput::Empty => HttpFailResult {
+                content_type: WebContentType::Text,
+                status_code: status_code,
+                content: Vec::new(),
+                write_telemetry,
+            },
+            HttpOutput::Content {
+                headers: _,
+                content_type,
+                content,
+            } => HttpFailResult {
+                content_type: content_type.unwrap_or(WebContentType::Text),
+                status_code: status_code,
+                content,
+                write_telemetry,
+            },
+            HttpOutput::Redirect {
+                url: _,
+                permanent: _,
+            } => {
+                panic!("Redirect can not be turned into Http Fail result")
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Raw response can not be turned into Http Fail result")
+            }
+        };
+
+        Err(result)
+    }
+
+    pub fn as_text(text: String) -> Self {
+        Self::Content {
+            headers: None,
+            content_type: Some(WebContentType::Text),
+            content: text.into_bytes(),
+        }
+    }
+
+    pub fn as_json<T: Serialize>(model: T) -> Self {
         let json = serde_json::to_vec(&model).unwrap();
-        HttpOkResult::Content {
+
+        Self::Content {
+            headers: None,
             content_type: Some(WebContentType::Json),
             content: json,
         }
     }
 
-    pub fn create_as_usize(number: usize) -> HttpOkResult {
-        HttpOkResult::Content {
+    pub fn as_redirect(src: &str, permanent: bool) -> Self {
+        Self::Redirect {
+            url: src.to_string(),
+            permanent,
+        }
+    }
+
+    pub fn as_usize(number: usize) -> Self {
+        Self::Content {
+            headers: None,
             content_type: Some(WebContentType::Text),
             content: number.to_string().into_bytes(),
         }
     }
 
-    pub fn redirect(src: &str) -> HttpOkResult {
-        HttpOkResult::Redirect {
-            url: src.to_string(),
-        }
-    }
-
     pub fn get_status_code(&self) -> u16 {
         match self {
-            HttpOkResult::Ok => 200,
-            HttpOkResult::Empty => 202,
-            HttpOkResult::Content {
+            Self::Empty => 202,
+            Self::Content {
+                headers: _,
                 content_type: _,
                 content: _,
             } => 200,
-            HttpOkResult::Text { text: _ } => 200,
-            HttpOkResult::Redirect { url: _ } => 308,
+            Self::Redirect { url: _, permanent } => {
+                if *permanent {
+                    301
+                } else {
+                    302
+                }
+            }
+
+            HttpOutput::Raw(body) => body.status().as_u16(),
         }
+    }
+}
+
+pub struct HttpOkResult {
+    pub write_telemetry: bool,
+    pub output: HttpOutput,
+}
+
+impl HttpOkResult {
+    pub fn get_status_code(&self) -> u16 {
+        self.output.get_status_code()
     }
 }
 
@@ -63,9 +136,13 @@ pub trait IntoHttpOkResult {
 
 impl Into<HttpOkResult> for String {
     fn into(self) -> HttpOkResult {
-        HttpOkResult::Content {
-            content_type: Some(WebContentType::Text),
-            content: self.into_bytes(),
+        HttpOkResult {
+            write_telemetry: true,
+            output: HttpOutput::Content {
+                headers: None,
+                content_type: Some(WebContentType::Text),
+                content: self.into_bytes(),
+            },
         }
     }
 }
@@ -80,40 +157,43 @@ impl Into<Response<Body>> for HttpOkResult {
     fn into(self) -> Response<Body> {
         let status_code = self.get_status_code();
 
-        return match self {
-            HttpOkResult::Ok => Response::builder()
-                .header("Content-Type", WebContentType::Text.as_str())
-                .status(status_code)
-                .body(Body::from("OK"))
-                .unwrap(),
-            HttpOkResult::Content {
+        return match self.output {
+            HttpOutput::Content {
+                headers,
                 content_type,
                 content,
             } => match content_type {
-                Some(content_type) => Response::builder()
-                    .header("Content-Type", content_type.as_str())
-                    .status(status_code)
-                    .body(Body::from(content))
-                    .unwrap(),
+                Some(content_type) => {
+                    let mut builder =
+                        Response::builder().header("Content-Type", content_type.as_str());
+
+                    if let Some(headers) = headers {
+                        for (key, value) in headers {
+                            builder = builder.header(key, value);
+                        }
+                    }
+
+                    builder
+                        .status(status_code)
+                        .body(Body::from(content))
+                        .unwrap()
+                }
                 None => Response::builder()
                     .status(status_code)
                     .body(Body::from(content))
                     .unwrap(),
             },
-            HttpOkResult::Text { text } => Response::builder()
-                .header("Content-Type", WebContentType::Text.as_str())
-                .status(status_code)
-                .body(Body::from(text))
-                .unwrap(),
-            HttpOkResult::Redirect { url } => Response::builder()
+            HttpOutput::Redirect { url, permanent: _ } => Response::builder()
                 .status(status_code)
                 .header("Location", url)
                 .body(Body::empty())
                 .unwrap(),
-            HttpOkResult::Empty => Response::builder()
+            HttpOutput::Empty => Response::builder()
                 .status(status_code)
                 .body(Body::empty())
                 .unwrap(),
+
+            HttpOutput::Raw(body) => body,
         };
     }
 }

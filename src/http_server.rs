@@ -4,7 +4,11 @@ use hyper::{
     Body, Request, Response, Server,
 };
 
-use rust_extensions::ApplicationStates;
+#[cfg(feature = "my-telemetry")]
+use my_telemetry::TelemetryEvent;
+#[cfg(feature = "my-telemetry")]
+use rust_extensions::date_time::DateTimeAsMicroseconds;
+use rust_extensions::{ApplicationStates, Logger};
 use std::{net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
@@ -39,17 +43,22 @@ impl MyHttpServer {
         }
     }
 
-    pub fn start<TAppStates>(&mut self, app_states: Arc<TAppStates>)
-    where
-        TAppStates: ApplicationStates + Send + Sync + 'static,
-    {
-        let mut middlewares = None;
-
-        std::mem::swap(&mut middlewares, &mut self.middlewares);
+    pub fn start(
+        &mut self,
+        app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+        logger: Arc<dyn Logger + Send + Sync + 'static>,
+    ) {
+        let middlewares = self.middlewares.take();
 
         if middlewares.is_none() {
             panic!("You can not start HTTP server two times");
         }
+
+        logger.write_info(
+            "Starting Http Server".to_string(),
+            format!("Http server starts at: {:?}", self.addr),
+            None,
+        );
 
         let http_server_data = HttpServerData {
             middlewares: middlewares.unwrap(),
@@ -63,13 +72,11 @@ impl MyHttpServer {
     }
 }
 
-pub async fn start<TAppStates>(
+pub async fn start(
     addr: SocketAddr,
     http_server_data: Arc<HttpServerData>,
-    app_states: Arc<TAppStates>,
-) where
-    TAppStates: ApplicationStates + Send + Sync + 'static,
-{
+    app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+) {
     let http_server_data_spawned = http_server_data.clone();
 
     let make_service = make_service_fn(move |conn: &AddrStream| {
@@ -77,8 +84,8 @@ pub async fn start<TAppStates>(
         let addr = conn.remote_addr();
 
         async move {
-            Ok::<_, hyper::Error>(service_fn(move |_req| {
-                handle_requests(_req, http_server_data.clone(), addr)
+            Ok::<_, hyper::Error>(service_fn(move |req| {
+                handle_requests(req, http_server_data.clone(), addr)
             }))
         }
     });
@@ -99,58 +106,94 @@ pub async fn handle_requests(
 ) -> hyper::Result<Response<Body>> {
     let req = HttpRequest::new(req, addr);
     let mut ctx = HttpContext::new(req);
+    #[cfg(feature = "my-telemetry")]
+    let process_id = ctx.telemetry_context.process_id;
 
-    let mut flows = HttpServerRequestFlow::new(http_server_data.middlewares.clone());
+    #[cfg(feature = "my-telemetry")]
+    let telemetry_data = if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
+        Some((
+            format!("[{}]{}", ctx.request.get_method(), ctx.request.get_path()),
+            ctx.request.get_ip().to_string(),
+        ))
+    } else {
+        None
+    };
 
-    let result = flows.next(&mut ctx).await;
+    #[cfg(feature = "my-telemetry")]
+    let started = DateTimeAsMicroseconds::now();
 
-    match result {
-        Ok(ok_result) => Ok(ok_result.into()),
-        Err(err_result) => Ok(err_result.into()),
+    let result = tokio::spawn(async move {
+        let mut flows = HttpServerRequestFlow::new(http_server_data.middlewares.clone());
+        flows.next(&mut ctx).await
+    });
+
+    match result.await {
+        Ok(not_paniced) => match not_paniced {
+            Ok(ok_result) => {
+                #[cfg(feature = "my-telemetry")]
+                if ok_result.write_telemetry {
+                    if let Some(telemetry_data) = telemetry_data {
+                        my_telemetry::TELEMETRY_INTERFACE
+                            .write_telemetry_event(TelemetryEvent {
+                                process_id: process_id,
+                                started: started.unix_microseconds,
+                                finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                                data: telemetry_data.0,
+                                success: Some(format!(
+                                    "Status code: {}",
+                                    ok_result.output.get_status_code()
+                                )),
+                                fail: None,
+                                ip: Some(telemetry_data.1),
+                            })
+                            .await;
+                    }
+                }
+
+                Ok(ok_result.into())
+            }
+            Err(err_result) => {
+                #[cfg(feature = "my-telemetry")]
+                if err_result.write_telemetry {
+                    if let Some(telemetry_data) = telemetry_data {
+                        my_telemetry::TELEMETRY_INTERFACE
+                            .write_telemetry_event(TelemetryEvent {
+                                process_id: process_id,
+                                started: started.unix_microseconds,
+                                finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                                data: telemetry_data.0,
+                                success: None,
+
+                                fail: Some(format!("Status code: {}", err_result.status_code)),
+                                ip: Some(telemetry_data.1),
+                            })
+                            .await;
+                    }
+                }
+                Ok(err_result.into())
+            }
+        },
+        Err(_err) => {
+            #[cfg(feature = "my-telemetry")]
+            if let Some(telemetry_data) = telemetry_data {
+                my_telemetry::TELEMETRY_INTERFACE
+                    .write_telemetry_event(TelemetryEvent {
+                        process_id: process_id,
+                        started: started.unix_microseconds,
+                        finished: DateTimeAsMicroseconds::now().unix_microseconds,
+                        data: telemetry_data.0,
+                        success: None,
+                        fail: Some(format!("Panic: {:?}", _err)),
+                        ip: Some(telemetry_data.1),
+                    })
+                    .await;
+            }
+            panic!("Http Server error");
+        }
     }
-
-    /*/
-       for middleware in &http_server_data.middlewares {
-           match middleware.handle_request(&mut ctx).await {
-               Ok(result) => match result {
-                   crate::MiddleWareResult::Ok(ok_result) => {
-                       if let Some(mut my_telemetry) = my_telemetry {
-                           my_telemetry.sw.pause();
-                           my_telemetry.telemetry.track_url_duration(
-                               ctx.request.method.clone(),
-                               ctx.request.uri.clone(),
-                               ok_result.get_status_code(),
-                               my_telemetry.sw.duration(),
-                           );
-                       }
-
-                       return Ok(ok_result.into());
-                   }
-                   crate::MiddleWareResult::Next => {}
-               },
-               Err(fail_result) => {
-                   if fail_result.write_telemetry {
-                       if let Some(mut my_telemetry) = my_telemetry {
-                           my_telemetry.sw.pause();
-                           my_telemetry.telemetry.track_url_duration(
-                               ctx.request.method.clone(),
-                               ctx.request.uri.clone(),
-                               fail_result.status_code,
-                               my_telemetry.sw.duration(),
-                           );
-                       }
-                   }
-
-                   return Ok(fail_result.into());
-               }
-           }
-       }
-
-       let not_found = HttpFailResult::as_not_found("Page not found".to_string(), false);
-    */
 }
 
-async fn shutdown_signal<TAppStates: ApplicationStates>(app: Arc<TAppStates>) {
+async fn shutdown_signal(app: Arc<dyn ApplicationStates + Send + Sync + 'static>) {
     let duration = Duration::from_secs(1);
     while !app.is_shutting_down() {
         tokio::time::sleep(duration).await;

@@ -1,4 +1,4 @@
-use crate::{url_decoder::UrlDecodeError, HttpFailResult, WebContentType};
+use crate::{HttpFailResult, WebContentType};
 use hyper::{Body, Response};
 
 impl From<hyper::Error> for HttpFailResult {
@@ -19,12 +19,6 @@ impl Into<Response<Body>> for HttpFailResult {
             .status(self.status_code)
             .body(Body::from(self.content))
             .unwrap()
-    }
-}
-
-impl From<UrlDecodeError> for HttpFailResult {
-    fn from(src: UrlDecodeError) -> Self {
-        Self::as_fatal_error(format!("{:?}", src))
     }
 }
 

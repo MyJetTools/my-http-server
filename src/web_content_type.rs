@@ -22,20 +22,17 @@ impl WebContentType {
         }
     }
 
-    pub fn detect_by_extension(path: &str) -> Self {
+    pub fn detect_by_extension(path: &str) -> Option<Self> {
         let res = path.split(".");
 
-        let el = res.last();
+        let el = res.last()?;
 
-        match el {
-            Some(extension) => match extension {
-                "png" => WebContentType::Png,
-                "svg" => WebContentType::Svg,
-                "css" => WebContentType::Css,
-                "js" => WebContentType::JavaScript,
-                _ => WebContentType::Text,
-            },
-            None => WebContentType::Text,
+        match el.to_lowercase().as_str() {
+            "png" => WebContentType::Png.into(),
+            "svg" => WebContentType::Svg.into(),
+            "css" => WebContentType::Css.into(),
+            "js" => WebContentType::JavaScript.into(),
+            _ => None,
         }
     }
 }
