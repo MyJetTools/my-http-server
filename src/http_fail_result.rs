@@ -8,6 +8,17 @@ pub struct HttpFailResult {
     pub write_telemetry: bool,
 }
 
+impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
+    fn from(src: url_utils::url_encoded_data_reader::ReadingEncodedDataError) -> Self {
+        Self {
+            content_type: WebContentType::Text,
+            content: format!("Reading encoded parameter failed. Err: '{:?}'", src).into_bytes(),
+            status_code: 400,
+            write_telemetry: true,
+        }
+    }
+}
+
 impl HttpFailResult {
     pub fn into_err<T>(self) -> Result<T, HttpFailResult> {
         Result::Err(self)
