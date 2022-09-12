@@ -13,7 +13,10 @@ use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
 
-use crate::{request_flow::HttpServerRequestFlow, HttpContext, HttpRequest, HttpServerMiddleware};
+use crate::{
+    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpRequest,
+    HttpServerMiddleware,
+};
 
 pub struct HttpServerData {
     middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
@@ -129,8 +132,8 @@ pub async fn handle_requests(
     match result.await {
         Ok(not_paniced) => match not_paniced {
             Ok(ok_result) => {
-                #[cfg(feature = "my-telemetry")]
                 if ok_result.write_telemetry {
+                    #[cfg(feature = "my-telemetry")]
                     if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
                         my_telemetry::TELEMETRY_INTERFACE
                             .write_telemetry_event(TelemetryEvent {
@@ -152,8 +155,8 @@ pub async fn handle_requests(
                 Ok(ok_result.into())
             }
             Err(err_result) => {
-                #[cfg(feature = "my-telemetry")]
                 if err_result.write_telemetry {
+                    #[cfg(feature = "my-telemetry")]
                     if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
                         my_telemetry::TELEMETRY_INTERFACE
                             .write_telemetry_event(TelemetryEvent {
@@ -164,10 +167,24 @@ pub async fn handle_requests(
                                 success: None,
 
                                 fail: Some(format!("Status code: {}", err_result.status_code)),
-                                ip: Some(ip),
+                                ip: Some(ip.to_string()),
                             })
                             .await;
                     }
+
+                    let mut ctx = HashMap::new();
+                    ctx.insert("path".to_string(), path);
+                    ctx.insert("method".to_string(), method);
+                    ctx.insert("ip".to_string(), ip);
+                    ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
+                    logger.write_warning(
+                        "HttpRequest".to_string(),
+                        format!(
+                            "Http request finished with error: {}",
+                            get_error_text(&err_result)
+                        ),
+                        Some(ctx),
+                    );
                 }
                 Ok(err_result.into())
             }
@@ -208,5 +225,13 @@ async fn shutdown_signal(app: Arc<dyn ApplicationStates + Send + Sync + 'static>
     let duration = Duration::from_secs(1);
     while !app.is_shutting_down() {
         tokio::time::sleep(duration).await;
+    }
+}
+
+fn get_error_text(err: &HttpFailResult) -> &str {
+    if err.content.len() > 256 {
+        std::str::from_utf8(&err.content[..256]).unwrap()
+    } else {
+        std::str::from_utf8(&err.content).unwrap()
     }
 }
