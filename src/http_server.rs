@@ -9,7 +9,7 @@ use my_telemetry::TelemetryEvent;
 #[cfg(feature = "my-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use rust_extensions::{ApplicationStates, Logger};
-use std::{net::SocketAddr, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
 
@@ -68,6 +68,7 @@ impl MyHttpServer {
             self.addr.clone(),
             Arc::new(http_server_data),
             app_states,
+            logger,
         ));
     }
 }
@@ -76,16 +77,19 @@ pub async fn start(
     addr: SocketAddr,
     http_server_data: Arc<HttpServerData>,
     app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) {
     let http_server_data_spawned = http_server_data.clone();
 
     let make_service = make_service_fn(move |conn: &AddrStream| {
         let http_server_data = http_server_data_spawned.clone();
+
+        let logger_to_move = logger.clone();
         let addr = conn.remote_addr();
 
         async move {
             Ok::<_, hyper::Error>(service_fn(move |req| {
-                handle_requests(req, http_server_data.clone(), addr)
+                handle_requests(req, http_server_data.clone(), addr, logger_to_move.clone())
             }))
         }
     });
@@ -103,21 +107,16 @@ pub async fn handle_requests(
     req: Request<Body>,
     http_server_data: Arc<HttpServerData>,
     addr: SocketAddr,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> hyper::Result<Response<Body>> {
     let req = HttpRequest::new(req, addr);
     let mut ctx = HttpContext::new(req);
     #[cfg(feature = "my-telemetry")]
     let process_id = ctx.telemetry_context.process_id;
 
-    #[cfg(feature = "my-telemetry")]
-    let telemetry_data = if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
-        Some((
-            format!("[{}]{}", ctx.request.get_method(), ctx.request.get_path()),
-            ctx.request.get_ip().to_string(),
-        ))
-    } else {
-        None
-    };
+    let path = ctx.request.get_path().to_string();
+    let method = ctx.request.get_method().to_string();
+    let ip = ctx.request.get_ip().to_string();
 
     #[cfg(feature = "my-telemetry")]
     let started = DateTimeAsMicroseconds::now();
@@ -132,19 +131,19 @@ pub async fn handle_requests(
             Ok(ok_result) => {
                 #[cfg(feature = "my-telemetry")]
                 if ok_result.write_telemetry {
-                    if let Some(telemetry_data) = telemetry_data {
+                    if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
                         my_telemetry::TELEMETRY_INTERFACE
                             .write_telemetry_event(TelemetryEvent {
                                 process_id: process_id,
                                 started: started.unix_microseconds,
                                 finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                                data: telemetry_data.0,
+                                data: format!("[{}]{}", method, path),
                                 success: Some(format!(
                                     "Status code: {}",
                                     ok_result.output.get_status_code()
                                 )),
                                 fail: None,
-                                ip: Some(telemetry_data.1),
+                                ip: Some(ip),
                             })
                             .await;
                     }
@@ -155,17 +154,17 @@ pub async fn handle_requests(
             Err(err_result) => {
                 #[cfg(feature = "my-telemetry")]
                 if err_result.write_telemetry {
-                    if let Some(telemetry_data) = telemetry_data {
+                    if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
                         my_telemetry::TELEMETRY_INTERFACE
                             .write_telemetry_event(TelemetryEvent {
                                 process_id: process_id,
                                 started: started.unix_microseconds,
                                 finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                                data: telemetry_data.0,
+                                data: format!("[{}]{}", method, path),
                                 success: None,
 
                                 fail: Some(format!("Status code: {}", err_result.status_code)),
-                                ip: Some(telemetry_data.1),
+                                ip: Some(ip),
                             })
                             .await;
                     }
@@ -173,21 +172,33 @@ pub async fn handle_requests(
                 Ok(err_result.into())
             }
         },
-        Err(_err) => {
+        Err(err) => {
             #[cfg(feature = "my-telemetry")]
-            if let Some(telemetry_data) = telemetry_data {
+            if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
                 my_telemetry::TELEMETRY_INTERFACE
                     .write_telemetry_event(TelemetryEvent {
                         process_id: process_id,
                         started: started.unix_microseconds,
                         finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                        data: telemetry_data.0,
+                        data: format!("[{}]{}", method, path),
                         success: None,
-                        fail: Some(format!("Panic: {:?}", _err)),
-                        ip: Some(telemetry_data.1),
+                        fail: Some(format!("Panic: {:?}", err)),
+                        ip: Some(ip.clone()),
                     })
                     .await;
             }
+
+            let mut ctx = HashMap::new();
+            ctx.insert("path".to_string(), path);
+            ctx.insert("method".to_string(), method);
+            ctx.insert("ip".to_string(), ip);
+
+            logger.write_error(
+                "HttpRequest".to_string(),
+                format!("Panic: {:?}", err),
+                Some(ctx),
+            );
+
             panic!("Http Server error");
         }
     }
