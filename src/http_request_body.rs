@@ -97,6 +97,7 @@ fn get_form_data_as_url_encoded(body_as_str: &str) -> Result<FormData, HttpFailR
                 content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
                 content_type: WebContentType::Text,
                 status_code: 412,
+                write_to_log: true,
             };
 
             return Err(result);
@@ -113,6 +114,7 @@ fn get_form_data_as_json_encoded(body: &[u8]) -> Result<FormData, HttpFailResult
                 content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
                 content_type: WebContentType::Text,
                 status_code: 412,
+                write_to_log: true,
             };
 
             return Err(result);

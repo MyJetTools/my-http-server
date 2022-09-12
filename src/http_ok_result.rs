@@ -40,6 +40,7 @@ impl HttpOutput {
                 status_code: status_code,
                 content: Vec::new(),
                 write_telemetry,
+                write_to_log: false,
             },
             HttpOutput::Content {
                 headers: _,
@@ -50,6 +51,7 @@ impl HttpOutput {
                 status_code: status_code,
                 content,
                 write_telemetry,
+                write_to_log: false,
             },
             HttpOutput::Redirect {
                 url: _,

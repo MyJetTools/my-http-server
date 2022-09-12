@@ -156,6 +156,22 @@ pub async fn handle_requests(
             }
             Err(err_result) => {
                 if err_result.write_telemetry {
+                    if err_result.write_to_log {
+                        let mut ctx = HashMap::new();
+                        ctx.insert("path".to_string(), path.to_string());
+                        ctx.insert("method".to_string(), method.to_string());
+                        ctx.insert("ip".to_string(), ip.to_string());
+                        ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
+                        logger.write_warning(
+                            "HttpRequest".to_string(),
+                            format!(
+                                "Http request finished with error: {}",
+                                get_error_text(&err_result)
+                            ),
+                            Some(ctx),
+                        );
+                    }
+
                     #[cfg(feature = "my-telemetry")]
                     if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
                         my_telemetry::TELEMETRY_INTERFACE
@@ -167,24 +183,10 @@ pub async fn handle_requests(
                                 success: None,
 
                                 fail: Some(format!("Status code: {}", err_result.status_code)),
-                                ip: Some(ip.to_string()),
+                                ip: Some(ip),
                             })
                             .await;
                     }
-
-                    let mut ctx = HashMap::new();
-                    ctx.insert("path".to_string(), path);
-                    ctx.insert("method".to_string(), method);
-                    ctx.insert("ip".to_string(), ip);
-                    ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
-                    logger.write_warning(
-                        "HttpRequest".to_string(),
-                        format!(
-                            "Http request finished with error: {}",
-                            get_error_text(&err_result)
-                        ),
-                        Some(ctx),
-                    );
                 }
                 Ok(err_result.into())
             }

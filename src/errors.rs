@@ -8,6 +8,7 @@ impl From<hyper::Error> for HttpFailResult {
             status_code: 501,
             content: format!("{:?}", src).into_bytes(),
             write_telemetry: true,
+            write_to_log: true,
         }
     }
 }

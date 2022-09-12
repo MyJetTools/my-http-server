@@ -6,6 +6,7 @@ pub struct HttpFailResult {
     pub status_code: u16,
     pub content: Vec<u8>,
     pub write_telemetry: bool,
+    pub write_to_log: bool,
 }
 
 impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
@@ -15,6 +16,7 @@ impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpF
             content: format!("Reading encoded parameter failed. Err: '{:?}'", src).into_bytes(),
             status_code: 400,
             write_telemetry: true,
+            write_to_log: true,
         }
     }
 }
@@ -30,6 +32,7 @@ impl HttpFailResult {
             content: format!("Path parameter '{}' is required", param_name).into_bytes(),
             status_code: 400,
             write_telemetry: true,
+            write_to_log: false,
         }
     }
 
@@ -39,6 +42,7 @@ impl HttpFailResult {
             content: text.into_bytes(),
             status_code: 404,
             write_telemetry,
+            write_to_log: false,
         }
     }
 
@@ -52,6 +56,7 @@ impl HttpFailResult {
             },
             status_code: 401,
             write_telemetry: true,
+            write_to_log: false,
         }
     }
 
@@ -65,6 +70,7 @@ impl HttpFailResult {
             },
             status_code: 403,
             write_telemetry: true,
+            write_to_log: false,
         }
     }
 
@@ -74,6 +80,7 @@ impl HttpFailResult {
             content: reason.into_bytes(),
             status_code: 400,
             write_telemetry: true,
+            write_to_log: true,
         }
     }
 
@@ -86,6 +93,7 @@ impl HttpFailResult {
             .into_bytes(),
             status_code: 400,
             write_telemetry: true,
+            write_to_log: false,
         }
     }
 
@@ -95,6 +103,7 @@ impl HttpFailResult {
             content: text.into_bytes(),
             status_code: 500,
             write_telemetry: true,
+            write_to_log: true,
         }
     }
 
@@ -104,6 +113,7 @@ impl HttpFailResult {
             content: text.into_bytes(),
             status_code: 415,
             write_telemetry: true,
+            write_to_log: true,
         }
     }
 }
