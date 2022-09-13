@@ -255,16 +255,17 @@ impl HttpRequest {
     }
 
     pub fn get_required_header(&self, header_name: &str) -> Result<&str, HttpFailResult> {
+        let header_name_lc = header_name.to_lowercase();
         for (http_header, value) in self.get_headers() {
-            let http_header = http_header.as_str();
-            if http_header == header_name {
+            let http_header = http_header.as_str().to_lowercase();
+            if http_header == header_name_lc {
                 return Ok(value.to_str().unwrap());
             }
         }
 
         return Err(HttpFailResult::required_parameter_is_missing(
             header_name,
-            UrlEncodedDataSource::QueryString.as_str(),
+            UrlEncodedDataSource::Headers.as_str(),
         ));
     }
 
