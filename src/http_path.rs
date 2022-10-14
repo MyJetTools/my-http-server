@@ -58,7 +58,7 @@ impl HttpPath {
         false
     }
 
-    pub fn has_values_at_index(&self, index_from: usize, values: &[&str]) -> bool {
+    pub fn has_values_at_index_case_insensitive(&self, index_from: usize, values: &[&str]) -> bool {
         for offset in 0..values.len() {
             let value = values.get(offset).unwrap();
             if let Some(segment_value) = self.get_segment_value(index_from + offset) {
@@ -154,9 +154,9 @@ mod test {
     fn test_segments() {
         let path = HttpPath::new("/First/Second/");
 
-        assert!(path.has_values_at_index(0, &["first", "second"]));
+        assert!(path.has_values_at_index_case_insensitive(0, &["first", "second"]));
 
-        assert!(!path.has_values_at_index(1, &["second", "third"]));
+        assert!(!path.has_values_at_index_case_insensitive(1, &["second", "third"]));
     }
 }
 
