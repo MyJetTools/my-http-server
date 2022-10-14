@@ -49,6 +49,43 @@ impl HttpPath {
         let result = &self.path[*pos_prev + 1..*pos];
         Some(std::str::from_utf8(result).unwrap())
     }
+
+    pub fn has_value_at_index_case_insensitive(&self, index: usize, value: &str) -> bool {
+        if let Some(segment_value) = self.get_segment_value(index) {
+            return equal_strings_case_insensitive(segment_value, value);
+        }
+
+        false
+    }
+
+    pub fn has_values_at_index(&self, index_from: usize, values: &[&str]) -> bool {
+        for offset in 0..values.len() {
+            let value = values.get(offset).unwrap();
+            if let Some(segment_value) = self.get_segment_value(index_from + offset) {
+                if !equal_strings_case_insensitive(segment_value, value) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+fn equal_strings_case_insensitive(src: &str, dest: &str) -> bool {
+    if src.len() != dest.len() {
+        return false;
+    }
+
+    for (src_char, dest_char) in src.chars().zip(dest.chars()) {
+        if src_char.to_ascii_lowercase() != dest_char.to_ascii_lowercase() {
+            return false;
+        }
+    }
+
+    true
 }
 
 #[cfg(test)]
@@ -103,6 +140,23 @@ mod test {
         assert_eq!("first", path.get_segment_value(0).unwrap());
         assert_eq!("second", path.get_segment_value(1).unwrap());
         assert!(path.get_segment_value(2).is_none());
+    }
+
+    #[test]
+    fn test_segment_by_segment() {
+        let path = HttpPath::new("/First/Second/");
+
+        assert!(path.has_value_at_index_case_insensitive(0, "first"));
+        assert!(path.has_value_at_index_case_insensitive(1, "second"));
+    }
+
+    #[test]
+    fn test_segments() {
+        let path = HttpPath::new("/First/Second/");
+
+        assert!(path.has_values_at_index(0, &["first", "second"]));
+
+        assert!(!path.has_values_at_index(1, &["second", "third"]));
     }
 }
 
