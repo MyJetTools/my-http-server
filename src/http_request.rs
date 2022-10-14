@@ -1,8 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    http_path::{GetPathValueResult, PathSegments},
-    HttpFailResult, HttpRequestBody, RequestIp, UrlEncodedData, UrlEncodedDataSource,
+    http_path::HttpPath, HttpFailResult, HttpRequestBody, RequestIp, UrlEncodedData,
+    UrlEncodedDataSource,
 };
 use hyper::{Body, Method, Request, Uri};
 
@@ -30,9 +30,8 @@ pub struct HttpRequest {
     pub method: Method,
     pub uri: Uri,
     pub req: RequestData,
-    path_lower_case: String,
+    pub http_path: HttpPath,
     pub addr: SocketAddr,
-    pub route: Option<PathSegments>,
     key_values: Option<HashMap<String, Vec<u8>>>,
     x_forwarded_proto: Option<String>,
     x_forwarded_for: Option<String>,
@@ -43,7 +42,6 @@ impl HttpRequest {
     pub fn new(req: Request<Body>, addr: SocketAddr) -> Self {
         let uri = req.uri().clone();
 
-        let path_lower_case = req.uri().path().to_lowercase();
         let method = req.method().clone();
 
         let x_forwarded_for = if let Some(value) = req.headers().get("X-Forwarded-For") {
@@ -65,10 +63,9 @@ impl HttpRequest {
         };
 
         Self {
+            http_path: HttpPath::new(req.uri().path()),
             req: RequestData::AsRaw(req),
-            path_lower_case,
             addr,
-            route: None,
             uri,
             method,
             key_values: None,
@@ -89,53 +86,6 @@ impl HttpRequest {
         }
     }
 
-    pub fn get_value_from_path(&self, key: &str) -> Result<&str, HttpFailResult> {
-        let path = self.get_path();
-
-        if self.route.is_none() {
-            return Err(HttpFailResult::as_forbidden(Some(format!(
-                "Path [{}] does not has keys in it",
-                path
-            ))));
-        }
-
-        let route = self.route.as_ref().unwrap();
-
-        match route.get_value(path, key) {
-            GetPathValueResult::Value(value) => Ok(value),
-            GetPathValueResult::NoKeyInTheRoute => Err(HttpFailResult::as_forbidden(Some(
-                format!("Route [{}] does not have key[{}]", route.path, key),
-            ))),
-            GetPathValueResult::NoValue => Err(HttpFailResult::as_forbidden(Some(format!(
-                "Route [{}] does not have value for the path [{}] with the key [{}]",
-                route.path,
-                self.get_path(),
-                key
-            )))),
-        }
-    }
-
-    pub fn get_value_from_path_optional(&self, key: &str) -> Result<Option<&str>, HttpFailResult> {
-        let path = self.get_path();
-
-        if self.route.is_none() {
-            return Err(HttpFailResult::as_forbidden(Some(format!(
-                "No route found to extract key [{}] from the path [{}]",
-                key, path
-            ))));
-        }
-
-        let route = self.route.as_ref().unwrap();
-
-        match route.get_value(path, key) {
-            GetPathValueResult::Value(value) => Ok(Some(value)),
-            GetPathValueResult::NoValue => Ok(None),
-            GetPathValueResult::NoKeyInTheRoute => Err(HttpFailResult::as_forbidden(Some(
-                format!("Route [{}] does not have key[{}]", route.path, key),
-            ))),
-        }
-    }
-
     pub fn set_key_value(&mut self, key: String, value: Vec<u8>) -> Option<Vec<u8>> {
         if self.key_values.is_none() {
             self.key_values = Some(HashMap::new());
@@ -148,18 +98,6 @@ impl HttpRequest {
         let result = self.key_values.as_ref()?.get(key)?;
 
         Some(result)
-    }
-
-    pub fn get_value_from_path_optional_as_string(
-        &self,
-        key: &str,
-    ) -> Result<Option<String>, HttpFailResult> {
-        let result = self.get_value_from_path_optional(key)?;
-
-        match result {
-            Some(value) => Ok(Some(value.to_owned())),
-            None => Ok(None),
-        }
     }
 
     async fn init_body(&mut self) -> Result<(), HttpFailResult> {
@@ -231,10 +169,6 @@ impl HttpRequest {
 
     pub fn get_path(&self) -> &str {
         self.uri.path()
-    }
-
-    pub fn get_path_lower_case(&self) -> &str {
-        &self.path_lower_case
     }
 
     pub fn get_headers(&self) -> &hyper::HeaderMap<hyper::header::HeaderValue> {
