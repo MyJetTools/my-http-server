@@ -34,6 +34,23 @@ impl HttpPath {
         Self { path, segments }
     }
 
+    pub fn is_the_same_to(&self, http_path: &HttpPath) -> bool {
+        let segments_amount = self.segments_amount();
+        if segments_amount != http_path.segments_amount() {
+            return false;
+        }
+
+        for i in 0..segments_amount {
+            let src = self.get_segment_value(i).unwrap();
+            let dest = http_path.get_segment_value(i).unwrap();
+            if !equal_strings_case_insensitive(src, dest) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     pub fn is_root(&self) -> bool {
         self.path.len() == 1
     }
@@ -157,6 +174,18 @@ mod test {
         assert!(path.has_values_at_index_case_insensitive(0, &["first", "second"]));
 
         assert!(!path.has_values_at_index_case_insensitive(1, &["second", "third"]));
+    }
+
+    #[test]
+    fn test_paths_equality() {
+        let path1 = HttpPath::new("/First/Second/");
+        let path2 = HttpPath::new("/first/second/");
+
+        assert!(path1.is_the_same_to(&path2));
+
+        let path2 = HttpPath::new("/first/second");
+
+        assert!(path1.is_the_same_to(&path2));
     }
 }
 
