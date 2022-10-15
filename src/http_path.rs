@@ -5,33 +5,41 @@ pub struct HttpPath {
 }
 
 impl HttpPath {
-    pub fn new(path: &str) -> Self {
+    pub fn from_str(path: &str) -> Self {
+        Self::from_vec(path.as_bytes().to_vec())
+    }
+    pub fn from_string(path: String) -> Self {
+        Self::from_vec(path.into_bytes())
+    }
+
+    pub fn from_vec(path_as_vec: Vec<u8>) -> Self {
         let mut segments = Vec::new();
 
-        let path = path.as_bytes().to_vec();
-
-        if path.len() == 0 {
+        if path_as_vec.len() == 0 {
             panic!("Invalid http path. Path at least should contain one character '/'");
         }
 
-        if path[0] != b'/' {
+        if path_as_vec[0] != b'/' {
             panic!("Invalid http path. Path should start with '/'");
         }
 
         let mut last: u8 = 0;
 
-        for pos in 0..path.len() {
-            last = path[pos];
+        for pos in 0..path_as_vec.len() {
+            last = path_as_vec[pos];
             if last == b'/' {
                 segments.push(pos);
             }
         }
 
         if last != b'/' {
-            segments.push(path.len());
+            segments.push(path_as_vec.len());
         }
 
-        Self { path, segments }
+        Self {
+            path: path_as_vec,
+            segments,
+        }
     }
 
     pub fn is_the_same_to(&self, http_path: &HttpPath) -> bool {
@@ -111,7 +119,7 @@ mod test {
 
     #[test]
     fn test_root_case() {
-        let path = HttpPath::new("/");
+        let path = HttpPath::from_str("/");
 
         assert!(path.is_root());
         assert_eq!(0, path.segments_amount());
@@ -119,7 +127,7 @@ mod test {
 
     #[test]
     fn test_one_segment_case_not_slash_at_the_end() {
-        let path = HttpPath::new("/First");
+        let path = HttpPath::from_str("/First");
 
         assert!(!path.is_root());
         assert_eq!(1, path.segments_amount());
@@ -129,7 +137,7 @@ mod test {
 
     #[test]
     fn test_one_segment_case_with_slash_at_the_end() {
-        let path = HttpPath::new("/first/");
+        let path = HttpPath::from_str("/first/");
 
         assert!(!path.is_root());
         assert_eq!(1, path.segments_amount());
@@ -139,7 +147,7 @@ mod test {
 
     #[test]
     fn test_two_segments_case_not_slash_at_the_end() {
-        let path = HttpPath::new("/First/sEcond");
+        let path = HttpPath::from_str("/First/sEcond");
 
         assert!(!path.is_root());
         assert_eq!(2, path.segments_amount());
@@ -150,7 +158,7 @@ mod test {
 
     #[test]
     fn test_two_segment_case_with_slash_at_the_end() {
-        let path = HttpPath::new("/first/second/");
+        let path = HttpPath::from_str("/first/second/");
 
         assert!(!path.is_root());
         assert_eq!(2, path.segments_amount());
@@ -161,7 +169,7 @@ mod test {
 
     #[test]
     fn test_segment_by_segment() {
-        let path = HttpPath::new("/First/Second/");
+        let path = HttpPath::from_str("/First/Second/");
 
         assert!(path.has_value_at_index_case_insensitive(0, "first"));
         assert!(path.has_value_at_index_case_insensitive(1, "second"));
@@ -169,7 +177,7 @@ mod test {
 
     #[test]
     fn test_segments() {
-        let path = HttpPath::new("/First/Second/");
+        let path = HttpPath::from_str("/First/Second/");
 
         assert!(path.has_values_at_index_case_insensitive(0, &["first", "second"]));
 
@@ -178,12 +186,12 @@ mod test {
 
     #[test]
     fn test_paths_equality() {
-        let path1 = HttpPath::new("/First/Second/");
-        let path2 = HttpPath::new("/first/second/");
+        let path1 = HttpPath::from_str("/First/Second/");
+        let path2 = HttpPath::from_str("/first/second/");
 
         assert!(path1.is_the_same_to(&path2));
 
-        let path2 = HttpPath::new("/first/second");
+        let path2 = HttpPath::from_str("/first/second");
 
         assert!(path1.is_the_same_to(&path2));
     }

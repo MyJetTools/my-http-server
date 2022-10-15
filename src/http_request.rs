@@ -63,7 +63,7 @@ impl HttpRequest {
         };
 
         Self {
-            http_path: HttpPath::new(req.uri().path()),
+            http_path: HttpPath::from_str(req.uri().path()),
             req: RequestData::AsRaw(req),
             addr,
             uri,
