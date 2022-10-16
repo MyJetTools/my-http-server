@@ -75,6 +75,22 @@ impl HttpPath {
         Some(std::str::from_utf8(result).unwrap())
     }
 
+    pub fn is_starting_with(&self, http_path: &HttpPath) -> bool {
+        if self.segments_amount() < http_path.segments_amount() {
+            return false;
+        }
+
+        for index in 0..http_path.segments_amount() {
+            let one_side = http_path.get_segment_value(index).unwrap();
+            let other_side = self.get_segment_value(index).unwrap();
+            if !equal_strings_case_insensitive(one_side, other_side) {
+                return false;
+            }
+        }
+
+        true
+    }
+
     pub fn has_value_at_index_case_insensitive(&self, index: usize, value: &str) -> bool {
         if let Some(segment_value) = self.get_segment_value(index) {
             return equal_strings_case_insensitive(segment_value, value);
@@ -195,44 +211,24 @@ mod test {
 
         assert!(path1.is_the_same_to(&path2));
     }
-}
-
-/*
-#[cfg(test)]
-mod test {
-    use super::*;
 
     #[test]
-    fn test_is_my_path() {
-        let path_segments = HttpPath::new("/Segment1/{Key1}/Segment2");
+    fn test_starts_with() {
+        let src = HttpPath::from_str("/First/Second/Third");
 
-        assert_eq!(true, path_segments.is_my_path("/Segment1/MyValue/Segment2"));
+        let path2 = HttpPath::from_str("/first");
+        assert!(src.is_starting_with(&path2));
 
-        assert_eq!(
-            "MyValue",
-            path_segments
-                .get_value("/Segment1/MyValue/Segment2", "key1")
-                .unwrap()
-                .as_str()
-        );
-    }
+        let path2 = HttpPath::from_str("/first/second/");
+        assert!(src.is_starting_with(&path2));
 
-    #[test]
-    fn test_is_not_my_path() {
-        let path_segments = HttpPath::new("/Segment1/{Key1}/Segment2");
+        let path2 = HttpPath::from_str("/first/second/third");
+        assert!(src.is_starting_with(&path2));
 
-        assert!(path_segments.is_my_path("/Segment2/MyValue/Segment2"));
-    }
+        let path2 = HttpPath::from_str("/first/second/third/fourth");
+        assert!(!src.is_starting_with(&path2));
 
-    #[test]
-    fn test_is_my_path_with_last_key() {
-        let path_segments = HttpPath::new("/Segment1/Segment2/{Key1}");
-
-        assert_eq!(true, path_segments.is_my_path("/Segment1/Segment2"));
-
-        let value = path_segments.get_value("/Segment1/Segment2", "Key1");
-
-        assert_eq!(true, value.is_none());
+        let path2 = HttpPath::from_str("/ffirst/second");
+        assert!(!src.is_starting_with(&path2));
     }
 }
- */
