@@ -1,23 +1,22 @@
 use crate::{
     request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult, HttpOutput,
-    HttpServerMiddleware, WebContentType,
+    HttpPath, HttpServerMiddleware, WebContentType,
 };
 
 pub struct FilesMapping {
-    pub uri_prefix: String,
+    pub uri_prefix: HttpPath,
     pub folder_path: String,
 }
 
 impl FilesMapping {
     pub fn new(uri_prefix: &str, folder_path: &str) -> Self {
         Self {
-            uri_prefix: uri_prefix.to_string(),
+            uri_prefix: HttpPath::from_str(uri_prefix),
             folder_path: folder_path.to_string(),
         }
     }
 
     pub fn to_lowercase(&mut self) {
-        self.uri_prefix = self.uri_prefix.to_lowercase();
         self.folder_path = self.folder_path.to_lowercase();
     }
 }
@@ -115,12 +114,14 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let path = ctx.request.get_path_lower_case();
-
         if let Some(mappings) = &self.file_folders {
             for mapping in mappings {
-                if path.starts_with(mapping.uri_prefix.as_str()) {
-                    let path = &path[mapping.uri_prefix.len()..];
+                if ctx.request.http_path.is_starting_with(&mapping.uri_prefix) {
+                    let path = ctx
+                        .request
+                        .http_path
+                        .as_str_from_segment(mapping.uri_prefix.segments_amount());
+
                     if let Some(result) =
                         self.handle_folder(mapping.folder_path.as_str(), path).await
                     {
@@ -130,7 +131,13 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
             }
         }
 
-        if let Some(result) = self.handle_folder(super::files::DEFAULT_FOLDER, path).await {
+        if let Some(result) = self
+            .handle_folder(
+                super::files::DEFAULT_FOLDER,
+                ctx.request.http_path.as_str_from_segment(0),
+            )
+            .await
+        {
             return result;
         }
 

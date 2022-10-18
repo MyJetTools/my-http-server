@@ -91,6 +91,12 @@ impl HttpPath {
         true
     }
 
+    pub fn as_str_from_segment(&self, from_segment: usize) -> &str {
+        let result = &self.path[self.segments[from_segment]..];
+
+        std::str::from_utf8(result).unwrap()
+    }
+
     pub fn has_value_at_index_case_insensitive(&self, index: usize, value: &str) -> bool {
         if let Some(segment_value) = self.get_segment_value(index) {
             return equal_strings_case_insensitive(segment_value, value);
@@ -230,5 +236,18 @@ mod test {
 
         let path2 = HttpPath::from_str("/ffirst/second");
         assert!(!src.is_starting_with(&path2));
+    }
+
+    #[test]
+    fn test_as_str_from_segment() {
+        let src = HttpPath::from_str("/First/Second/Third");
+        let result = src.as_str_from_segment(0);
+        assert_eq!("/First/Second/Third", result);
+
+        let result = src.as_str_from_segment(1);
+        assert_eq!("/Second/Third", result);
+
+        let result = src.as_str_from_segment(2);
+        assert_eq!("/Third", result);
     }
 }
