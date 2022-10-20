@@ -3,7 +3,7 @@ use url_utils::{
     url_encoded_data_reader::{UrlEncodedDataReader, UrlEncodedValueAsString},
 };
 
-use crate::HttpFailResult;
+use crate::{form_data::FORM_DATA_SRC, HttpFailResult};
 
 #[derive(Debug, Clone, Copy)]
 pub enum UrlEncodedDataSource {
@@ -21,31 +21,73 @@ impl UrlEncodedDataSource {
     }
 }
 
-pub struct UrlEncodedData<'s> {
-    data_reader: UrlEncodedDataReader<'s>,
-    data_source: UrlEncodedDataSource,
+pub enum UrlEncodedData<'s> {
+    Headers(UrlEncodedDataReader<'s>),
+    FormData(UrlEncodedDataReader<'s>),
+    QueryString(UrlEncodedDataReader<'s>),
+    QueryStringEmpty,
 }
 
 impl<'s> UrlEncodedData<'s> {
-    pub fn new(src: &'s str, data_source: UrlEncodedDataSource) -> Result<Self, UrlDecodeError> {
-        let result = Self {
-            data_reader: UrlEncodedDataReader::new(src)?,
-            data_source,
-        };
+    pub fn from_headers(src: &'s str) -> Result<Self, UrlDecodeError> {
+        let result = UrlEncodedDataReader::new(src)?;
+        Ok(Self::Headers(result))
+    }
 
-        Ok(result)
+    pub fn from_form_data(src: &'s str) -> Result<Self, UrlDecodeError> {
+        let result = UrlEncodedDataReader::new(src)?;
+        Ok(Self::FormData(result))
+    }
+
+    pub fn from_query_string(src: &'s str) -> Result<Self, UrlDecodeError> {
+        let result = UrlEncodedDataReader::new(src)?;
+        Ok(Self::QueryString(result))
+    }
+
+    pub fn new_query_string_empty() -> Self {
+        Self::QueryStringEmpty
     }
 
     pub fn get_required(
         &'s self,
         name: &str,
     ) -> Result<&'s UrlEncodedValueAsString<'s>, HttpFailResult> {
-        let result = self.data_reader.get_required(name);
-        return super::convert_error(result, self.data_source);
+        match self {
+            UrlEncodedData::Headers(src) => {
+                let result = src.get_required(name);
+                return super::convert_error(result, self.get_source_as_string());
+            }
+            UrlEncodedData::FormData(src) => {
+                let result = src.get_required(name);
+                return super::convert_error(result, self.get_source_as_string());
+            }
+            UrlEncodedData::QueryString(src) => {
+                let result = src.get_required(name);
+                return super::convert_error(result, self.get_source_as_string());
+            }
+            UrlEncodedData::QueryStringEmpty => Err(HttpFailResult::required_parameter_is_missing(
+                name,
+                self.get_source_as_string(),
+            )),
+        }
     }
 
     pub fn get_optional(&'s self, name: &str) -> Option<&'s UrlEncodedValueAsString<'s>> {
-        return self.data_reader.get_optional(name);
+        match self {
+            UrlEncodedData::Headers(src) => src.get_optional(name),
+            UrlEncodedData::FormData(src) => src.get_optional(name),
+            UrlEncodedData::QueryString(src) => src.get_optional(name),
+            UrlEncodedData::QueryStringEmpty => None,
+        }
+    }
+
+    pub fn get_source_as_string(&self) -> &'static str {
+        match self {
+            UrlEncodedData::Headers(_) => "headers",
+            UrlEncodedData::FormData(_) => FORM_DATA_SRC,
+            UrlEncodedData::QueryString(_) => "query string",
+            UrlEncodedData::QueryStringEmpty => "query string",
+        }
     }
 }
 

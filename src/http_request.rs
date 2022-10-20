@@ -77,12 +77,10 @@ impl HttpRequest {
 
     pub fn get_query_string(&self) -> Result<UrlEncodedData, HttpFailResult> {
         if let Some(query) = self.uri.query() {
-            let result = UrlEncodedData::new(query, UrlEncodedDataSource::QueryString)?;
+            let result = UrlEncodedData::from_query_string(query)?;
             Ok(result)
         } else {
-            Err(HttpFailResult::as_forbidden(Some(
-                "No query string found".to_string(),
-            )))
+            Ok(UrlEncodedData::new_query_string_empty())
         }
     }
 

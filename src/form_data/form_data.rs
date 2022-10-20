@@ -2,6 +2,8 @@ use crate::{url_encoded_data::UrlEncodedData, HttpFailResult, JsonEncodedData};
 
 use super::FormDataValueAsString;
 
+pub const FORM_DATA_SRC: &str = "form data";
+
 pub enum FormDataInner<'s> {
     UrlEncoded(UrlEncodedData<'s>),
     JsonEncoded(JsonEncodedData<'s>),

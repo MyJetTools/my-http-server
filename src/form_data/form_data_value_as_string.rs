@@ -4,6 +4,8 @@ use url_utils::url_encoded_data_reader::UrlEncodedValueAsString;
 
 use crate::{json_encoded_data::JsonEncodedValueAsString, HttpFailResult};
 
+use super::FORM_DATA_SRC;
+
 pub enum FormDataValueAsString<'s> {
     UrlEncodedValueAsString(&'s UrlEncodedValueAsString<'s>),
     JsonEncodedData(&'s JsonEncodedValueAsString<'s>),
@@ -14,10 +16,7 @@ impl<'s> FormDataValueAsString<'s> {
         match self {
             FormDataValueAsString::UrlEncodedValueAsString(result) => {
                 let result = result.as_string();
-                return crate::url_encoded_data::convert_error(
-                    result,
-                    crate::UrlEncodedDataSource::FormData,
-                );
+                return crate::url_encoded_data::convert_error(result, FORM_DATA_SRC);
             }
 
             FormDataValueAsString::JsonEncodedData(result) => result.as_string(),
@@ -27,10 +26,7 @@ impl<'s> FormDataValueAsString<'s> {
         match self {
             FormDataValueAsString::UrlEncodedValueAsString(result) => {
                 let result = result.as_bool();
-                return crate::url_encoded_data::convert_error(
-                    result,
-                    crate::UrlEncodedDataSource::FormData,
-                );
+                return crate::url_encoded_data::convert_error(result, FORM_DATA_SRC);
             }
             FormDataValueAsString::JsonEncodedData(result) => {
                 return result.as_bool();
@@ -41,10 +37,7 @@ impl<'s> FormDataValueAsString<'s> {
         match self {
             FormDataValueAsString::UrlEncodedValueAsString(result) => {
                 let result = result.parse();
-                return crate::url_encoded_data::convert_error(
-                    result,
-                    crate::UrlEncodedDataSource::FormData,
-                );
+                return crate::url_encoded_data::convert_error(result, FORM_DATA_SRC);
             }
             FormDataValueAsString::JsonEncodedData(result) => result.parse(),
         }

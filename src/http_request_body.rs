@@ -1,9 +1,6 @@
 use serde::de::DeserializeOwned;
 
-use crate::{
-    form_data::FormData, HttpFailResult, JsonEncodedData, UrlEncodedData, UrlEncodedDataSource,
-    WebContentType,
-};
+use crate::{form_data::FormData, HttpFailResult, JsonEncodedData, UrlEncodedData, WebContentType};
 
 pub enum BodyContentType {
     Json,
@@ -89,7 +86,7 @@ impl HttpRequestBody {
 }
 
 fn get_form_data_as_url_encoded(body_as_str: &str) -> Result<FormData, HttpFailResult> {
-    match UrlEncodedData::new(body_as_str, UrlEncodedDataSource::FormData) {
+    match UrlEncodedData::from_form_data(body_as_str) {
         Ok(result) => return Ok(FormData::crate_as_url_encoded_data(result)),
         Err(err) => {
             let result = HttpFailResult {
