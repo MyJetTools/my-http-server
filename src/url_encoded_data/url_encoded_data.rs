@@ -83,39 +83,18 @@ impl<'s> UrlEncodedData<'s> {
         }
     }
 
-    pub fn get_vec_of_string_optional(
-        &'s self,
-        name: &str,
-    ) -> Result<Option<Vec<String>>, HttpFailResult> {
+    pub fn get_vec_of_string(&'s self, name: &str) -> Result<Vec<String>, HttpFailResult> {
         match self {
             UrlEncodedData::Headers(src) => {
-                let result = src.get_vec_of_string_optional(name)?;
+                let result = src.get_vec_of_string(name)?;
                 return Ok(result);
             }
             UrlEncodedData::FormData(src) => {
-                let result = src.get_vec_of_string_optional(name)?;
+                let result = src.get_vec_of_string(name)?;
                 return Ok(result);
             }
             UrlEncodedData::QueryString(src) => {
-                let result = src.get_vec_of_string_optional(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::QueryStringEmpty => Ok(None),
-        }
-    }
-
-    pub fn get_vec_of_string_required(&'s self, name: &str) -> Result<Vec<String>, HttpFailResult> {
-        match self {
-            UrlEncodedData::Headers(src) => {
-                let result = src.get_vec_of_string_required(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::FormData(src) => {
-                let result = src.get_vec_of_string_required(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::QueryString(src) => {
-                let result = src.get_vec_of_string_required(name)?;
+                let result = src.get_vec_of_string(name)?;
                 return Ok(result);
             }
             UrlEncodedData::QueryStringEmpty => Err(HttpFailResult::required_parameter_is_missing(
@@ -125,42 +104,18 @@ impl<'s> UrlEncodedData<'s> {
         }
     }
 
-    pub fn get_vec_optional<TResult: FromStr>(
-        &'s self,
-        name: &str,
-    ) -> Result<Option<Vec<TResult>>, HttpFailResult> {
+    pub fn get_vec<TResult: FromStr>(&'s self, name: &str) -> Result<Vec<TResult>, HttpFailResult> {
         match self {
             UrlEncodedData::Headers(src) => {
-                let result = src.get_vec_optional(name)?;
+                let result = src.get_vec(name)?;
                 return Ok(result);
             }
             UrlEncodedData::FormData(src) => {
-                let result = src.get_vec_optional(name)?;
+                let result = src.get_vec(name)?;
                 return Ok(result);
             }
             UrlEncodedData::QueryString(src) => {
-                let result = src.get_vec_optional(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::QueryStringEmpty => Ok(None),
-        }
-    }
-
-    pub fn get_vec_required<TResult: FromStr>(
-        &'s self,
-        name: &str,
-    ) -> Result<Vec<TResult>, HttpFailResult> {
-        match self {
-            UrlEncodedData::Headers(src) => {
-                let result = src.get_vec_required(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::FormData(src) => {
-                let result = src.get_vec_required(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::QueryString(src) => {
-                let result: Vec<TResult> = src.get_vec_required(name)?;
+                let result: Vec<TResult> = src.get_vec(name)?;
                 return Ok(result);
             }
             UrlEncodedData::QueryStringEmpty => Err(HttpFailResult::required_parameter_is_missing(
