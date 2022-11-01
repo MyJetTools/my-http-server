@@ -97,10 +97,9 @@ impl<'s> UrlEncodedData<'s> {
                 let result = src.get_vec_of_string(name)?;
                 return Ok(result);
             }
-            UrlEncodedData::QueryStringEmpty => Err(HttpFailResult::required_parameter_is_missing(
-                name,
-                self.get_source_as_string(),
-            )),
+            UrlEncodedData::QueryStringEmpty => {
+                return Ok(vec![]);
+            }
         }
     }
 
@@ -118,10 +117,9 @@ impl<'s> UrlEncodedData<'s> {
                 let result: Vec<TResult> = src.get_vec(name)?;
                 return Ok(result);
             }
-            UrlEncodedData::QueryStringEmpty => Err(HttpFailResult::required_parameter_is_missing(
-                name,
-                self.get_source_as_string(),
-            )),
+            UrlEncodedData::QueryStringEmpty => {
+                return Ok(vec![]);
+            }
         }
     }
 
