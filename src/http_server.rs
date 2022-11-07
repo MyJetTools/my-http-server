@@ -18,25 +18,12 @@ use crate::{
     HttpServerMiddleware,
 };
 
-use crate::RequestCredentials;
-
-pub struct MyHttpServer<TRequestCredentials: RequestCredentials + Send + Sync + 'static> {
+pub struct MyHttpServer {
     pub addr: SocketAddr,
-    middlewares: Option<
-        Vec<
-            Arc<
-                dyn HttpServerMiddleware<TRequestCredentials = TRequestCredentials>
-                    + Send
-                    + Sync
-                    + 'static,
-            >,
-        >,
-    >,
+    middlewares: Option<Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
 }
 
-impl<TRequestCredentials: RequestCredentials + Send + Sync + 'static>
-    MyHttpServer<TRequestCredentials>
-{
+impl MyHttpServer {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
             addr,
@@ -46,12 +33,7 @@ impl<TRequestCredentials: RequestCredentials + Send + Sync + 'static>
 
     pub fn add_middleware(
         &mut self,
-        middleware: Arc<
-            dyn HttpServerMiddleware<TRequestCredentials = TRequestCredentials>
-                + Send
-                + Sync
-                + 'static,
-        >,
+        middleware: Arc<dyn HttpServerMiddleware + Send + Sync + 'static>,
     ) {
         match &mut self.middlewares {
             Some(middlewares) => middlewares.push(middleware),
@@ -91,9 +73,9 @@ impl<TRequestCredentials: RequestCredentials + Send + Sync + 'static>
     }
 }
 
-pub async fn start<TRequestCredentials: RequestCredentials + Send + Sync + 'static>(
+pub async fn start(
     addr: SocketAddr,
-    http_server_data: Arc<HttpServerData<TRequestCredentials>>,
+    http_server_data: Arc<HttpServerData>,
     app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) {
@@ -121,9 +103,9 @@ pub async fn start<TRequestCredentials: RequestCredentials + Send + Sync + 'stat
     }
 }
 
-pub async fn handle_requests<TRequestCredentials: RequestCredentials + Send + Sync + 'static>(
+pub async fn handle_requests(
     req: Request<Body>,
-    http_server_data: Arc<HttpServerData<TRequestCredentials>>,
+    http_server_data: Arc<HttpServerData>,
     addr: SocketAddr,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> hyper::Result<Response<Body>> {

@@ -7,15 +7,6 @@ use std::sync::Arc;
 
 use crate::HttpServerMiddleware;
 
-use crate::RequestCredentials;
-
-pub struct HttpServerData<TRequestCredentials: RequestCredentials + Send + Sync + 'static> {
-    pub middlewares: Vec<
-        Arc<
-            dyn HttpServerMiddleware<TRequestCredentials = TRequestCredentials>
-                + Send
-                + Sync
-                + 'static,
-        >,
-    >,
+pub struct HttpServerData {
+    pub middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
 }
