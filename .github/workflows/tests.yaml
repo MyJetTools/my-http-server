@@ -17,6 +17,15 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - name: Test Default build  
+        run: |
+          cargo build   
+      - name: Test with-authorization 
+        run: |
+          cargo build --features static-files       
+      - name: Test with-authorization 
+        run: |
+          cargo build --features my-telemetry             
       - name: Test Build      
         run: |
           cargo test

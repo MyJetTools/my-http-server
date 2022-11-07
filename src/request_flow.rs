@@ -2,15 +2,38 @@ use std::sync::Arc;
 
 use crate::{HttpContext, HttpFailResult, HttpOkResult, HttpServerMiddleware};
 
-pub struct HttpServerRequestFlow {
-    middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
+use crate::RequestCredentials;
+
+pub struct HttpServerRequestFlow<TRequestCredentials: RequestCredentials + Send + Sync + 'static> {
+    middlewares: Vec<
+        Arc<
+            dyn HttpServerMiddleware<TRequestCredentials = TRequestCredentials>
+                + Send
+                + Sync
+                + 'static,
+        >,
+    >,
 }
 
-impl HttpServerRequestFlow {
-    pub fn new(middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>) -> Self {
+impl<TRequestCredentials: RequestCredentials + Send + Sync + 'static>
+    HttpServerRequestFlow<TRequestCredentials>
+{
+    pub fn new(
+        middlewares: Vec<
+            Arc<
+                dyn HttpServerMiddleware<TRequestCredentials = TRequestCredentials>
+                    + Send
+                    + Sync
+                    + 'static,
+            >,
+        >,
+    ) -> Self {
         Self { middlewares }
     }
-    pub async fn next(&mut self, ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
+    pub async fn next(
+        &mut self,
+        ctx: &mut HttpContext<TRequestCredentials>,
+    ) -> Result<HttpOkResult, HttpFailResult> {
         if self.middlewares.is_empty() {
             let not_found = HttpFailResult::as_not_found("404 - Not Found".to_string(), false);
 
