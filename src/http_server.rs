@@ -131,7 +131,7 @@ pub async fn handle_requests<TRequestCredentials: RequestCredentials + Send + Sy
     let mut request_ctx = HttpContext::new(req);
 
     #[cfg(feature = "my-telemetry")]
-    let process_id = ctx.telemetry_context.process_id;
+    let process_id = request_ctx.telemetry_context.process_id;
 
     let path = request_ctx.request.get_path().to_string();
     let method = request_ctx.request.get_method().to_string();

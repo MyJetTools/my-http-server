@@ -20,10 +20,10 @@ jobs:
       - name: Test Default build  
         run: |
           cargo build   
-      - name: Test with-authorization 
+      - name: Test static-files 
         run: |
           cargo build --features static-files       
-      - name: Test with-authorization 
+      - name: Test my-telemetry 
         run: |
           cargo build --features my-telemetry             
       - name: Test Build      
