@@ -8,7 +8,7 @@ pub trait HttpServerMiddleware {
     type TRequestCredentials: RequestCredentials + Send + Sync + 'static;
     async fn handle_request(
         &self,
-        ctx: &mut HttpContext<Self::TRequestCredentials>,
+        ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow<Self::TRequestCredentials>,
     ) -> Result<HttpOkResult, HttpFailResult>;
 }

@@ -30,10 +30,7 @@ impl<TRequestCredentials: RequestCredentials + Send + Sync + 'static>
     ) -> Self {
         Self { middlewares }
     }
-    pub async fn next(
-        &mut self,
-        ctx: &mut HttpContext<TRequestCredentials>,
-    ) -> Result<HttpOkResult, HttpFailResult> {
+    pub async fn next(&mut self, ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
         if self.middlewares.is_empty() {
             let not_found = HttpFailResult::as_not_found("404 - Not Found".to_string(), false);
 
