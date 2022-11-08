@@ -8,5 +8,7 @@ pub trait RequestClaim {
 
 pub trait RequestCredentials {
     fn get_id(&self) -> &str;
-    fn get_claims<'s>(&'s self) -> Option<&[&'s dyn RequestClaim]>;
+    fn get_claims<'s, TIterator: Iterator<Item = &'s dyn RequestClaim>>(
+        &'s self,
+    ) -> Option<TIterator>;
 }
