@@ -8,7 +8,7 @@ pub struct RequestClaim<'s> {
 
 pub trait RequestCredentials {
     fn get_id(&self) -> &str;
-    fn get_claims<'s>(&'s self) -> Option<&'s [RequestClaim<'s>]>;
+    fn get_claims<'s>(&'s self) -> Option<Vec<RequestClaim<'s>>>;
 }
 
 impl<'s> RequestClaim<'s> {
