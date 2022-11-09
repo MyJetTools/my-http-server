@@ -7,6 +7,7 @@ pub enum WebContentType {
     JavaScript,
     Json,
     Text,
+    Raw(String),
 }
 
 impl WebContentType {
@@ -19,6 +20,7 @@ impl WebContentType {
             WebContentType::Text => "text/plain; charset=utf-8",
             WebContentType::Png => "image/png",
             WebContentType::Svg => "image/svg+xml",
+            WebContentType::Raw(content_type) => content_type.as_str(),
         }
     }
 

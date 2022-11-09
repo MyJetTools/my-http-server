@@ -18,6 +18,11 @@ pub enum HttpOutput {
         permanent: bool,
     },
 
+    File {
+        file_name: String,
+        content: Vec<u8>,
+    },
+
     Raw(Response<Body>),
 }
 
@@ -62,6 +67,19 @@ impl HttpOutput {
             HttpOutput::Raw(_) => {
                 panic!("Raw response can not be turned into Http Fail result")
             }
+            HttpOutput::File { file_name, content } => HttpFailResult {
+                content_type: if let Some(ct) =
+                    WebContentType::detect_by_extension(file_name.as_str())
+                {
+                    ct
+                } else {
+                    WebContentType::Text
+                },
+                status_code,
+                content,
+                write_telemetry,
+                write_to_log: false,
+            },
         };
 
         Err(result)
@@ -115,6 +133,11 @@ impl HttpOutput {
                     302
                 }
             }
+
+            Self::File {
+                file_name: _,
+                content: _,
+            } => 200,
 
             HttpOutput::Raw(body) => body.status().as_u16(),
         }
@@ -196,6 +219,20 @@ impl Into<Response<Body>> for HttpOkResult {
                 .unwrap(),
 
             HttpOutput::Raw(body) => body,
+            HttpOutput::File { file_name, content } => {
+                let builder = Response::builder().header(
+                    "content-disposition",
+                    format!(
+                        "attachment; filename=\"{file_name}\"; filename*=UTF-8''{file_name}",
+                        file_name = file_name
+                    ),
+                );
+
+                builder
+                    .status(status_code)
+                    .body(Body::from(content))
+                    .unwrap()
+            }
         };
     }
 }
