@@ -6,8 +6,12 @@ use url_utils::url_encoded_data_reader::UrlEncodedValueAsString;
 use crate::{json_encoded_data::JsonEncodedValueAsString, HttpFailResult};
 
 pub enum ValueAsString<'s> {
-    UrlEncodedValueAsString {
+    UrlEncodedValueAsStringRef {
         value: &'s UrlEncodedValueAsString<'s>,
+        src: &'static str,
+    },
+    UrlEncodedValueAsString {
+        value: UrlEncodedValueAsString<'s>,
         src: &'static str,
     },
     JsonEncodedData {
@@ -23,6 +27,11 @@ pub enum ValueAsString<'s> {
 impl<'s> ValueAsString<'s> {
     pub fn as_string(&self) -> Result<String, HttpFailResult> {
         match self {
+            ValueAsString::UrlEncodedValueAsStringRef { value, src } => {
+                let result = value.as_string();
+                return crate::url_encoded_data::convert_error(result, src);
+            }
+
             ValueAsString::UrlEncodedValueAsString { value, src } => {
                 let result = value.as_string();
                 return crate::url_encoded_data::convert_error(result, src);
@@ -34,6 +43,10 @@ impl<'s> ValueAsString<'s> {
     }
     pub fn as_bool(&self) -> Result<bool, HttpFailResult> {
         match self {
+            ValueAsString::UrlEncodedValueAsStringRef { value, src } => {
+                let result = value.as_bool();
+                return crate::url_encoded_data::convert_error(result, src);
+            }
             ValueAsString::UrlEncodedValueAsString { value, src } => {
                 let result = value.as_bool();
                 return crate::url_encoded_data::convert_error(result, src);
@@ -49,6 +62,10 @@ impl<'s> ValueAsString<'s> {
 
     pub fn as_date_time(&self) -> Result<DateTimeAsMicroseconds, HttpFailResult> {
         match self {
+            ValueAsString::UrlEncodedValueAsStringRef { value, src } => {
+                let result = value.as_date_time();
+                return crate::url_encoded_data::convert_error(result, src);
+            }
             ValueAsString::UrlEncodedValueAsString { value, src } => {
                 let result = value.as_date_time();
                 return crate::url_encoded_data::convert_error(result, src);
@@ -63,6 +80,10 @@ impl<'s> ValueAsString<'s> {
     pub fn parse<T: FromStr>(&self) -> Result<T, HttpFailResult> {
         match self {
             ValueAsString::UrlEncodedValueAsString { value, src } => {
+                let result = value.parse();
+                return crate::url_encoded_data::convert_error(result, src);
+            }
+            ValueAsString::UrlEncodedValueAsStringRef { value, src } => {
                 let result = value.parse();
                 return crate::url_encoded_data::convert_error(result, src);
             }

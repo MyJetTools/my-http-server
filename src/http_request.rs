@@ -211,11 +211,14 @@ impl HttpRequest {
         ));
     }
 
-    pub fn get_optional_header(&self, header_name: &str) -> Option<&str> {
+    pub fn get_optional_header(&self, header_name: &str) -> Option<ValueAsString> {
         let result = self.get_headers().get(header_name)?;
 
         match result.to_str() {
-            Ok(value) => Some(value),
+            Ok(value) => Some(ValueAsString::Raw {
+                value,
+                src: "header",
+            }),
             Err(_) => None,
         }
     }

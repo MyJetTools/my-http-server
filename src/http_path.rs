@@ -1,3 +1,7 @@
+use url_utils::url_encoded_data_reader::UrlEncodedValueAsString;
+
+use crate::ValueAsString;
+
 #[derive(Debug, Clone)]
 pub struct HttpPath {
     pub path: Vec<u8>,
@@ -49,8 +53,8 @@ impl HttpPath {
         }
 
         for i in 0..segments_amount {
-            let src = self.get_segment_value(i).unwrap();
-            let dest = http_path.get_segment_value(i).unwrap();
+            let src = self.get_segment_value_as_str(i).unwrap();
+            let dest = http_path.get_segment_value_as_str(i).unwrap();
             if !equal_strings_case_insensitive(src, dest) {
                 return false;
             }
@@ -67,12 +71,20 @@ impl HttpPath {
         self.segments.len() - 1
     }
 
-    pub fn get_segment_value(&self, index: usize) -> Option<&str> {
+    pub fn get_segment_value_as_str(&self, index: usize) -> Option<&str> {
         let pos = self.segments.get(index + 1)?;
         let pos_prev = self.segments.get(index)?;
 
         let result = &self.path[*pos_prev + 1..*pos];
         Some(std::str::from_utf8(result).unwrap())
+    }
+
+    pub fn get_segment_value(&self, index: usize) -> Option<ValueAsString> {
+        let value = self.get_segment_value_as_str(index)?;
+        Some(ValueAsString::UrlEncodedValueAsString {
+            value: UrlEncodedValueAsString::new(value),
+            src: "path",
+        })
     }
 
     pub fn is_starting_with(&self, http_path: &HttpPath) -> bool {
@@ -81,8 +93,8 @@ impl HttpPath {
         }
 
         for index in 0..http_path.segments_amount() {
-            let one_side = http_path.get_segment_value(index).unwrap();
-            let other_side = self.get_segment_value(index).unwrap();
+            let one_side = http_path.get_segment_value_as_str(index).unwrap();
+            let other_side = self.get_segment_value_as_str(index).unwrap();
             if !equal_strings_case_insensitive(one_side, other_side) {
                 return false;
             }
@@ -98,7 +110,7 @@ impl HttpPath {
     }
 
     pub fn has_value_at_index_case_insensitive(&self, index: usize, value: &str) -> bool {
-        if let Some(segment_value) = self.get_segment_value(index) {
+        if let Some(segment_value) = self.get_segment_value_as_str(index) {
             return equal_strings_case_insensitive(segment_value, value);
         }
 
@@ -108,7 +120,7 @@ impl HttpPath {
     pub fn has_values_at_index_case_insensitive(&self, index_from: usize, values: &[&str]) -> bool {
         for offset in 0..values.len() {
             let value = values.get(offset).unwrap();
-            if let Some(segment_value) = self.get_segment_value(index_from + offset) {
+            if let Some(segment_value) = self.get_segment_value_as_str(index_from + offset) {
                 if !equal_strings_case_insensitive(segment_value, value) {
                     return false;
                 }
@@ -153,7 +165,7 @@ mod test {
 
         assert!(!path.is_root());
         assert_eq!(1, path.segments_amount());
-        assert_eq!("First", path.get_segment_value(0).unwrap());
+        assert_eq!("First", path.get_segment_value_as_str(0).unwrap());
         assert!(path.get_segment_value(1).is_none());
     }
 
@@ -163,7 +175,7 @@ mod test {
 
         assert!(!path.is_root());
         assert_eq!(1, path.segments_amount());
-        assert_eq!("first", path.get_segment_value(0).unwrap());
+        assert_eq!("first", path.get_segment_value_as_str(0).unwrap());
         assert!(path.get_segment_value(1).is_none());
     }
 
@@ -173,8 +185,8 @@ mod test {
 
         assert!(!path.is_root());
         assert_eq!(2, path.segments_amount());
-        assert_eq!("First", path.get_segment_value(0).unwrap());
-        assert_eq!("sEcond", path.get_segment_value(1).unwrap());
+        assert_eq!("First", path.get_segment_value_as_str(0).unwrap());
+        assert_eq!("sEcond", path.get_segment_value_as_str(1).unwrap());
         assert!(path.get_segment_value(2).is_none());
     }
 
@@ -184,8 +196,8 @@ mod test {
 
         assert!(!path.is_root());
         assert_eq!(2, path.segments_amount());
-        assert_eq!("first", path.get_segment_value(0).unwrap());
-        assert_eq!("second", path.get_segment_value(1).unwrap());
+        assert_eq!("first", path.get_segment_value_as_str(0).unwrap());
+        assert_eq!("second", path.get_segment_value_as_str(1).unwrap());
         assert!(path.get_segment_value(2).is_none());
     }
 

@@ -29,7 +29,7 @@ impl<'s> BodyDataReader<'s> {
         match &self.inner {
             BodyDataReaderInner::UrlEncoded(result) => {
                 let value = result.get_required(name)?;
-                Ok(ValueAsString::UrlEncodedValueAsString {
+                Ok(ValueAsString::UrlEncodedValueAsStringRef {
                     value,
                     src: BODY_SRC,
                 })
@@ -48,7 +48,7 @@ impl<'s> BodyDataReader<'s> {
         match &self.inner {
             BodyDataReaderInner::UrlEncoded(result) => {
                 let value = result.get_optional(name)?;
-                Some(ValueAsString::UrlEncodedValueAsString {
+                Some(ValueAsString::UrlEncodedValueAsStringRef {
                     value,
                     src: BODY_SRC,
                 })
