@@ -5,40 +5,18 @@ use url_utils::{
     url_encoded_data_reader::{UrlEncodedDataReader, UrlEncodedValueAsString},
 };
 
-use crate::{form_data::FORM_DATA_SRC, HttpFailResult};
-
-#[derive(Debug, Clone, Copy)]
-pub enum UrlEncodedDataSource {
-    Headers,
-    FormData,
-    QueryString,
-}
-impl UrlEncodedDataSource {
-    pub fn as_str(&self) -> &str {
-        match self {
-            UrlEncodedDataSource::Headers => "headers",
-            UrlEncodedDataSource::FormData => "from data",
-            UrlEncodedDataSource::QueryString => "query string",
-        }
-    }
-}
+use crate::{body_data_reader::BODY_SRC, HttpFailResult};
 
 pub enum UrlEncodedData<'s> {
-    Headers(UrlEncodedDataReader<'s>),
-    FormData(UrlEncodedDataReader<'s>),
+    Body(UrlEncodedDataReader<'s>),
     QueryString(UrlEncodedDataReader<'s>),
     QueryStringEmpty,
 }
 
 impl<'s> UrlEncodedData<'s> {
-    pub fn from_headers(src: &'s str) -> Result<Self, UrlDecodeError> {
+    pub fn from_body(src: &'s str) -> Result<Self, UrlDecodeError> {
         let result = UrlEncodedDataReader::new(src)?;
-        Ok(Self::Headers(result))
-    }
-
-    pub fn from_form_data(src: &'s str) -> Result<Self, UrlDecodeError> {
-        let result = UrlEncodedDataReader::new(src)?;
-        Ok(Self::FormData(result))
+        Ok(Self::Body(result))
     }
 
     pub fn from_query_string(src: &'s str) -> Result<Self, UrlDecodeError> {
@@ -55,11 +33,7 @@ impl<'s> UrlEncodedData<'s> {
         name: &str,
     ) -> Result<&'s UrlEncodedValueAsString<'s>, HttpFailResult> {
         match self {
-            UrlEncodedData::Headers(src) => {
-                let result = src.get_required(name);
-                return super::convert_error(result, self.get_source_as_string());
-            }
-            UrlEncodedData::FormData(src) => {
+            UrlEncodedData::Body(src) => {
                 let result = src.get_required(name);
                 return super::convert_error(result, self.get_source_as_string());
             }
@@ -76,8 +50,7 @@ impl<'s> UrlEncodedData<'s> {
 
     pub fn get_optional(&'s self, name: &str) -> Option<&'s UrlEncodedValueAsString<'s>> {
         match self {
-            UrlEncodedData::Headers(src) => src.get_optional(name),
-            UrlEncodedData::FormData(src) => src.get_optional(name),
+            UrlEncodedData::Body(src) => src.get_optional(name),
             UrlEncodedData::QueryString(src) => src.get_optional(name),
             UrlEncodedData::QueryStringEmpty => None,
         }
@@ -85,11 +58,7 @@ impl<'s> UrlEncodedData<'s> {
 
     pub fn get_vec_of_string(&'s self, name: &str) -> Result<Vec<String>, HttpFailResult> {
         match self {
-            UrlEncodedData::Headers(src) => {
-                let result = src.get_vec_of_string(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::FormData(src) => {
+            UrlEncodedData::Body(src) => {
                 let result = src.get_vec_of_string(name)?;
                 return Ok(result);
             }
@@ -105,11 +74,7 @@ impl<'s> UrlEncodedData<'s> {
 
     pub fn get_vec<TResult: FromStr>(&'s self, name: &str) -> Result<Vec<TResult>, HttpFailResult> {
         match self {
-            UrlEncodedData::Headers(src) => {
-                let result = src.get_vec(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::FormData(src) => {
+            UrlEncodedData::Body(src) => {
                 let result = src.get_vec(name)?;
                 return Ok(result);
             }
@@ -125,8 +90,7 @@ impl<'s> UrlEncodedData<'s> {
 
     pub fn get_source_as_string(&self) -> &'static str {
         match self {
-            UrlEncodedData::Headers(_) => "headers",
-            UrlEncodedData::FormData(_) => FORM_DATA_SRC,
+            UrlEncodedData::Body(_) => BODY_SRC,
             UrlEncodedData::QueryString(_) => "query string",
             UrlEncodedData::QueryStringEmpty => "query string",
         }

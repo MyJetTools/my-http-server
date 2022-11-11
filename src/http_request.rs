@@ -1,8 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    http_path::HttpPath, HttpFailResult, HttpRequestBody, RequestIp, UrlEncodedData,
-    UrlEncodedDataSource,
+    http_path::HttpPath, HttpFailResult, HttpRequestBody, RequestIp, UrlEncodedData, ValueAsString,
 };
 use hyper::{Body, Method, Request, Uri};
 
@@ -186,18 +185,29 @@ impl HttpRequest {
         return RequestIp::Result(self.addr.to_string());
     }
 
-    pub fn get_required_header(&self, header_name: &str) -> Result<&str, HttpFailResult> {
+    pub fn get_required_header(&self, header_name: &str) -> Result<ValueAsString, HttpFailResult> {
         let header_name_lc = header_name.to_lowercase();
         for (http_header, value) in self.get_headers() {
             let http_header = http_header.as_str().to_lowercase();
             if http_header == header_name_lc {
-                return Ok(value.to_str().unwrap());
+                if let Ok(value) = std::str::from_utf8(value.as_bytes()) {
+                    return Ok(ValueAsString::Raw {
+                        value,
+                        src: "header",
+                    });
+                } else {
+                    return HttpFailResult::invalid_value_to_parse(format!(
+                        "Can not convert header {} value to string",
+                        header_name
+                    ))
+                    .into_err();
+                }
             }
         }
 
         return Err(HttpFailResult::required_parameter_is_missing(
             header_name,
-            UrlEncodedDataSource::Headers.as_str(),
+            "header",
         ));
     }
 

@@ -1,8 +1,9 @@
 use std::str::FromStr;
 
 use my_json::json_reader::JsonValue;
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 
-use crate::HttpFailResult;
+use crate::{value_as_string::*, HttpFailResult, BODY_SRC};
 
 pub struct JsonEncodedValueAsString<'s> {
     name: &'s str,
@@ -18,46 +19,33 @@ impl<'s> JsonEncodedValueAsString<'s> {
         match self.json_value.as_str() {
             Some(result) => Ok(result.to_string()),
             None => Err(HttpFailResult::required_parameter_is_missing(
-                self.name, "FormData",
+                self.name, BODY_SRC,
             )),
         }
     }
     pub fn as_bool(&self) -> Result<bool, HttpFailResult> {
         match self.json_value.as_str() {
-            Some(result) => parse_bool_value(result),
+            Some(result) => parse_bool_value(result, BODY_SRC),
             None => Err(HttpFailResult::required_parameter_is_missing(
-                self.name, "FormData",
+                self.name, BODY_SRC,
+            )),
+        }
+    }
+
+    pub fn as_date_time(&self) -> Result<DateTimeAsMicroseconds, HttpFailResult> {
+        match self.json_value.as_str() {
+            Some(result) => parse_date_time(result, BODY_SRC),
+            None => Err(HttpFailResult::required_parameter_is_missing(
+                self.name, BODY_SRC,
             )),
         }
     }
     pub fn parse<T: FromStr>(&self) -> Result<T, HttpFailResult> {
         match self.json_value.as_str() {
-            Some(value) => match value.parse::<T>() {
-                Ok(result) => Ok(result),
-                Err(_) => Err(HttpFailResult::invalid_value_to_parse(format!(
-                    "Can not parse value {:?}",
-                    self.json_value.as_str()
-                ))),
-            },
+            Some(value) => parse_into_type(value, BODY_SRC),
             None => Err(HttpFailResult::required_parameter_is_missing(
-                self.name, "FormData",
+                self.name, BODY_SRC,
             )),
         }
     }
-}
-
-fn parse_bool_value(value: &str) -> Result<bool, HttpFailResult> {
-    let value = value.to_lowercase();
-    if value == "1" || value.to_lowercase() == "true" {
-        return Ok(true);
-    }
-
-    if value == "0" || value.to_lowercase() == "false" {
-        return Ok(false);
-    }
-
-    let err =
-        HttpFailResult::invalid_value_to_parse(format!("Can not parse [{}] as boolean", value));
-
-    return Err(err);
 }

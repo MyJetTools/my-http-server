@@ -1,6 +1,9 @@
 use serde::de::DeserializeOwned;
 
-use crate::{form_data::FormData, HttpFailResult, JsonEncodedData, UrlEncodedData, WebContentType};
+use crate::{
+    body_data_reader::BodyDataReader, HttpFailResult, JsonEncodedData, UrlEncodedData,
+    WebContentType,
+};
 
 pub enum BodyContentType {
     Json,
@@ -69,12 +72,12 @@ impl HttpRequestBody {
         }
     }
 
-    pub fn get_form_data(&self) -> Result<FormData, HttpFailResult> {
+    pub fn get_body_data_reader(&self) -> Result<BodyDataReader, HttpFailResult> {
         match self.body_content_type {
-            BodyContentType::Json => get_form_data_as_json_encoded(self.raw_body.as_slice()),
+            BodyContentType::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
             BodyContentType::UrlEncoded => {
                 let body_as_str = self.as_str()?;
-                get_form_data_as_url_encoded(body_as_str)
+                get_body_data_reader_as_url_encoded(body_as_str)
             }
             BodyContentType::Unknown => {
                 return Err(HttpFailResult::as_not_supported_content_type(
@@ -85,9 +88,11 @@ impl HttpRequestBody {
     }
 }
 
-fn get_form_data_as_url_encoded(body_as_str: &str) -> Result<FormData, HttpFailResult> {
-    match UrlEncodedData::from_form_data(body_as_str) {
-        Ok(result) => return Ok(FormData::crate_as_url_encoded_data(result)),
+fn get_body_data_reader_as_url_encoded(
+    body_as_str: &str,
+) -> Result<BodyDataReader, HttpFailResult> {
+    match UrlEncodedData::from_body(body_as_str) {
+        Ok(result) => return Ok(BodyDataReader::crate_as_url_encoded_data(result)),
         Err(err) => {
             let result = HttpFailResult {
                 write_telemetry: true,
@@ -102,9 +107,9 @@ fn get_form_data_as_url_encoded(body_as_str: &str) -> Result<FormData, HttpFailR
     }
 }
 
-fn get_form_data_as_json_encoded(body: &[u8]) -> Result<FormData, HttpFailResult> {
+fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, HttpFailResult> {
     match JsonEncodedData::new(body) {
-        Ok(result) => Ok(FormData::create_as_json_encoded_data(result)),
+        Ok(result) => Ok(BodyDataReader::create_as_json_encoded_data(result)),
         Err(err) => {
             let result = HttpFailResult {
                 write_telemetry: true,
@@ -129,7 +134,7 @@ mod test {
 
         let body = HttpRequestBody::new(body.as_bytes().to_vec());
 
-        let form_data = body.get_form_data().unwrap();
+        let form_data = body.get_body_data_reader().unwrap();
 
         assert_eq!(
             "8269e2ac-fa3b-419a-8e65-1a606ba07942",
