@@ -41,41 +41,6 @@ impl<'s> ValueAsString<'s> {
             ValueAsString::Raw { value, src: _ } => Ok(value.to_string()),
         }
     }
-    pub fn as_bool(&self) -> Result<bool, HttpFailResult> {
-        match self {
-            ValueAsString::UrlEncodedValueAsStringRef { value, src } => {
-                let result = value.as_bool();
-                return crate::url_encoded_data::convert_error(result, src);
-            }
-            ValueAsString::UrlEncodedValueAsString { value, src } => {
-                let result = value.as_bool();
-                return crate::url_encoded_data::convert_error(result, src);
-            }
-            ValueAsString::JsonEncodedData { value, src: _ } => {
-                return value.as_bool();
-            }
-            ValueAsString::Raw { value, src } => {
-                return parse_bool_value(value, src);
-            }
-        }
-    }
-
-    pub fn as_date_time(&self) -> Result<DateTimeAsMicroseconds, HttpFailResult> {
-        match self {
-            ValueAsString::UrlEncodedValueAsStringRef { value, src } => {
-                let result = value.as_date_time();
-                return crate::url_encoded_data::convert_error(result, src);
-            }
-            ValueAsString::UrlEncodedValueAsString { value, src } => {
-                let result = value.as_date_time();
-                return crate::url_encoded_data::convert_error(result, src);
-            }
-            ValueAsString::JsonEncodedData { value, src: _ } => {
-                return value.as_date_time();
-            }
-            ValueAsString::Raw { value, src } => parse_date_time(value, src),
-        }
-    }
 
     pub fn parse<T: FromStr>(&self) -> Result<T, HttpFailResult> {
         match self {
@@ -91,10 +56,37 @@ impl<'s> ValueAsString<'s> {
             ValueAsString::Raw { value, src } => parse_into_type(value, src),
         }
     }
+
+    fn get_raw_str(&self) -> Result<&str, HttpFailResult> {
+        match self {
+            ValueAsString::UrlEncodedValueAsStringRef { value, src: _ } => Ok(value.value),
+            ValueAsString::UrlEncodedValueAsString { value, src: _ } => Ok(value.value),
+            ValueAsString::JsonEncodedData { value, src: _ } => value.as_raw_str(),
+            ValueAsString::Raw { value, src: _ } => Ok(value),
+        }
+    }
+
+    fn get_src(&self) -> &str {
+        match self {
+            ValueAsString::UrlEncodedValueAsStringRef { value: _, src } => src,
+            ValueAsString::UrlEncodedValueAsString { value: _, src } => src,
+            ValueAsString::JsonEncodedData { value: _, src } => src,
+            ValueAsString::Raw { value: _, src } => src,
+        }
+    }
+}
+
+pub fn parse_date_time(value: &str, src: &str) -> Result<DateTimeAsMicroseconds, HttpFailResult> {
+    match DateTimeAsMicroseconds::from_str(value) {
+        Some(result) => Ok(result),
+        None => Err(HttpFailResult::invalid_value_to_parse(format!(
+            "Can not parse [{}] as date time  from [{}]",
+            value, src
+        ))),
+    }
 }
 
 pub fn parse_bool_value(value: &str, src: &str) -> Result<bool, HttpFailResult> {
-    let value = value.to_lowercase();
     if value == "1" || value.to_lowercase() == "true" {
         return Ok(true);
     }
@@ -111,16 +103,6 @@ pub fn parse_bool_value(value: &str, src: &str) -> Result<bool, HttpFailResult> 
     return Err(err);
 }
 
-pub fn parse_date_time(value: &str, src: &str) -> Result<DateTimeAsMicroseconds, HttpFailResult> {
-    match DateTimeAsMicroseconds::from_str(value) {
-        Some(result) => Ok(result),
-        None => Err(HttpFailResult::invalid_value_to_parse(format!(
-            "Can not parse [{}] as date time  from [{}]",
-            value, src
-        ))),
-    }
-}
-
 pub fn parse_into_type<T: FromStr>(value: &str, src: &str) -> Result<T, HttpFailResult> {
     let result = value.parse::<T>();
     return match result {
@@ -130,4 +112,96 @@ pub fn parse_into_type<T: FromStr>(value: &str, src: &str) -> Result<T, HttpFail
             value, src
         ))),
     };
+}
+
+impl TryInto<DateTimeAsMicroseconds> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<DateTimeAsMicroseconds, Self::Error> {
+        match self {
+            ValueAsString::UrlEncodedValueAsStringRef { value, src } => {
+                let result = value.as_date_time();
+                return crate::url_encoded_data::convert_error(result, src);
+            }
+            ValueAsString::UrlEncodedValueAsString { value, src } => {
+                let result = value.as_date_time();
+                return crate::url_encoded_data::convert_error(result, src);
+            }
+            ValueAsString::JsonEncodedData { value, src: _ } => {
+                return value.as_date_time();
+            }
+            ValueAsString::Raw { value, src } => parse_date_time(value, src),
+        }
+    }
+}
+
+impl TryInto<bool> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<bool, Self::Error> {
+        return parse_bool_value(self.get_raw_str()?, self.get_src());
+    }
+}
+
+impl TryInto<u8> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u8, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<i8> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i8, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<u16> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u16, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<i16> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i16, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<u32> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u32, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<i32> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i32, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<u64> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u64, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<i64> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i64, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<String> for ValueAsString<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<String, Self::Error> {
+        self.as_string()
+    }
 }

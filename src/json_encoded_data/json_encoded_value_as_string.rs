@@ -15,6 +15,15 @@ impl<'s> JsonEncodedValueAsString<'s> {
         Self { name, json_value }
     }
 
+    pub fn as_raw_str(&'s self) -> Result<&'s str, HttpFailResult> {
+        match self.json_value.as_str() {
+            Some(result) => Ok(result),
+            None => Err(HttpFailResult::required_parameter_is_missing(
+                self.name, BODY_SRC,
+            )),
+        }
+    }
+
     pub fn as_string(&self) -> Result<String, HttpFailResult> {
         match self.json_value.as_str() {
             Some(result) => Ok(result.to_string()),
