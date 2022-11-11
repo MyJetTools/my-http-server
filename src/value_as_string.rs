@@ -57,7 +57,7 @@ impl<'s> ValueAsString<'s> {
         }
     }
 
-    fn get_raw_str(&self) -> Result<&str, HttpFailResult> {
+    pub fn get_raw_str(&self) -> Result<&str, HttpFailResult> {
         match self {
             ValueAsString::UrlEncodedValueAsStringRef { value, src: _ } => Ok(value.value),
             ValueAsString::UrlEncodedValueAsString { value, src: _ } => Ok(value.value),
