@@ -135,6 +135,15 @@ impl TryInto<DateTimeAsMicroseconds> for ValueAsString<'_> {
     }
 }
 
+impl<'s> From<&'s UrlEncodedValueAsString<'s>> for ValueAsString<'s> {
+    fn from(src: &'s UrlEncodedValueAsString) -> Self {
+        ValueAsString::UrlEncodedValueAsStringRef {
+            value: src,
+            src: "query",
+        }
+    }
+}
+
 impl TryInto<bool> for ValueAsString<'_> {
     type Error = HttpFailResult;
 
