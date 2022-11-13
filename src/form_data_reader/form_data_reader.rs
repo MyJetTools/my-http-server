@@ -28,6 +28,8 @@ impl<'s> FormDataReader<'s> {
         //Debugging
         println!("Boundary: {:?}", std::str::from_utf8(boundary));
 
+        println!("Pyload: {:?}", content);
+
         for chunk in ContentIterator::new(boundary, content) {
             println!("chunk: {:?}", chunk);
         }
