@@ -23,6 +23,7 @@ mod headers_reader;
 mod web_content_type;
 
 mod body_data_reader;
+mod form_data_reader;
 #[cfg(feature = "static_files")]
 mod static_files_middleware;
 #[cfg(feature = "static_files")]
@@ -55,4 +56,5 @@ pub use headers_reader::*;
 pub use http_server_data::*;
 
 pub use body_data_reader::*;
+pub use form_data_reader::*;
 pub use value_as_string::*;

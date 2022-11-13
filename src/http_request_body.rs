@@ -1,8 +1,8 @@
 use serde::de::DeserializeOwned;
 
 use crate::{
-    body_data_reader::BodyDataReader, HttpFailResult, JsonEncodedData, UrlEncodedData,
-    WebContentType,
+    body_data_reader::BodyDataReader, FormDataReader, HttpFailResult, JsonEncodedData,
+    UrlEncodedData, WebContentType,
 };
 
 pub enum BodyContentType {
@@ -29,16 +29,18 @@ impl BodyContentType {
 }
 
 pub struct HttpRequestBody {
+    content_type: Option<String>,
     raw_body: Vec<u8>,
     body_content_type: BodyContentType,
 }
 
 impl HttpRequestBody {
-    pub fn new(body: Vec<u8>) -> Self {
+    pub fn new(body: Vec<u8>, content_type: Option<String>) -> Self {
         let body_content_type = BodyContentType::detect(body.as_slice());
         Self {
             raw_body: body,
             body_content_type,
+            content_type,
         }
     }
 
@@ -86,6 +88,16 @@ impl HttpRequestBody {
             }
         }
     }
+
+    pub fn get_body_form_data(&self) -> Result<FormDataReader, HttpFailResult> {
+        if self.content_type.is_none() {
+            panic!("Content type is not set");
+        }
+        Ok(FormDataReader::new(
+            extract_boundary(self.content_type.as_ref().unwrap().as_bytes()),
+            &self.raw_body,
+        ))
+    }
 }
 
 fn get_body_data_reader_as_url_encoded(
@@ -124,6 +136,26 @@ fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, H
     }
 }
 
+fn extract_boundary(src: &[u8]) -> &[u8] {
+    let pos = rust_extensions::slice_of_u8_utils::find_sequence_pos(src, "boundary".as_bytes(), 0);
+
+    if pos.is_none() {
+        panic!("Can not find boundary tag");
+    }
+
+    let pos = rust_extensions::slice_of_u8_utils::find_byte(src, '=' as u8, pos.unwrap());
+    if pos.is_none() {
+        panic!("Boundary tag does not have eq mark after it");
+    }
+
+    let end_pos = rust_extensions::slice_of_u8_utils::find_byte(src, ';' as u8, pos.unwrap());
+
+    match end_pos {
+        Some(end_pos) => &src[pos.unwrap() + 1..end_pos],
+        None => &src[pos.unwrap() + 1..],
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -132,7 +164,7 @@ mod test {
     fn test() {
         let body = r#"{"processId":"8269e2ac-fa3b-419a-8e65-1a606ba07942","sellAmount":0.4,"buyAmount":null,"sellAsset":"ETH","buyAsset":"USDT"}"#;
 
-        let body = HttpRequestBody::new(body.as_bytes().to_vec());
+        let body = HttpRequestBody::new(body.as_bytes().to_vec(), None);
 
         let form_data = body.get_body_data_reader().unwrap();
 
@@ -156,5 +188,18 @@ mod test {
 
         let result = form_data.get_optional("buyAmount");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_boundary_extractor() {
+        let content_type_header =
+            "multipart/form-data; boundary=----WebKitFormBoundaryXayIfSQWkEtJ6k10";
+
+        let boundary = extract_boundary(content_type_header.as_bytes());
+
+        assert_eq!(
+            "----WebKitFormBoundaryXayIfSQWkEtJ6k10",
+            std::str::from_utf8(boundary).unwrap()
+        );
     }
 }

@@ -31,6 +31,7 @@ pub struct HttpRequest {
     pub req: RequestData,
     pub http_path: HttpPath,
     pub addr: SocketAddr,
+    pub content_type_header: Option<String>,
     key_values: Option<HashMap<String, Vec<u8>>>,
     x_forwarded_proto: Option<String>,
     x_forwarded_for: Option<String>,
@@ -71,6 +72,7 @@ impl HttpRequest {
             x_forwarded_proto,
             x_forwarded_for,
             host,
+            content_type_header: None,
         }
     }
 
@@ -98,6 +100,12 @@ impl HttpRequest {
     }
 
     async fn init_body(&mut self) -> Result<(), HttpFailResult> {
+        if self.content_type_header.is_none() {
+            if let Some(value) = self.get_optional_header("content-type") {
+                self.content_type_header = Some(value.as_string()?);
+            }
+        }
+
         if self.req.is_http_body() {
             return Ok(());
         }
@@ -115,7 +123,10 @@ impl HttpRequest {
 
             let body = full_body.into_iter().collect::<Vec<u8>>();
 
-            self.req = RequestData::AsHttpBody(HttpRequestBody::new(body));
+            self.req = RequestData::AsHttpBody(HttpRequestBody::new(
+                body,
+                self.content_type_header.take(),
+            ));
         }
 
         Ok(())
