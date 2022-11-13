@@ -1,8 +1,8 @@
 use serde::de::DeserializeOwned;
 
 use crate::{
-    body_data_reader::BodyDataReader, FormDataReader, HttpFailResult, JsonEncodedData,
-    UrlEncodedData, WebContentType,
+    body_data_reader::BodyDataReader, HttpFailResult, JsonEncodedData, UrlEncodedData,
+    WebContentType,
 };
 
 pub enum BodyContentType {
@@ -29,7 +29,7 @@ impl BodyContentType {
 }
 
 pub struct HttpRequestBody {
-    content_type: Option<String>,
+    pub content_type: Option<String>,
     raw_body: Vec<u8>,
     body_content_type: BodyContentType,
 }
@@ -75,6 +75,12 @@ impl HttpRequestBody {
     }
 
     pub fn get_body_data_reader(&self) -> Result<BodyDataReader, HttpFailResult> {
+        if let Some(content_type) = self.content_type.as_ref() {
+            if let Some(boundary) = extract_boundary(content_type.as_bytes()) {
+                let reader = BodyDataReader::create_as_form_data(boundary, &self.raw_body);
+                return Ok(reader);
+            }
+        }
         match self.body_content_type {
             BodyContentType::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
             BodyContentType::UrlEncoded => {
@@ -87,18 +93,6 @@ impl HttpRequestBody {
                 ))
             }
         }
-    }
-
-    pub fn get_body_form_data(&self) -> Result<FormDataReader, HttpFailResult> {
-        if self.content_type.is_none() {
-            panic!("Content type is not set");
-        }
-
-        println!("Content type: {:?}", self.content_type);
-        Ok(FormDataReader::new(
-            extract_boundary(self.content_type.as_ref().unwrap().as_bytes()),
-            &self.raw_body,
-        ))
     }
 }
 
@@ -138,23 +132,16 @@ fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, H
     }
 }
 
-fn extract_boundary(src: &[u8]) -> &[u8] {
-    let pos = rust_extensions::slice_of_u8_utils::find_sequence_pos(src, "boundary".as_bytes(), 0);
+fn extract_boundary(src: &[u8]) -> Option<&[u8]> {
+    let pos = rust_extensions::slice_of_u8_utils::find_sequence_pos(src, "boundary".as_bytes(), 0)?;
 
-    if pos.is_none() {
-        panic!("Can not find boundary tag");
-    }
+    let pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, '=' as u8, pos)?;
 
-    let pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, '=' as u8, pos.unwrap());
-    if pos.is_none() {
-        panic!("Boundary tag does not have eq mark after it");
-    }
-
-    let end_pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, ';' as u8, pos.unwrap());
+    let end_pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, ';' as u8, pos);
 
     match end_pos {
-        Some(end_pos) => &src[pos.unwrap() + 1..end_pos],
-        None => &src[pos.unwrap() + 1..],
+        Some(end_pos) => Some(&src[pos + 1..end_pos]),
+        None => Some(&src[pos + 1..]),
     }
 }
 
@@ -197,7 +184,7 @@ mod test {
         let content_type_header =
             "multipart/form-data; boundary=----WebKitFormBoundaryXayIfSQWkEtJ6k10";
 
-        let boundary = extract_boundary(content_type_header.as_bytes());
+        let boundary = extract_boundary(content_type_header.as_bytes()).unwrap();
 
         assert_eq!(
             "----WebKitFormBoundaryXayIfSQWkEtJ6k10",
