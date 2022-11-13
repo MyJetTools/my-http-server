@@ -25,6 +25,7 @@ impl<'s> FormDataReader<'s> {
         boundary_data[2..2 + boundary.len()].copy_from_slice(boundary);
 
         let boundary = &boundary_data[..boundary.len() + 2];
+        //Debugging
         println!("Boundary: {:?}", std::str::from_utf8(boundary));
 
         for chunk in ContentIterator::new(boundary, content) {
