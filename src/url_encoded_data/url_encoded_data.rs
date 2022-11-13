@@ -1,12 +1,11 @@
 use std::str::FromStr;
 
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 use url_utils::{
     url_decoder::UrlDecodeError,
     url_encoded_data_reader::{UrlEncodedDataReader, UrlEncodedValueAsString},
 };
 
-use crate::{body_data_reader::BODY_SRC, HttpFailResult};
+use crate::HttpFailResult;
 
 pub enum UrlEncodedData<'s> {
     Body(UrlEncodedDataReader<'s>),
@@ -91,7 +90,7 @@ impl<'s> UrlEncodedData<'s> {
 
     pub fn get_source_as_string(&self) -> &'static str {
         match self {
-            UrlEncodedData::Body(_) => BODY_SRC,
+            UrlEncodedData::Body(_) => "body",
             UrlEncodedData::QueryString(_) => "query string",
             UrlEncodedData::QueryStringEmpty => "query string",
         }

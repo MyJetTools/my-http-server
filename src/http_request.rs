@@ -1,7 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    http_path::HttpPath, HttpFailResult, HttpRequestBody, RequestIp, UrlEncodedData, ValueAsString,
+    http_path::HttpPath, HttpFailResult, HttpRequestBody, InputParamValue, RequestIp,
+    UrlEncodedData,
 };
 use hyper::{Body, Method, Request, Uri};
 
@@ -196,13 +197,16 @@ impl HttpRequest {
         return RequestIp::Result(self.addr.to_string());
     }
 
-    pub fn get_required_header(&self, header_name: &str) -> Result<ValueAsString, HttpFailResult> {
+    pub fn get_required_header(
+        &self,
+        header_name: &str,
+    ) -> Result<InputParamValue, HttpFailResult> {
         let header_name_lc = header_name.to_lowercase();
         for (http_header, value) in self.get_headers() {
             let http_header = http_header.as_str().to_lowercase();
             if http_header == header_name_lc {
                 if let Ok(value) = std::str::from_utf8(value.as_bytes()) {
-                    return Ok(ValueAsString::Raw {
+                    return Ok(InputParamValue::Raw {
                         value,
                         src: "header",
                     });
@@ -222,11 +226,11 @@ impl HttpRequest {
         ));
     }
 
-    pub fn get_optional_header(&self, header_name: &str) -> Option<ValueAsString> {
+    pub fn get_optional_header(&self, header_name: &str) -> Option<InputParamValue> {
         let result = self.get_headers().get(header_name)?;
 
         match result.to_str() {
-            Ok(value) => Some(ValueAsString::Raw {
+            Ok(value) => Some(InputParamValue::Raw {
                 value,
                 src: "header",
             }),

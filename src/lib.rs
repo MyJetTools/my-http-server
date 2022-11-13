@@ -17,12 +17,13 @@ mod url_encoded_data;
 
 mod http_server;
 mod http_server_data;
-mod value_as_string;
+mod input_param_value;
 
 mod headers_reader;
 mod web_content_type;
 
 mod body_data_reader;
+mod file_content_input_data;
 mod form_data_reader;
 #[cfg(feature = "static_files")]
 mod static_files_middleware;
@@ -56,5 +57,6 @@ pub use headers_reader::*;
 pub use http_server_data::*;
 
 pub use body_data_reader::*;
+pub use file_content_input_data::*;
 pub use form_data_reader::*;
-pub use value_as_string::*;
+pub use input_param_value::*;

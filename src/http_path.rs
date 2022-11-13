@@ -1,6 +1,6 @@
 use url_utils::url_encoded_data_reader::UrlEncodedValueAsString;
 
-use crate::ValueAsString;
+use crate::InputParamValue;
 
 #[derive(Debug, Clone)]
 pub struct HttpPath {
@@ -79,9 +79,9 @@ impl HttpPath {
         Some(std::str::from_utf8(result).unwrap())
     }
 
-    pub fn get_segment_value(&self, index: usize) -> Option<ValueAsString> {
+    pub fn get_segment_value(&self, index: usize) -> Option<InputParamValue> {
         let value = self.get_segment_value_as_str(index)?;
-        Some(ValueAsString::UrlEncodedValueAsString {
+        Some(InputParamValue::UrlEncodedValueAsString {
             value: UrlEncodedValueAsString::new(value),
             src: "path",
         })

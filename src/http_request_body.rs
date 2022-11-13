@@ -145,12 +145,12 @@ fn extract_boundary(src: &[u8]) -> &[u8] {
         panic!("Can not find boundary tag");
     }
 
-    let pos = rust_extensions::slice_of_u8_utils::find_byte(src, '=' as u8, pos.unwrap());
+    let pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, '=' as u8, pos.unwrap());
     if pos.is_none() {
         panic!("Boundary tag does not have eq mark after it");
     }
 
-    let end_pos = rust_extensions::slice_of_u8_utils::find_byte(src, ';' as u8, pos.unwrap());
+    let end_pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, ';' as u8, pos.unwrap());
 
     match end_pos {
         Some(end_pos) => &src[pos.unwrap() + 1..end_pos],
