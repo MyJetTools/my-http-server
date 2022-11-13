@@ -18,10 +18,6 @@ impl<'s> Iterator for ContentIterator<'s> {
     type Item = &'s [u8];
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pos == 0 {
-            self.pos += 2;
-        }
-
         self.pos += self.boundary.len();
         self.pos = find_non_space(self.payload, self.pos)?;
 
@@ -31,7 +27,7 @@ impl<'s> Iterator for ContentIterator<'s> {
             self.pos,
         )?;
 
-        let result = &self.payload[self.pos..next_pos - 2];
+        let result = &self.payload[self.pos..next_pos];
 
         self.pos = next_pos;
         Some(result)
@@ -56,7 +52,7 @@ mod tests {
 
     #[test]
     fn test_splitting() {
-        let boundary = "----WebKitFormBoundaryvrDBuVcszaZRkg3v";
+        let boundary = "------WebKitFormBoundaryvrDBuVcszaZRkg3v";
         let payload: Vec<u8> = vec![
             45, 45, 45, 45, 45, 45, 87, 101, 98, 75, 105, 116, 70, 111, 114, 109, 66, 111, 117,
             110, 100, 97, 114, 121, 118, 114, 68, 66, 117, 86, 99, 115, 122, 97, 90, 82, 107, 103,
