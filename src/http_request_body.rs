@@ -93,6 +93,8 @@ impl HttpRequestBody {
         if self.content_type.is_none() {
             panic!("Content type is not set");
         }
+
+        println!("Content type: {:?}", self.content_type);
         Ok(FormDataReader::new(
             extract_boundary(self.content_type.as_ref().unwrap().as_bytes()),
             &self.raw_body,
