@@ -21,6 +21,10 @@ pub struct FormDataReader<'s> {
 
 impl<'s> FormDataReader<'s> {
     pub fn new(boundary: &'s [u8], content: &'s [u8]) -> Self {
+        println!("Boundary: {:?}", std::str::from_utf8(boundary));
+        println!("----");
+        println!("Content: {:?}", content);
+        println!("----");
         for chunk in ContentIterator::new(boundary, content) {
             println!("chunk: {:?}", chunk);
         }
