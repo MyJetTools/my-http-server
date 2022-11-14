@@ -237,6 +237,20 @@ impl TryInto<i64> for InputParamValue<'_> {
     }
 }
 
+impl TryInto<usize> for InputParamValue<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<usize, Self::Error> {
+        self.parse()
+    }
+}
+
+impl TryInto<isize> for InputParamValue<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<isize, Self::Error> {
+        self.parse()
+    }
+}
+
 impl TryInto<String> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<String, Self::Error> {
