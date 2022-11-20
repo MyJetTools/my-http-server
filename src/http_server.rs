@@ -5,8 +5,6 @@ use hyper::{
 };
 
 #[cfg(feature = "my-telemetry")]
-use my_telemetry::TelemetryEvent;
-#[cfg(feature = "my-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use rust_extensions::{ApplicationStates, Logger};
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
@@ -113,7 +111,7 @@ pub async fn handle_requests(
     let mut request_ctx = HttpContext::new(req);
 
     #[cfg(feature = "my-telemetry")]
-    let process_id = request_ctx.telemetry_context.process_id;
+    let ctx = request_ctx.telemetry_context.clone();
 
     let path = request_ctx.request.get_path().to_string();
     let method = request_ctx.request.get_method().to_string();
@@ -132,19 +130,15 @@ pub async fn handle_requests(
         Ok(result) => (result.0, result.1),
         Err(err) => {
             #[cfg(feature = "my-telemetry")]
-            if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
-                my_telemetry::TELEMETRY_INTERFACE
-                    .write_telemetry_event(TelemetryEvent {
-                        process_id: process_id,
-                        started: started.unix_microseconds,
-                        finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                        data: format!("[{}]{}", method, path),
-                        success: None,
-                        fail: Some(format!("Panic: {:?}", err)),
-                        ip: Some(ip.clone()),
-                    })
-                    .await;
-            }
+            my_telemetry::TELEMETRY_INTERFACE
+                .write_fail(
+                    &ctx,
+                    started,
+                    format!("[{}]{}", method, path),
+                    format!("Panic: {:?}", err),
+                    Some(ip.clone()),
+                )
+                .await;
 
             let mut ctx = HashMap::new();
             ctx.insert("path".to_string(), path);
@@ -165,22 +159,15 @@ pub async fn handle_requests(
         Ok(ok_result) => {
             if ok_result.write_telemetry {
                 #[cfg(feature = "my-telemetry")]
-                if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
-                    my_telemetry::TELEMETRY_INTERFACE
-                        .write_telemetry_event(TelemetryEvent {
-                            process_id: process_id,
-                            started: started.unix_microseconds,
-                            finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                            data: format!("[{}]{}", method, path),
-                            success: Some(format!(
-                                "Status code: {}",
-                                ok_result.output.get_status_code()
-                            )),
-                            fail: None,
-                            ip: Some(ip),
-                        })
-                        .await;
-                }
+                my_telemetry::TELEMETRY_INTERFACE
+                    .write_success(
+                        &ctx,
+                        started,
+                        format!("[{}]{}", method, path),
+                        format!("Status code: {}", ok_result.output.get_status_code()),
+                        Some(ip.clone()),
+                    )
+                    .await;
             }
 
             Ok(ok_result.into())
@@ -209,20 +196,15 @@ pub async fn handle_requests(
                 }
 
                 #[cfg(feature = "my-telemetry")]
-                if my_telemetry::TELEMETRY_INTERFACE.is_telemetry_set_up() {
-                    my_telemetry::TELEMETRY_INTERFACE
-                        .write_telemetry_event(TelemetryEvent {
-                            process_id: process_id,
-                            started: started.unix_microseconds,
-                            finished: DateTimeAsMicroseconds::now().unix_microseconds,
-                            data: format!("[{}]{}", method, path),
-                            success: None,
-
-                            fail: Some(format!("Status code: {}", err_result.status_code)),
-                            ip: Some(ip),
-                        })
-                        .await;
-                }
+                my_telemetry::TELEMETRY_INTERFACE
+                    .write_fail(
+                        &ctx,
+                        started,
+                        format!("[{}]{}", method, path),
+                        format!("Status code: {}", err_result.status_code),
+                        Some(ip.clone()),
+                    )
+                    .await;
             }
             Ok(err_result.into())
         }
