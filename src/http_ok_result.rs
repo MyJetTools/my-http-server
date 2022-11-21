@@ -118,6 +118,10 @@ impl HttpOutput {
         }
     }
 
+    pub fn as_file(file_name: String, content: Vec<u8>) -> Self {
+        Self::File { file_name, content }
+    }
+
     pub fn get_status_code(&self) -> u16 {
         match self {
             Self::Empty => 202,
