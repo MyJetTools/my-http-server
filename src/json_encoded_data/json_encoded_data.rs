@@ -40,9 +40,7 @@ impl<'s> JsonEncodedData<'s> {
 
         match result {
             Some(result) => Ok(result),
-            None => Err(HttpFailResult::required_parameter_is_missing(
-                name, "FormData",
-            )),
+            None => Err(HttpFailResult::required_parameter_is_missing(name, "Body")),
         }
     }
 
