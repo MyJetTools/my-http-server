@@ -124,7 +124,7 @@ impl HttpOutput {
 
     pub fn get_status_code(&self) -> u16 {
         match self {
-            Self::Empty => 202,
+            Self::Empty => 204,
             Self::Content {
                 headers: _,
                 content_type: _,
