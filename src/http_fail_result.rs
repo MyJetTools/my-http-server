@@ -1,6 +1,6 @@
 use crate::WebContentType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HttpFailResult {
     pub content_type: WebContentType,
     pub status_code: u16,
