@@ -60,6 +60,16 @@ impl HttpFailResult {
         }
     }
 
+    pub fn as_validation_error(text: String) -> Self {
+        Self {
+            content_type: WebContentType::Text,
+            content: format!("Validation error: {}", text).into_bytes(),
+            status_code: 401,
+            write_telemetry: true,
+            write_to_log: false,
+        }
+    }
+
     pub fn as_forbidden(text: Option<String>) -> Self {
         Self {
             content_type: WebContentType::Text,
