@@ -13,10 +13,7 @@ impl<'s> ContentIterator<'s> {
             payload,
             pos: 0,
         };
-        println!(
-            "boundary: {:?}",
-            std::str::from_utf8(result.boundary_data).unwrap()
-        );
+
         result
     }
 }

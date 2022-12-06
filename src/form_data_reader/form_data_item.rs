@@ -15,6 +15,24 @@ pub enum FormDataItem<'s> {
 }
 
 impl<'s> FormDataItem<'s> {
+    pub fn unwrap_as_string(&'s self) -> &'s str {
+        match self {
+            FormDataItem::ValueAsString { value, .. } => value,
+            FormDataItem::File { .. } => {
+                panic!("Can not unwrap FormDataItem as string. It is file")
+            }
+        }
+    }
+
+    pub fn unwrap_as_file_name(&'s self) -> &'s str {
+        match self {
+            FormDataItem::ValueAsString { .. } => {
+                panic!("Can not unwrap FormDataItem as string. It is file")
+            }
+            FormDataItem::File { file_name, .. } => file_name,
+        }
+    }
+
     pub fn get_name(&'s self) -> &'s str {
         match self {
             FormDataItem::ValueAsString { name, .. } => name,
@@ -53,7 +71,16 @@ impl<'s> FormDataItem<'s> {
 
             match header_name {
                 "Content-Disposition" => {
-                    for itm in ContentDispositionParser::new(&src[double_quote_pos + 1..]) {
+                    let content_disposition_data = &src[double_quote_pos + 1..];
+
+                    let end = content_disposition_data
+                        .iter()
+                        .position(|p| *p == 13)
+                        .unwrap();
+
+                    let content_disposition_data = &content_disposition_data[..end];
+
+                    for itm in ContentDispositionParser::new(content_disposition_data) {
                         match itm.key {
                             "name" => name = itm.value,
                             "filename" => file_name = itm.value,
@@ -166,4 +193,21 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    pub fn test_content_disposition_test_real_data() {
+        let src: Vec<u8> = vec![
+            67, 111, 110, 116, 101, 110, 116, 45, 68, 105, 115, 112, 111, 115, 105, 116, 105, 111,
+            110, 58, 32, 102, 111, 114, 109, 45, 100, 97, 116, 97, 59, 32, 110, 97, 109, 101, 61,
+            34, 100, 111, 99, 73, 100, 34, 13, 10, 13, 10, 48, 13, 10,
+        ];
+
+        println!("src: {:?}", std::str::from_utf8(src.as_slice()).unwrap());
+
+        let result = super::FormDataItem::parse(&src);
+
+        assert_eq!(result.get_name(), "docId");
+        assert_eq!(result.unwrap_as_string(), "0");
+    }
+    
 }
