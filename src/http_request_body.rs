@@ -76,8 +76,8 @@ impl HttpRequestBody {
 
     pub fn get_body_data_reader(&self) -> Result<BodyDataReader, HttpFailResult> {
         if let Some(content_type) = self.content_type.as_ref() {
-            if let Some(boundary) = extract_boundary(content_type.as_bytes()) {
-                let reader = BodyDataReader::create_as_form_data(boundary, &self.raw_body);
+            if extract_boundary(content_type.as_bytes()).is_some() {
+                let reader = BodyDataReader::create_as_form_data(&self.raw_body);
                 return Ok(reader);
             }
         }

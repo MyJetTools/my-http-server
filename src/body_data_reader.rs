@@ -30,9 +30,9 @@ impl<'s> BodyDataReader<'s> {
         }
     }
 
-    pub fn create_as_form_data(boundary: &[u8], body: &'s [u8]) -> Self {
+    pub fn create_as_form_data(body: &'s [u8]) -> Self {
         Self {
-            inner: BodyDataReaderInner::FormData(FormDataReader::new(boundary, body)),
+            inner: BodyDataReaderInner::FormData(FormDataReader::new(body)),
         }
     }
 

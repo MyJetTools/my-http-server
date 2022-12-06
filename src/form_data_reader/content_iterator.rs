@@ -1,26 +1,23 @@
 pub struct ContentIterator<'s> {
-    boundary_data: [u8; 255],
-    boundary_len: usize,
+    boundary_data: &'s [u8],
     payload: &'s [u8],
     pos: usize,
 }
 
 impl<'s> ContentIterator<'s> {
-    pub fn new(boundary: &[u8], payload: &'s [u8]) -> Self {
-        let mut result = Self {
-            boundary_data: [b'-'; 255],
-            boundary_len: boundary.len() + 2,
+    pub fn new(payload: &'s [u8]) -> Self {
+        let boundary_pos = payload.iter().position(|p| p == &13u8).unwrap();
+
+        let result = Self {
+            boundary_data: &payload[..boundary_pos],
             payload,
             pos: 0,
         };
-
-        result.boundary_data[2..2 + boundary.len()].copy_from_slice(boundary);
-
+        println!(
+            "boundary: {:?}",
+            std::str::from_utf8(result.boundary_data).unwrap()
+        );
         result
-    }
-
-    pub fn get_boundary(&'s self) -> &'s [u8] {
-        &self.boundary_data[..self.boundary_len]
     }
 }
 
@@ -28,12 +25,12 @@ impl<'s> Iterator for ContentIterator<'s> {
     type Item = &'s [u8];
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.pos += self.boundary_len;
+        self.pos += self.boundary_data.len();
         self.pos = find_non_space(self.payload, self.pos)?;
 
         let next_pos = rust_extensions::slice_of_u8_utils::find_sequence_pos(
             self.payload,
-            self.get_boundary(),
+            self.boundary_data,
             self.pos,
         )?;
 
@@ -62,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_splitting() {
-        let boundary = "----WebKitFormBoundaryu7oxE5T3UC2xY2Q9";
+        //let boundary = "----WebKitFormBoundaryu7oxE5T3UC2xY2Q9";
         let payload: Vec<u8> = vec![
             45, 45, 45, 45, 45, 45, 87, 101, 98, 75, 105, 116, 70, 111, 114, 109, 66, 111, 117,
             110, 100, 97, 114, 121, 117, 55, 111, 120, 69, 53, 84, 51, 85, 67, 50, 120, 89, 50, 81,
@@ -95,8 +92,7 @@ mod tests {
             45, 45, 13, 10,
         ];
 
-        let result: Vec<&[u8]> =
-            ContentIterator::new(boundary.as_bytes(), payload.as_slice()).collect();
+        let result: Vec<&[u8]> = ContentIterator::new(payload.as_slice()).collect();
 
         let expected_payload_0: Vec<u8> = vec![
             67, 111, 110, 116, 101, 110, 116, 45, 68, 105, 115, 112, 111, 115, 105, 116, 105, 111,

@@ -1,5 +1,6 @@
 use crate::ContentDispositionParser;
 
+#[derive(Debug)]
 pub enum FormDataItem<'s> {
     ValueAsString {
         value: &'s str,
