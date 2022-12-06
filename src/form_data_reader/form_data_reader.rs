@@ -11,6 +11,8 @@ impl<'s> FormDataReader<'s> {
         let mut data = Vec::new();
 
         for chunk in ContentIterator::new(content) {
+            println!("chunk: {:?}", chunk);
+
             let item = FormDataItem::parse(chunk);
             data.push(item);
         }
