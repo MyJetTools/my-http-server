@@ -34,7 +34,16 @@ impl<'s> Iterator for ContentDispositionParser<'s> {
 
         let b = self.content[pos];
 
-        let key = std::str::from_utf8(&self.content[self.pos..pos]).unwrap();
+        let key = std::str::from_utf8(&self.content[self.pos..pos]);
+
+        if key.is_err() {
+            println!("Key: {:?}", &self.content[self.pos..pos]);
+            println!("FormData: {:?}", self.content);
+            panic!("Can not parse Key for Form Data");
+        }
+
+        let key = key.unwrap();
+
         self.pos = pos + 1;
 
         if b == b';' {
