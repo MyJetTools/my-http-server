@@ -25,14 +25,9 @@ mod web_content_type;
 mod body_data_reader;
 mod file_content_input_data;
 mod form_data_reader;
-#[cfg(feature = "static_files")]
+#[cfg(feature = "static-files")]
 mod static_files_middleware;
-#[cfg(feature = "static_files")]
-pub use static_files_middleware::*;
-
-#[cfg(feature = "full")]
-mod static_files_middleware;
-#[cfg(feature = "full")]
+#[cfg(feature = "static-files")]
 pub use static_files_middleware::*;
 
 pub use http_ctx::HttpContext;
