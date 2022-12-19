@@ -1,4 +1,3 @@
-pub mod converters;
 pub mod errors;
 mod http_ctx;
 mod http_fail_result;

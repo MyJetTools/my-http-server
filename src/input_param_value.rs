@@ -127,7 +127,7 @@ pub fn parse_bool_value(value: &str, src: &str) -> Result<bool, HttpFailResult> 
 }
 
 pub fn parse_into_type<T: FromStr>(value: &str, src: &str) -> Result<T, HttpFailResult> {
-    let result = value.parse::<T>();
+    let result = T::from_str(value);
     return match result {
         Ok(value) => Ok(value),
         _ => Err(HttpFailResult::invalid_value_to_parse(format!(
