@@ -52,7 +52,7 @@ impl<'s> InputParamValue<'s> {
         }
     }
 
-    pub fn parse<T: FromStr>(&self) -> Result<T, HttpFailResult> {
+    pub fn from_str<T: FromStr>(&self) -> Result<T, HttpFailResult> {
         match self {
             InputParamValue::UrlEncodedValueAsString { value, src } => {
                 let result = value.parse();
@@ -184,84 +184,84 @@ impl TryInto<bool> for InputParamValue<'_> {
 impl TryInto<u8> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u8, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<i8> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i8, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<u16> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u16, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<i16> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i16, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<u32> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u32, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<i32> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i32, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<u64> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u64, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<i64> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i64, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<usize> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<usize, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<isize> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<isize, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<f64> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f64, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
 impl TryInto<f32> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f32, Self::Error> {
-        self.parse()
+        self.from_str()
     }
 }
 
