@@ -24,13 +24,9 @@ where
                     src
                 )))
             }
-            InputParamValue::JsonEncodedData { src, .. } => match serde_json::from_str(src) {
-                Ok(result) => Ok(result),
-                Err(_) => Err(HttpFailResult::invalid_value_to_parse(format!(
-                    "Can not parse [{}] as json",
-                    src
-                ))),
-            },
+            InputParamValue::JsonEncodedData { src, .. } => {
+                crate::input_param_value::parse_json_value(src)
+            }
             InputParamValue::Raw { src, .. } => Err(HttpFailResult::as_not_supported_content_type(
                 format!("reading file, but request contains a raw value in {}", src),
             )),

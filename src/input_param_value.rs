@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use rust_extensions::date_time::DateTimeAsMicroseconds;
+use serde::de::DeserializeOwned;
 use url_utils::url_encoded_data_reader::UrlEncodedValueAsString;
 
 use crate::{json_encoded_data::JsonEncodedValueAsString, types::FileContent, HttpFailResult};
@@ -88,6 +89,22 @@ impl<'s> InputParamValue<'s> {
         }
     }
 
+    pub fn from_json<TResult: DeserializeOwned>(&self) -> Result<TResult, HttpFailResult> {
+        match self {
+            InputParamValue::UrlEncodedValueAsStringRef { value, src: _ } => {
+                parse_json_value(value.as_string()?.as_str())
+            }
+            InputParamValue::UrlEncodedValueAsString { value, src: _ } => {
+                parse_json_value(value.as_string()?.as_str())
+            }
+            InputParamValue::JsonEncodedData { value, src: _ } => {
+                parse_json_value(value.as_string()?.as_str())
+            }
+            InputParamValue::Raw { value, src: _ } => parse_json_value(value),
+            InputParamValue::File { src, .. } => parse_json_value(src),
+        }
+    }
+
     fn get_src(&self) -> &str {
         match self {
             InputParamValue::UrlEncodedValueAsStringRef { src, .. } => src,
@@ -161,6 +178,16 @@ impl TryInto<DateTimeAsMicroseconds> for InputParamValue<'_> {
                 )))
             }
         }
+    }
+}
+
+pub fn parse_json_value<TResult: DeserializeOwned>(src: &str) -> Result<TResult, HttpFailResult> {
+    match serde_json::from_str(src) {
+        Ok(result) => Ok(result),
+        Err(_) => Err(HttpFailResult::invalid_value_to_parse(format!(
+            "Can not parse [{}] as json",
+            src
+        ))),
     }
 }
 
