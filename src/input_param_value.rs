@@ -3,7 +3,7 @@ use std::str::FromStr;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use url_utils::url_encoded_data_reader::UrlEncodedValueAsString;
 
-use crate::{json_encoded_data::JsonEncodedValueAsString, FileContent, HttpFailResult};
+use crate::{json_encoded_data::JsonEncodedValueAsString, types::FileContent, HttpFailResult};
 
 pub enum InputParamValue<'s> {
     UrlEncodedValueAsStringRef {
@@ -269,35 +269,5 @@ impl TryInto<String> for InputParamValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<String, Self::Error> {
         self.as_string()
-    }
-}
-
-impl TryInto<FileContent> for InputParamValue<'_> {
-    type Error = HttpFailResult;
-    fn try_into(self) -> Result<FileContent, Self::Error> {
-        match self {
-            InputParamValue::UrlEncodedValueAsStringRef { src, .. } => {
-                Err(HttpFailResult::as_not_supported_content_type(format!(
-                    "reading file, but request contains a raw value in {}",
-                    src
-                )))
-            }
-            InputParamValue::UrlEncodedValueAsString { src, .. } => {
-                Err(HttpFailResult::as_not_supported_content_type(format!(
-                    "reading file, but request contains a raw value in {}",
-                    src
-                )))
-            }
-            InputParamValue::JsonEncodedData { src, .. } => {
-                Err(HttpFailResult::as_not_supported_content_type(format!(
-                    "reading file, but request contains a raw value in {}",
-                    src
-                )))
-            }
-            InputParamValue::Raw { src, .. } => Err(HttpFailResult::as_not_supported_content_type(
-                format!("reading file, but request contains a raw value in {}", src),
-            )),
-            InputParamValue::File { file, src: _ } => Ok(file),
-        }
     }
 }

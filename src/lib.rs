@@ -7,6 +7,7 @@ mod http_path;
 mod http_request;
 mod http_request_body;
 mod http_server_middleware;
+pub mod types;
 
 mod json_encoded_data;
 
@@ -19,11 +20,9 @@ mod http_server;
 mod http_server_data;
 mod input_param_value;
 
-mod headers_reader;
 mod web_content_type;
 
 mod body_data_reader;
-mod file_content_input_data;
 mod form_data_reader;
 #[cfg(feature = "static-files")]
 mod static_files_middleware;
@@ -48,10 +47,8 @@ pub use request_ip::RequestIp;
 pub use url_encoded_data::UrlEncodedData;
 pub use web_content_type::WebContentType;
 
-pub use headers_reader::*;
 pub use http_server_data::*;
 
 pub use body_data_reader::*;
-pub use file_content_input_data::*;
 pub use form_data_reader::*;
 pub use input_param_value::*;

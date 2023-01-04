@@ -1,5 +1,6 @@
 use crate::{
-    url_encoded_data::UrlEncodedData, FileContent, FormDataReader, HttpFailResult, JsonEncodedData,
+    types::FileContent, url_encoded_data::UrlEncodedData, FormDataReader, HttpFailResult,
+    JsonEncodedData,
 };
 
 use super::InputParamValue;
