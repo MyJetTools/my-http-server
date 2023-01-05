@@ -51,8 +51,10 @@ impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for InputParamValue<'_> {
     }
 }
 
-impl<T: DeserializeOwned> Into<RawDataTyped<T>> for HttpRequestBody {
-    fn into(self) -> RawDataTyped<T> {
-        RawDataTyped::new(self.get_body())
+impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for HttpRequestBody {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
+        Ok(RawDataTyped::new(self.get_body()))
     }
 }

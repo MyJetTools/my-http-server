@@ -37,8 +37,10 @@ impl TryInto<RawData> for InputParamValue<'_> {
     }
 }
 
-impl Into<RawData> for HttpRequestBody {
-    fn into(self) -> RawData {
-        RawData::new(self.get_body())
+impl TryInto<RawData> for HttpRequestBody {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<RawData, Self::Error> {
+        Ok(RawData::new(self.get_body()))
     }
 }
