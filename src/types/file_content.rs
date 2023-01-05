@@ -12,19 +12,19 @@ impl TryInto<FileContent> for InputParamValue<'_> {
         match self {
             InputParamValue::UrlEncodedValueAsStringRef { src, .. } => {
                 Err(HttpFailResult::as_not_supported_content_type(format!(
-                    "reading file, but request contains a raw value in {}",
+                    "reading file, but request contains a UrlEncoded in {}",
                     src
                 )))
             }
             InputParamValue::UrlEncodedValueAsString { src, .. } => {
                 Err(HttpFailResult::as_not_supported_content_type(format!(
-                    "reading file, but request contains a raw value in {}",
+                    "reading file, but request contains a UrlEncoded in {}",
                     src
                 )))
             }
             InputParamValue::JsonEncodedData { src, .. } => {
                 Err(HttpFailResult::as_not_supported_content_type(format!(
-                    "reading file, but request contains a raw value in {}",
+                    "reading file, but request contains a Json in {}",
                     src
                 )))
             }
