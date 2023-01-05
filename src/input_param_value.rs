@@ -92,16 +92,16 @@ impl<'s> InputParamValue<'s> {
     pub fn from_json<TResult: DeserializeOwned>(&self) -> Result<TResult, HttpFailResult> {
         match self {
             InputParamValue::UrlEncodedValueAsStringRef { value, src: _ } => {
-                parse_json_value(value.as_string()?.as_str())
+                parse_json_value(value.as_string()?.as_bytes())
             }
             InputParamValue::UrlEncodedValueAsString { value, src: _ } => {
-                parse_json_value(value.as_string()?.as_str())
+                parse_json_value(value.as_string()?.as_bytes())
             }
             InputParamValue::JsonEncodedData { value, src: _ } => {
-                parse_json_value(value.as_string()?.as_str())
+                parse_json_value(value.as_string()?.as_bytes())
             }
-            InputParamValue::Raw { value, src: _ } => parse_json_value(value),
-            InputParamValue::File { src, .. } => parse_json_value(src),
+            InputParamValue::Raw { value, src: _ } => parse_json_value(value.as_bytes()),
+            InputParamValue::File { src, .. } => parse_json_value(src.as_bytes()),
         }
     }
 
@@ -181,13 +181,26 @@ impl TryInto<DateTimeAsMicroseconds> for InputParamValue<'_> {
     }
 }
 
-pub fn parse_json_value<TResult: DeserializeOwned>(src: &str) -> Result<TResult, HttpFailResult> {
-    match serde_json::from_str(src) {
+pub fn parse_json_value<TResult: DeserializeOwned>(src: &[u8]) -> Result<TResult, HttpFailResult> {
+    match serde_json::from_slice(src) {
         Ok(result) => Ok(result),
-        Err(_) => Err(HttpFailResult::invalid_value_to_parse(format!(
-            "Can not parse [{}] as json",
-            src
-        ))),
+        Err(_) => {
+            let slice = if src.len() > 512 {
+                src[0..512].to_vec()
+            } else {
+                src.to_vec()
+            };
+
+            let value = match String::from_utf8(slice.to_vec()) {
+                Ok(result) => result,
+                Err(_) => format!("{:?}", slice),
+            };
+
+            Err(HttpFailResult::invalid_value_to_parse(format!(
+                "Can not parse '{}' as json",
+                value
+            )))
+        }
     }
 }
 

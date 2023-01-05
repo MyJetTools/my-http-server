@@ -1,26 +1,40 @@
+use std::marker::PhantomData;
+
+use serde::de::DeserializeOwned;
+
 use crate::{HttpFailResult, HttpRequestBody, InputParamValue};
 
-pub struct RawData(Vec<u8>);
+pub struct RawData<T: DeserializeOwned> {
+    data: Vec<u8>,
+    ty: PhantomData<T>,
+}
 
-impl RawData {
+impl<T: DeserializeOwned> RawData<T> {
     pub fn new(data: Vec<u8>) -> Self {
-        Self(data)
+        Self {
+            data,
+            ty: PhantomData,
+        }
     }
 
     pub fn as_slice(&self) -> &[u8] {
-        self.0.as_slice()
+        self.data.as_slice()
+    }
+
+    pub fn deserialize_json(&self) -> Result<T, HttpFailResult> {
+        crate::input_param_value::parse_json_value(&self.data)
     }
 }
 
-impl AsRef<[u8]> for RawData {
+impl<T: DeserializeOwned> AsRef<[u8]> for RawData<T> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
+        self.data.as_ref()
     }
 }
 
-impl TryInto<RawData> for InputParamValue<'_> {
+impl<T: DeserializeOwned> TryInto<RawData<T>> for InputParamValue<'_> {
     type Error = HttpFailResult;
-    fn try_into(self) -> Result<RawData, Self::Error> {
+    fn try_into(self) -> Result<RawData<T>, Self::Error> {
         match self {
             InputParamValue::UrlEncodedValueAsStringRef { src, .. } => {
                 Ok(RawData::new(src.as_bytes().to_vec()))
@@ -37,8 +51,8 @@ impl TryInto<RawData> for InputParamValue<'_> {
     }
 }
 
-impl Into<RawData> for HttpRequestBody {
-    fn into(self) -> RawData {
+impl<T: DeserializeOwned> Into<RawData<T>> for HttpRequestBody {
+    fn into(self) -> RawData<T> {
         RawData::new(self.get_body())
     }
 }
