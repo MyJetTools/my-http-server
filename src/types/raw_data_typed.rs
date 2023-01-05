@@ -4,12 +4,12 @@ use serde::de::DeserializeOwned;
 
 use crate::{HttpFailResult, HttpRequestBody, InputParamValue};
 
-pub struct RawData<T: DeserializeOwned> {
+pub struct RawDataTyped<T: DeserializeOwned> {
     data: Vec<u8>,
     ty: PhantomData<T>,
 }
 
-impl<T: DeserializeOwned> RawData<T> {
+impl<T: DeserializeOwned> RawDataTyped<T> {
     pub fn new(data: Vec<u8>) -> Self {
         Self {
             data,
@@ -26,33 +26,33 @@ impl<T: DeserializeOwned> RawData<T> {
     }
 }
 
-impl<T: DeserializeOwned> AsRef<[u8]> for RawData<T> {
+impl<T: DeserializeOwned> AsRef<[u8]> for RawDataTyped<T> {
     fn as_ref(&self) -> &[u8] {
         self.data.as_ref()
     }
 }
 
-impl<T: DeserializeOwned> TryInto<RawData<T>> for InputParamValue<'_> {
+impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for InputParamValue<'_> {
     type Error = HttpFailResult;
-    fn try_into(self) -> Result<RawData<T>, Self::Error> {
+    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
         match self {
             InputParamValue::UrlEncodedValueAsStringRef { src, .. } => {
-                Ok(RawData::new(src.as_bytes().to_vec()))
+                Ok(RawDataTyped::new(src.as_bytes().to_vec()))
             }
             InputParamValue::UrlEncodedValueAsString { src, .. } => {
-                Ok(RawData::new(src.as_bytes().to_vec()))
+                Ok(RawDataTyped::new(src.as_bytes().to_vec()))
             }
             InputParamValue::JsonEncodedData { src, .. } => {
-                Ok(RawData::new(src.as_bytes().to_vec()))
+                Ok(RawDataTyped::new(src.as_bytes().to_vec()))
             }
-            InputParamValue::Raw { src, .. } => Ok(RawData::new(src.as_bytes().to_vec())),
-            InputParamValue::File { file, src: _ } => Ok(RawData::new(file.content)),
+            InputParamValue::Raw { src, .. } => Ok(RawDataTyped::new(src.as_bytes().to_vec())),
+            InputParamValue::File { file, src: _ } => Ok(RawDataTyped::new(file.content)),
         }
     }
 }
 
-impl<T: DeserializeOwned> Into<RawData<T>> for HttpRequestBody {
-    fn into(self) -> RawData<T> {
-        RawData::new(self.get_body())
+impl<T: DeserializeOwned> Into<RawDataTyped<T>> for HttpRequestBody {
+    fn into(self) -> RawDataTyped<T> {
+        RawDataTyped::new(self.get_body())
     }
 }
