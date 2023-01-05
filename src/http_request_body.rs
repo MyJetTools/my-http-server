@@ -115,6 +115,14 @@ fn get_body_data_reader_as_url_encoded(
     }
 }
 
+impl<T: DeserializeOwned> TryInto<Vec<T>> for HttpRequestBody {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<Vec<T>, Self::Error> {
+        crate::input_param_value::parse_json_value(self.as_slice())
+    }
+}
+
 fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, HttpFailResult> {
     match JsonEncodedData::new(body) {
         Ok(result) => Ok(BodyDataReader::create_as_json_encoded_data(result)),
