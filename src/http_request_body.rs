@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -119,6 +121,14 @@ impl<T: DeserializeOwned> TryInto<Vec<T>> for HttpRequestBody {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<Vec<T>, Self::Error> {
+        crate::input_param_value::parse_json_value(self.as_slice())
+    }
+}
+
+impl<T: DeserializeOwned> TryInto<HashMap<String, T>> for HttpRequestBody {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<HashMap<String, T>, Self::Error> {
         crate::input_param_value::parse_json_value(self.as_slice())
     }
 }
