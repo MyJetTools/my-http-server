@@ -1,3 +1,5 @@
+use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
+
 use crate::ContentDispositionParser;
 
 #[derive(Debug)]
@@ -55,11 +57,9 @@ impl<'s> FormDataItem<'s> {
                 break;
             }
 
-            pos = rust_extensions::slice_of_u8_utils::find_pos_by_condition(src, pos, |p| p > 32)
-                .unwrap();
+            pos = src.find_pos_by_condition(pos, |p| p > 32).unwrap();
 
-            let double_quote_pos =
-                rust_extensions::slice_of_u8_utils::find_byte_pos(src, b':' as u8, pos);
+            let double_quote_pos = src.find_byte_pos(b':' as u8, pos);
 
             if double_quote_pos.is_none() {
                 panic!("Invalid form data parsing. Can not find ':'");
@@ -88,37 +88,19 @@ impl<'s> FormDataItem<'s> {
                         }
                     }
 
-                    pos = rust_extensions::slice_of_u8_utils::find_byte_pos(
-                        src,
-                        13,
-                        double_quote_pos,
-                    )
-                    .unwrap();
+                    pos = src.find_byte_pos(13, double_quote_pos).unwrap();
                 }
                 "Content-Type" => {
-                    let start = rust_extensions::slice_of_u8_utils::find_pos_by_condition(
-                        src,
-                        double_quote_pos + 1,
-                        |p| p > 32,
-                    )
-                    .unwrap();
-                    let end = rust_extensions::slice_of_u8_utils::find_pos_by_condition(
-                        src,
-                        start,
-                        |p| p == 13,
-                    )
-                    .unwrap();
+                    let start = src
+                        .find_pos_by_condition(double_quote_pos + 1, |p| p > 32)
+                        .unwrap();
+                    let end = src.find_pos_by_condition(start, |p| p == 13).unwrap();
                     content_type = Some(std::str::from_utf8(&src[start..end]).unwrap());
 
                     pos = end;
                 }
                 _ => {
-                    pos = rust_extensions::slice_of_u8_utils::find_byte_pos(
-                        src,
-                        13,
-                        double_quote_pos,
-                    )
-                    .unwrap();
+                    pos = src.find_byte_pos(13, double_quote_pos).unwrap();
                 }
             }
         }
@@ -209,5 +191,4 @@ mod tests {
         assert_eq!(result.get_name(), "docId");
         assert_eq!(result.unwrap_as_string(), "0");
     }
-    
 }

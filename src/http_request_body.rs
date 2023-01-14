@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -151,11 +152,11 @@ fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, H
 }
 
 fn extract_boundary(src: &[u8]) -> Option<&[u8]> {
-    let pos = rust_extensions::slice_of_u8_utils::find_sequence_pos(src, "boundary".as_bytes(), 0)?;
+    let pos = src.find_sequence_pos("boundary".as_bytes(), 0)?;
 
-    let pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, '=' as u8, pos)?;
+    let pos = src.find_byte_pos('=' as u8, pos)?;
 
-    let end_pos = rust_extensions::slice_of_u8_utils::find_byte_pos(src, ';' as u8, pos);
+    let end_pos = src.find_byte_pos(';' as u8, pos);
 
     match end_pos {
         Some(end_pos) => Some(&src[pos + 1..end_pos]),

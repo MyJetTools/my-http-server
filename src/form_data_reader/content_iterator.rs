@@ -1,3 +1,5 @@
+use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
+
 pub struct ContentIterator<'s> {
     boundary_data: &'s [u8],
     payload: &'s [u8],
@@ -25,11 +27,9 @@ impl<'s> Iterator for ContentIterator<'s> {
         self.pos += self.boundary_data.len();
         self.pos = find_non_space(self.payload, self.pos)?;
 
-        let next_pos = rust_extensions::slice_of_u8_utils::find_sequence_pos(
-            self.payload,
-            self.boundary_data,
-            self.pos,
-        )?;
+        let next_pos = self
+            .payload
+            .find_sequence_pos(self.boundary_data, self.pos)?;
 
         let result = &self.payload[self.pos..next_pos];
 
