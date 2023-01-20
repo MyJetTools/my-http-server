@@ -311,3 +311,11 @@ impl TryInto<String> for InputParamValue<'_> {
         self.as_string()
     }
 }
+
+impl<T: DeserializeOwned> TryInto<Vec<T>> for InputParamValue<'_> {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<Vec<T>, Self::Error> {
+        self.from_json()
+    }
+}
