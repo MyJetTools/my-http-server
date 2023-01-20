@@ -64,8 +64,8 @@ impl<'s> JsonEncodedValueAsString<'s> {
     }
 
     pub fn as_bytes(&self) -> Result<&[u8], HttpFailResult> {
-        match self.json_value.as_str() {
-            Some(value) => Ok(value.as_bytes()),
+        match self.json_value.as_bytes() {
+            Some(value) => Ok(value),
             None => Err(HttpFailResult::required_parameter_is_missing(
                 self.name,
                 "body json",

@@ -128,3 +128,42 @@ impl<'s> BodyDataReader<'s> {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn test_parsing_json_model_with_array_as_param() {
+        use crate::{BodyDataReader, JsonEncodedData};
+
+        let src_data = r#"{"name":"John","age":30,"cars":["Ford","BMW","Fiat"]}"#;
+
+        let json_encoded_data = JsonEncodedData::new(src_data.as_bytes()).unwrap();
+        let body_data_reader = BodyDataReader::create_as_json_encoded_data(json_encoded_data);
+
+        assert_eq!(
+            "John",
+            body_data_reader
+                .get_required("name")
+                .unwrap()
+                .as_string()
+                .unwrap()
+        );
+
+        let result: i32 = body_data_reader
+            .get_required("age")
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        assert_eq!(30, result);
+
+        let result: Vec<String> = body_data_reader
+            .get_required("cars")
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        assert_eq!(vec!["Ford", "BMW", "Fiat"], result);
+    }
+}
