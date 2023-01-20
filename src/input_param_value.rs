@@ -98,7 +98,7 @@ impl<'s> InputParamValue<'s> {
                 parse_json_value(value.as_string()?.as_bytes())
             }
             InputParamValue::JsonEncodedData { value, src: _ } => {
-                parse_json_value(value.as_string()?.as_bytes())
+                parse_json_value(value.as_bytes()?)
             }
             InputParamValue::Raw { value, src: _ } => parse_json_value(value.as_bytes()),
             InputParamValue::File { src, .. } => parse_json_value(src.as_bytes()),
