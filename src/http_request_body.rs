@@ -164,6 +164,13 @@ fn extract_boundary(src: &[u8]) -> Option<&[u8]> {
     }
 }
 
+impl TryInto<String> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<String, Self::Error> {
+        Ok(self.as_str()?.to_string())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
