@@ -254,6 +254,96 @@ impl TryInto<i32> for HttpRequestBody {
     }
 }
 
+impl TryInto<u64> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u64, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<u64>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse u64. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<i64> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i64, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<i64>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse i64. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<usize> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<usize, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<usize>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse usize. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<isize> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<isize, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<isize>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse isize. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<f32> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<f32, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<f32>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse f32. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<f64> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<f64, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<f64>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse f64. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
 impl<'s> TryInto<&'s str> for &'s HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<&'s str, Self::Error> {
