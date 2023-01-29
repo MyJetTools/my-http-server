@@ -164,6 +164,43 @@ fn extract_boundary(src: &[u8]) -> Option<&[u8]> {
     }
 }
 
+impl TryInto<u8> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u8, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<u8>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse u8. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<i8> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i8, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<i8>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse u8. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<&'s str> for &'s HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<&'s str, Self::Error> {
+        Ok(self.as_str()?)
+    }
+}
+
 impl TryInto<String> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<String, Self::Error> {
