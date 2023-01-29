@@ -24,8 +24,8 @@ where
                     src
                 )))
             }
-            InputParamValue::JsonEncodedData { src, .. } => {
-                crate::input_param_value::parse_json_value(src.as_bytes())
+            InputParamValue::JsonEncodedData { value, .. } => {
+                crate::input_param_value::parse_json_value(value.as_bytes()?)
             }
             InputParamValue::Raw { src, .. } => Err(HttpFailResult::as_not_supported_content_type(
                 format!("reading file, but request contains a raw value in {}", src),
