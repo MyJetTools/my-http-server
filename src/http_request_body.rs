@@ -194,6 +194,66 @@ impl TryInto<i8> for HttpRequestBody {
     }
 }
 
+impl TryInto<u16> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u16, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<u16>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse u16. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<i16> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i16, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<i16>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse u16. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<u32> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u32, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<u32>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse u32. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
+impl TryInto<i32> for HttpRequestBody {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i32, Self::Error> {
+        let str = self.as_str()?;
+
+        match str.parse::<i32>() {
+            Ok(result) => Ok(result),
+            Err(err) => Err(HttpFailResult::as_validation_error(format!(
+                "Can not parse u32. {:?}",
+                err
+            ))),
+        }
+    }
+}
+
 impl<'s> TryInto<&'s str> for &'s HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<&'s str, Self::Error> {
