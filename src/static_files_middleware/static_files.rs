@@ -63,7 +63,11 @@ impl StaticFilesMiddleware {
     }
 
     pub fn set_not_found_file(mut self, file_name: String) -> Self {
-        self.not_found_file = Some(file_name);
+        if file_name.starts_with('/') {
+            self.not_found_file = Some(file_name);
+        } else {
+            self.not_found_file = Some(format!("/{}", file_name));
+        }
         self
     }
 
