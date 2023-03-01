@@ -24,6 +24,7 @@ impl FilesMapping {
 pub struct StaticFilesMiddleware {
     pub file_folders: Option<Vec<FilesMapping>>,
     pub index_files: Option<Vec<String>>,
+    pub not_found_file: Option<String>,
 }
 
 impl StaticFilesMiddleware {
@@ -57,7 +58,13 @@ impl StaticFilesMiddleware {
         Self {
             file_folders,
             index_files,
+            not_found_file: None,
         }
+    }
+
+    pub fn set_not_found_file(mut self, file_name: String) -> Self {
+        self.not_found_file = Some(file_name);
+        self
     }
 
     async fn handle_folder(
@@ -92,6 +99,32 @@ impl StaticFilesMiddleware {
                 let output = HttpOutput::Content {
                     headers: None,
                     content_type: WebContentType::detect_by_extension(path),
+                    content: file_content,
+                };
+
+                return Some(Ok(HttpOkResult {
+                    write_telemetry: false,
+                    output,
+                }));
+            }
+            Err(_) => {
+                return self.handle_not_found(file_folder).await;
+            }
+        }
+    }
+
+    async fn handle_not_found(
+        &self,
+        file_folder: &str,
+    ) -> Option<Result<HttpOkResult, HttpFailResult>> {
+        let not_found_file = self.not_found_file.as_ref()?;
+        let file = get_file_name(file_folder, not_found_file);
+
+        match super::files::get(file.as_str()).await {
+            Ok(file_content) => {
+                let output = HttpOutput::Content {
+                    headers: None,
+                    content_type: WebContentType::detect_by_extension(not_found_file),
                     content: file_content,
                 };
 
