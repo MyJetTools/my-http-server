@@ -278,6 +278,23 @@ impl HttpRequest {
         }
     }
 
+    pub fn get_header(&self, header_name: &str) -> Option<&str> {
+        #[cfg(feature = "cache-headers-before-receive-body")]
+        if let Some(cached_headers) = &self.cached_headers {
+            match cached_headers.get(header_name) {
+                Some(header_value) => return Some(header_value.to_str().unwrap()),
+                None => return None,
+            }
+        }
+
+        let result = self.get_headers().get(header_name)?;
+
+        match result.to_str() {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        }
+    }
+
     pub fn get_method(&self) -> &Method {
         &self.method
     }
