@@ -198,8 +198,8 @@ impl HttpRequest {
     }
 
     pub fn get_ip(&self) -> RequestIp {
-        if let Some(x_forwared_for) = &self.x_forwarded_for {
-            let result: Vec<&str> = x_forwared_for.split(",").map(|itm| itm.trim()).collect();
+        if let Some(x_forwarded_for) = &self.x_forwarded_for {
+            let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
             return RequestIp::Forwarded(result);
         }
 
