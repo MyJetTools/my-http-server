@@ -1,3 +1,4 @@
+mod cached_headers;
 pub mod errors;
 mod http_ctx;
 mod http_fail_result;
@@ -50,5 +51,6 @@ pub use web_content_type::WebContentType;
 pub use http_server_data::*;
 
 pub use body_data_reader::*;
+pub use cached_headers::*;
 pub use form_data_reader::*;
 pub use input_param_value::*;

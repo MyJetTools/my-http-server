@@ -37,6 +37,8 @@ pub struct HttpRequest {
     x_forwarded_proto: Option<String>,
     x_forwarded_for: Option<String>,
     host: Option<String>,
+    #[cfg(feature = "cache-headers-before-receive-body")]
+    cached_headers: Option<crate::CachedHeaders>,
 }
 
 impl HttpRequest {
@@ -74,6 +76,8 @@ impl HttpRequest {
             x_forwarded_for,
             host,
             content_type_header: None,
+            #[cfg(feature = "cache-headers-before-receive-body")]
+            cached_headers: None,
         }
     }
 
@@ -117,6 +121,11 @@ impl HttpRequest {
 
         let mut result = RequestData::None;
         std::mem::swap(&mut self.req, &mut result);
+
+        #[cfg(feature = "cache-headers-before-receive-body")]
+        if let RequestData::AsRaw(req) = &mut result {
+            self.cached_headers = Some(crate::CachedHeaders::new(req));
+        }
 
         if let RequestData::AsRaw(req) = result {
             let body = req.into_body();
@@ -180,7 +189,7 @@ impl HttpRequest {
         self.uri.path()
     }
 
-    pub fn get_headers(&self) -> &hyper::HeaderMap<hyper::header::HeaderValue> {
+    fn get_headers(&self) -> &hyper::HeaderMap<hyper::header::HeaderValue> {
         if let RequestData::AsRaw(req) = &self.req {
             return req.headers();
         }
@@ -202,6 +211,24 @@ impl HttpRequest {
         header_name: &str,
     ) -> Result<InputParamValue, HttpFailResult> {
         let header_name_lc = header_name.to_lowercase();
+        #[cfg(feature = "cache-headers-before-receive-body")]
+        if let Some(cached_headers) = &self.cached_headers {
+            match cached_headers.get(header_name) {
+                Some(header_value) => {
+                    return Ok(InputParamValue::Raw {
+                        value: header_value.to_str().unwrap(),
+                        src: "header",
+                    })
+                }
+                None => {
+                    return Err(HttpFailResult::required_parameter_is_missing(
+                        header_name,
+                        "header",
+                    ))
+                }
+            }
+        }
+
         for (http_header, value) in self.get_headers() {
             let http_header = http_header.as_str().to_lowercase();
             if http_header == header_name_lc {
@@ -227,6 +254,19 @@ impl HttpRequest {
     }
 
     pub fn get_optional_header(&self, header_name: &str) -> Option<InputParamValue> {
+        #[cfg(feature = "cache-headers-before-receive-body")]
+        if let Some(cached_headers) = &self.cached_headers {
+            match cached_headers.get(header_name) {
+                Some(header_value) => {
+                    return Some(InputParamValue::Raw {
+                        value: header_value.to_str().unwrap(),
+                        src: "header",
+                    })
+                }
+                None => return None,
+            }
+        }
+
         let result = self.get_headers().get(header_name)?;
 
         match result.to_str() {

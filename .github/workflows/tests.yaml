@@ -25,7 +25,10 @@ jobs:
           cargo build --features static-files       
       - name: Test my-telemetry 
         run: |
-          cargo build --features my-telemetry             
+          cargo build --features my-telemetry    
+      - name: Test my-telemetry 
+        run: |
+          cargo build --features cache-headers-before-receive-body                    
       - name: Test Build      
         run: |
           cargo test
