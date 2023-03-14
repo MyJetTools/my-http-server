@@ -210,89 +210,50 @@ impl HttpRequest {
         &self,
         header_name: &str,
     ) -> Result<InputParamValue, HttpFailResult> {
-        let header_name_lc = header_name.to_lowercase();
-        #[cfg(feature = "cache-headers-before-receive-body")]
-        if let Some(cached_headers) = &self.cached_headers {
-            match cached_headers.get(header_name) {
-                Some(header_value) => {
-                    return Ok(InputParamValue::Raw {
-                        value: header_value.to_str().unwrap(),
-                        src: "header",
-                    })
-                }
-                None => {
-                    return Err(HttpFailResult::required_parameter_is_missing(
-                        header_name,
-                        "header",
-                    ))
-                }
-            }
-        }
-
-        for (http_header, value) in self.get_headers() {
-            let http_header = http_header.as_str().to_lowercase();
-            if http_header == header_name_lc {
-                if let Ok(value) = std::str::from_utf8(value.as_bytes()) {
-                    return Ok(InputParamValue::Raw {
-                        value,
-                        src: "header",
-                    });
-                } else {
-                    return HttpFailResult::invalid_value_to_parse(format!(
-                        "Can not convert header {} value to string",
-                        header_name
-                    ))
-                    .into_err();
-                }
-            }
-        }
-
-        return Err(HttpFailResult::required_parameter_is_missing(
-            header_name,
-            "header",
-        ));
-    }
-
-    pub fn get_optional_header(&self, header_name: &str) -> Option<InputParamValue> {
-        #[cfg(feature = "cache-headers-before-receive-body")]
-        if let Some(cached_headers) = &self.cached_headers {
-            match cached_headers.get(header_name) {
-                Some(header_value) => {
-                    return Some(InputParamValue::Raw {
-                        value: header_value.to_str().unwrap(),
-                        src: "header",
-                    })
-                }
-                None => return None,
-            }
-        }
-
-        let result = self.get_headers().get(header_name)?;
-
-        match result.to_str() {
-            Ok(value) => Some(InputParamValue::Raw {
+        match self.get_header(header_name) {
+            Some(value) => Ok(InputParamValue::Raw {
                 value,
                 src: "header",
             }),
-            Err(_) => None,
+            None => {
+                return HttpFailResult::invalid_value_to_parse(format!(
+                    "Can not convert header {} value to string",
+                    header_name
+                ))
+                .into_err();
+            }
         }
     }
 
+    pub fn get_optional_header(&self, header_name: &str) -> Option<InputParamValue> {
+        let value = self.get_header(header_name)?;
+
+        Some(InputParamValue::Raw {
+            value,
+            src: "header",
+        })
+    }
+
     pub fn get_header(&self, header_name: &str) -> Option<&str> {
+        let header_name = header_name.to_lowercase();
         #[cfg(feature = "cache-headers-before-receive-body")]
         if let Some(cached_headers) = &self.cached_headers {
-            match cached_headers.get(header_name) {
+            match cached_headers.get(&header_name) {
                 Some(header_value) => return Some(header_value.to_str().unwrap()),
                 None => return None,
             }
         }
 
-        let result = self.get_headers().get(header_name)?;
-
-        match result.to_str() {
-            Ok(value) => Some(value),
-            Err(_) => None,
+        for (key, value) in self.get_headers() {
+            if key.as_str().to_lowercase() == header_name {
+                match value.to_str() {
+                    Ok(value) => return Some(value),
+                    Err(_) => return None,
+                }
+            }
         }
+
+        None
     }
 
     pub fn get_method(&self) -> &Method {
