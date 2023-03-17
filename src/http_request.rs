@@ -203,7 +203,7 @@ impl HttpRequest {
             return RequestIp::Forwarded(result);
         }
 
-        return RequestIp::Result(self.addr.to_string());
+        return RequestIp::create_as_single_ip(self.addr.ip().to_string());
     }
 
     pub fn get_required_header(
