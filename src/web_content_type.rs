@@ -34,6 +34,10 @@ impl WebContentType {
             "svg" => WebContentType::Svg.into(),
             "css" => WebContentType::Css.into(),
             "js" => WebContentType::JavaScript.into(),
+            "html" => WebContentType::Html.into(),
+            "htm" => WebContentType::Html.into(),
+            "text" => WebContentType::Text.into(),
+            "json" => WebContentType::Json.into(),
             _ => None,
         }
     }
