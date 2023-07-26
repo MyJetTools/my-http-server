@@ -141,8 +141,8 @@ pub async fn handle_requests(
                 .await;
 
             let mut ctx = HashMap::new();
-            ctx.insert("path".to_string(), path);
-            ctx.insert("method".to_string(), method);
+            ctx.insert("path".to_string(), path.to_string());
+            ctx.insert("method".to_string(), method.to_string());
             ctx.insert("ip".to_string(), ip);
 
             logger.write_error(
@@ -151,7 +151,7 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            panic!("Http Server error");
+            panic!("Http Server error: [{}]{}", method, path);
         }
     };
 
