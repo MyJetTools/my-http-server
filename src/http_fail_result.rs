@@ -13,61 +13,70 @@ pub struct HttpFailResult {
 
 impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
     fn from(src: url_utils::url_encoded_data_reader::ReadingEncodedDataError) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: format!("Reading encoded parameter failed. Err: '{:?}'", src).into_bytes(),
-            status_code: 400,
-            write_telemetry: true,
-            write_to_log: true,
-            #[cfg(feature = "my-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+        Self::new(
+            WebContentType::Text,
+            400,
+            format!("Reading encoded parameter failed. Err: '{:?}'", src).into_bytes(),
+            true,
+            false,
+        )
     }
 }
 
 impl HttpFailResult {
+    pub fn new(
+        content_type: WebContentType,
+        status_code: u16,
+        content: Vec<u8>,
+        write_telemetry: bool,
+        write_to_log: bool,
+    ) -> Self {
+        Self {
+            content_type,
+            status_code,
+            content,
+            write_telemetry,
+            write_to_log,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
+        }
+    }
     pub fn into_err<T>(self) -> Result<T, HttpFailResult> {
         Result::Err(self)
     }
 
     pub fn as_path_parameter_required(param_name: &str) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: format!("Path parameter '{}' is required", param_name).into_bytes(),
-            status_code: 400,
-            write_telemetry: true,
-            write_to_log: false,
-            #[cfg(feature = "my-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+        Self::new(
+            WebContentType::Text,
+            400,
+            format!("Path parameter '{}' is required", param_name).into_bytes(),
+            true,
+            false,
+        )
     }
 
     pub fn as_not_found(text: String, write_telemetry: bool) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: text.into_bytes(),
-            status_code: 404,
+        Self::new(
+            WebContentType::Text,
+            400,
+            text.into_bytes(),
             write_telemetry,
-            write_to_log: false,
-            #[cfg(feature = "my-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+            false,
+        )
     }
 
     pub fn as_unauthorized(text: Option<String>) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: if let Some(text) = text {
+        Self::new(
+            WebContentType::Text,
+            401,
+            if let Some(text) = text {
                 format!("Unauthorized request: {}", text).into_bytes()
             } else {
                 format!("Unauthorized request").into_bytes()
             },
-            status_code: 401,
-            write_telemetry: true,
-            write_to_log: false,
-            #[cfg(feature = "my-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+            true,
+            false,
+        )
     }
 
     pub fn as_validation_error(text: String) -> Self {
