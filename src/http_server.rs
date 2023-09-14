@@ -3,7 +3,8 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
-
+#[cfg(feature = "my-telemetry")]
+use my_telemetry::TelemetryEventTag;
 #[cfg(feature = "my-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use rust_extensions::{ApplicationStates, Logger};
@@ -136,7 +137,7 @@ pub async fn handle_requests(
                     started,
                     format!("[{}]{}", method, path),
                     format!("Panic: {:?}", err),
-                    Some(ip.clone()),
+                    wrap_ip_to_tags(ip.as_str()),
                 )
                 .await;
 
@@ -165,7 +166,10 @@ pub async fn handle_requests(
                         started,
                         format!("[{}]{}", method, path),
                         format!("Status code: {}", ok_result.output.get_status_code()),
-                        Some(ip.clone()),
+                        Some(vec![TelemetryEventTag {
+                            key: "ip".to_string(),
+                            value: ip.clone(),
+                        }]),
                     )
                     .await;
             }
@@ -202,7 +206,7 @@ pub async fn handle_requests(
                         started,
                         format!("[{}]{}", method, path),
                         format!("Status code: {}", err_result.status_code),
-                        Some(ip.clone()),
+                        wrap_ip_to_tags(ip.as_str()),
                     )
                     .await;
             }
@@ -224,4 +228,12 @@ fn get_error_text(err: &HttpFailResult) -> &str {
     } else {
         std::str::from_utf8(&err.content).unwrap()
     }
+}
+
+#[cfg(feature = "my-telemetry")]
+fn wrap_ip_to_tags(ip: &str) -> Option<Vec<TelemetryEventTag>> {
+    Some(vec![TelemetryEventTag {
+        key: "ip".to_string(),
+        value: ip.to_string(),
+    }])
 }
