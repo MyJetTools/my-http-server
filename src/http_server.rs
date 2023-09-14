@@ -4,7 +4,7 @@ use hyper::{
     Body, Request, Response, Server,
 };
 #[cfg(feature = "my-telemetry")]
-use my_telemetry::TelemetryEventTag;
+use my_telemetry::TelemetryEventTagsBuilder;
 #[cfg(feature = "my-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use rust_extensions::{ApplicationStates, Logger};
@@ -137,7 +137,9 @@ pub async fn handle_requests(
                     started,
                     format!("[{}]{}", method, path),
                     format!("Panic: {:?}", err),
-                    wrap_ip_to_tags(ip.as_str()),
+                    TelemetryEventTagsBuilder::new()
+                        .add_ip(ip.to_string())
+                        .build(),
                 )
                 .await;
 
@@ -160,18 +162,22 @@ pub async fn handle_requests(
         Ok(ok_result) => {
             if ok_result.write_telemetry {
                 #[cfg(feature = "my-telemetry")]
-                my_telemetry::TELEMETRY_INTERFACE
-                    .write_success(
-                        &ctx,
-                        started,
-                        format!("[{}]{}", method, path),
-                        format!("Status code: {}", ok_result.output.get_status_code()),
-                        Some(vec![TelemetryEventTag {
-                            key: "ip".to_string(),
-                            value: ip.clone(),
-                        }]),
-                    )
-                    .await;
+                {
+                    let mut tags = TelemetryEventTagsBuilder::new().add_ip(ip);
+
+                    if let Some(credentials) = &request_ctx.credentials {
+                        tags = tags.add("user_id", credentials.get_id().to_string());
+                    }
+                    my_telemetry::TELEMETRY_INTERFACE
+                        .write_success(
+                            &ctx,
+                            started,
+                            format!("[{}]{}", method, path),
+                            format!("Status code: {}", ok_result.output.get_status_code()),
+                            tags.into(),
+                        )
+                        .await;
+                }
             }
 
             Ok(ok_result.into())
@@ -200,15 +206,23 @@ pub async fn handle_requests(
                 }
 
                 #[cfg(feature = "my-telemetry")]
-                my_telemetry::TELEMETRY_INTERFACE
-                    .write_fail(
-                        &ctx,
-                        started,
-                        format!("[{}]{}", method, path),
-                        format!("Status code: {}", err_result.status_code),
-                        wrap_ip_to_tags(ip.as_str()),
-                    )
-                    .await;
+                {
+                    let mut tags = TelemetryEventTagsBuilder::new().add_ip(ip);
+
+                    if let Some(credentials) = &request_ctx.credentials {
+                        tags = tags.add("user_id", credentials.get_id().to_string());
+                    }
+
+                    my_telemetry::TELEMETRY_INTERFACE
+                        .write_fail(
+                            &ctx,
+                            started,
+                            format!("[{}]{}", method, path),
+                            format!("Status code: {}", err_result.status_code),
+                            tags.into(),
+                        )
+                        .await;
+                }
             }
             Ok(err_result.into())
         }
@@ -228,12 +242,4 @@ fn get_error_text(err: &HttpFailResult) -> &str {
     } else {
         std::str::from_utf8(&err.content).unwrap()
     }
-}
-
-#[cfg(feature = "my-telemetry")]
-fn wrap_ip_to_tags(ip: &str) -> Option<Vec<TelemetryEventTag>> {
-    Some(vec![TelemetryEventTag {
-        key: "ip".to_string(),
-        value: ip.to_string(),
-    }])
 }
