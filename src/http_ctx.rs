@@ -1,5 +1,6 @@
 #[cfg(feature = "my-telemetry")]
 use my_telemetry::MyTelemetryContext;
+#[cfg(feature = "my-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
 
 use crate::HttpRequest;
