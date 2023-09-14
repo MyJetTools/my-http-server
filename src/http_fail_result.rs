@@ -7,6 +7,8 @@ pub struct HttpFailResult {
     pub content: Vec<u8>,
     pub write_telemetry: bool,
     pub write_to_log: bool,
+    #[cfg(feature = "my-telemetry")]
+    pub add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder,
 }
 
 impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
@@ -17,6 +19,8 @@ impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpF
             status_code: 400,
             write_telemetry: true,
             write_to_log: true,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 }
@@ -33,6 +37,8 @@ impl HttpFailResult {
             status_code: 400,
             write_telemetry: true,
             write_to_log: false,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -43,6 +49,8 @@ impl HttpFailResult {
             status_code: 404,
             write_telemetry,
             write_to_log: false,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -57,6 +65,8 @@ impl HttpFailResult {
             status_code: 401,
             write_telemetry: true,
             write_to_log: false,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -67,6 +77,8 @@ impl HttpFailResult {
             status_code: 401,
             write_telemetry: true,
             write_to_log: false,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -81,6 +93,8 @@ impl HttpFailResult {
             status_code: 403,
             write_telemetry: true,
             write_to_log: false,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -91,6 +105,8 @@ impl HttpFailResult {
             status_code: 400,
             write_telemetry: true,
             write_to_log: true,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -104,6 +120,8 @@ impl HttpFailResult {
             status_code: 400,
             write_telemetry: true,
             write_to_log: false,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -114,6 +132,8 @@ impl HttpFailResult {
             status_code: 500,
             write_telemetry: true,
             write_to_log: true,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 
@@ -124,6 +144,8 @@ impl HttpFailResult {
             status_code: 415,
             write_telemetry: true,
             write_to_log: true,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 }

@@ -127,7 +127,7 @@ pub async fn handle_requests(
         (result, request_ctx)
     });
 
-    let (result, mut request_ctx) = match result.await {
+    let (result, request_ctx) = match result.await {
         Ok(result) => (result.0, result.1),
         Err(err) => {
             #[cfg(feature = "my-telemetry")]
@@ -159,11 +159,11 @@ pub async fn handle_requests(
     };
 
     match result {
-        Ok(ok_result) => {
+        Ok(mut ok_result) => {
             if ok_result.write_telemetry {
                 #[cfg(feature = "my-telemetry")]
                 {
-                    let mut tags = request_ctx.telemetry_tags.take_tags().add_ip(ip);
+                    let mut tags = ok_result.add_telemetry_tags.take_tags().add_ip(ip);
 
                     if let Some(credentials) = &request_ctx.credentials {
                         tags = tags.add("user_id", credentials.get_id().to_string());
@@ -182,7 +182,7 @@ pub async fn handle_requests(
 
             Ok(ok_result.into())
         }
-        Err(err_result) => {
+        Err(mut err_result) => {
             if err_result.write_telemetry {
                 if err_result.write_to_log {
                     let mut ctx = HashMap::new();
@@ -207,7 +207,7 @@ pub async fn handle_requests(
 
                 #[cfg(feature = "my-telemetry")]
                 {
-                    let mut tags = request_ctx.telemetry_tags.take_tags().add_ip(ip);
+                    let mut tags = err_result.add_telemetry_tags.take_tags().add_ip(ip);
 
                     if let Some(credentials) = &request_ctx.credentials {
                         tags = tags.add("user_id", credentials.get_id().to_string());

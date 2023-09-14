@@ -111,6 +111,8 @@ fn get_body_data_reader_as_url_encoded(
                 content_type: WebContentType::Text,
                 status_code: 412,
                 write_to_log: true,
+                #[cfg(feature = "my-telemetry")]
+                add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             };
 
             return Err(result);
@@ -144,6 +146,8 @@ fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, H
                 content_type: WebContentType::Text,
                 status_code: 412,
                 write_to_log: true,
+                #[cfg(feature = "my-telemetry")]
+                add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             };
 
             return Err(result);

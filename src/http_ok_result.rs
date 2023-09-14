@@ -30,6 +30,20 @@ impl HttpOutput {
     pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
         Ok(HttpOkResult {
             write_telemetry,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
+            output: self,
+        })
+    }
+
+    #[cfg(feature = "my-telemetry")]
+    pub fn into_ok_result_with_telemetry_tags(
+        self,
+        add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        Ok(HttpOkResult {
+            write_telemetry: true,
+            add_telemetry_tags,
             output: self,
         })
     }
@@ -46,6 +60,8 @@ impl HttpOutput {
                 content: Vec::new(),
                 write_telemetry,
                 write_to_log: false,
+                #[cfg(feature = "my-telemetry")]
+                add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             },
             HttpOutput::Content {
                 headers: _,
@@ -57,6 +73,8 @@ impl HttpOutput {
                 content,
                 write_telemetry,
                 write_to_log: false,
+                #[cfg(feature = "my-telemetry")]
+                add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             },
             HttpOutput::Redirect {
                 url: _,
@@ -79,6 +97,8 @@ impl HttpOutput {
                 content,
                 write_telemetry,
                 write_to_log: false,
+                #[cfg(feature = "my-telemetry")]
+                add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             },
         };
 
@@ -150,6 +170,8 @@ impl HttpOutput {
 
 pub struct HttpOkResult {
     pub write_telemetry: bool,
+    #[cfg(feature = "my-telemetry")]
+    pub add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder,
     pub output: HttpOutput,
 }
 
@@ -167,6 +189,8 @@ impl Into<HttpOkResult> for String {
     fn into(self) -> HttpOkResult {
         HttpOkResult {
             write_telemetry: true,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             output: HttpOutput::Content {
                 headers: None,
                 content_type: Some(WebContentType::Text),

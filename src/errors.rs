@@ -9,6 +9,8 @@ impl From<hyper::Error> for HttpFailResult {
             content: format!("{:?}", src).into_bytes(),
             write_telemetry: true,
             write_to_log: true,
+            #[cfg(feature = "my-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
     }
 }
