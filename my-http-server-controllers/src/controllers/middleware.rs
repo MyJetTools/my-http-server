@@ -43,6 +43,17 @@ impl ControllersMiddleware {
         }
     }
 
+    pub fn update_authorization_map(&mut self, authorization: AuthorizationMap) {
+        self.authorization_map = authorization;
+    }
+
+    pub fn update_auth_error_factory(
+        &mut self,
+        value: Arc<dyn AuthErrorFactory + Send + Sync + 'static>,
+    ) {
+        self.auth_error_factory = Some(value);
+    }
+
     pub fn register_get_action<
         TGetAction: GetAction + HandleHttpRequest + GetDescription + Send + Sync + 'static,
     >(
