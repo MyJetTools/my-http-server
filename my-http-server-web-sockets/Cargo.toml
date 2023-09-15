@@ -1,0 +1,15 @@
+[package]
+name = "my-http-server-web-sockets"
+version = "0.5.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+my-http-server-core = { path = "../my-http-server-core" }
+tokio = { version = "*", features = ["full"] }
+async-trait = "*"
+hyper = { version = "*", features = ["full"] }
+hyper-tungstenite = "*"
+futures = "*"
