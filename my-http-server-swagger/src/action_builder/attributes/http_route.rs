@@ -88,7 +88,7 @@ impl<'s> HttpRouteModel<'s> {
             }
 
             return Ok(quote::quote!(ShouldBeAuthorized::YesWithClaims(
-                my_http_server_controllers::controllers::RequiredClaims::from_vec(
+                my_http_server::controllers::RequiredClaims::from_vec(
                     vec![#(#result.to_string(),)*]
                 )
             ))

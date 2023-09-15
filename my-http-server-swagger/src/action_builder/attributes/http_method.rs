@@ -20,16 +20,16 @@ impl HttpMethod {
     pub fn get_trait_name(&self) -> TokenStream {
         match self {
             HttpMethod::Get => {
-                quote::quote!(my_http_server_controllers::controllers::actions::GetAction)
+                quote::quote!(my_http_server::controllers::actions::GetAction)
             }
             HttpMethod::Post => {
-                quote::quote!(my_http_server_controllers::controllers::actions::PostAction)
+                quote::quote!(my_http_server::controllers::actions::PostAction)
             }
             HttpMethod::Put => {
-                quote::quote!(my_http_server_controllers::controllers::actions::PutAction)
+                quote::quote!(my_http_server::controllers::actions::PutAction)
             }
             HttpMethod::Delete => {
-                quote::quote!(my_http_server_controllers::controllers::actions::DeleteAction)
+                quote::quote!(my_http_server::controllers::actions::DeleteAction)
             }
         }
     }

@@ -56,14 +56,14 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
             }
         }
 
-        impl my_http_server_controllers::controllers::actions::GetDescription for #struct_name{
+        impl my_http_server::controllers::actions::GetDescription for #struct_name{
             fn get_description(&self) -> Option<#http_action_description>{
                 #description
             }
         }
 
         #[async_trait::async_trait]
-        impl my_http_server_controllers::controllers::actions::HandleHttpRequest for #struct_name{
+        impl my_http_server::controllers::actions::HandleHttpRequest for #struct_name{
             async fn handle_request(&self, http_route: &#http_route, ctx: &mut #http_context) -> Result<#http_ok_result, #http_fail_result> {
                 #handle_request
             }

@@ -26,8 +26,8 @@ pub fn generate_data_provider(
 
     let result = quote::quote! {
 
-        impl #generic my_http_server_controllers::controllers::documentation::DataTypeProvider for #struct_name #generic_ident {
-            fn get_data_type() -> my_http_server_controllers::controllers::documentation::data_types::HttpDataType {
+        impl #generic my_http_server::controllers::documentation::DataTypeProvider for #struct_name #generic_ident {
+            fn get_data_type() -> my_http_server::controllers::documentation::data_types::HttpDataType {
                 Self::get_http_data_structure().into_http_data_type_object()
             }
 

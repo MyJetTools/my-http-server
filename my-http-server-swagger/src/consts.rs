@@ -15,7 +15,7 @@ pub fn get_http_array_element() -> TokenStream {
 
 pub fn get_use_documentation() -> TokenStream {
     quote!(
-        use my_http_server_controllers::controllers::documentation::*;
+        use my_http_server::controllers::documentation::*;
     )
 }
 
@@ -24,9 +24,7 @@ pub fn get_http_input_parameter() -> TokenStream {
 }
 
 pub fn get_http_input_parameter_with_ns() -> TokenStream {
-    quote!(
-        my_http_server_controllers::controllers::documentation::in_parameters::HttpInputParameter
-    )
+    quote!(my_http_server::controllers::documentation::in_parameters::HttpInputParameter)
 }
 
 pub fn get_http_parameter_input_src() -> TokenStream {
@@ -54,11 +52,11 @@ pub fn get_http_action_description() -> TokenStream {
 }
 
 pub fn get_http_action_description_with_ns() -> TokenStream {
-    quote!(my_http_server_controllers::controllers::documentation::HttpActionDescription)
+    quote!(my_http_server::controllers::documentation::HttpActionDescription)
 }
 
 pub fn get_http_route() -> TokenStream {
-    quote!(my_http_server_controllers::controllers::HttpRoute)
+    quote!(my_http_server::controllers::HttpRoute)
 }
 
 pub fn get_http_result() -> TokenStream {

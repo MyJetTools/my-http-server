@@ -126,8 +126,8 @@ pub fn generate(ast: &syn::DeriveInput, as_integer: bool) -> Result<TokenStream,
         }
 
 
-        impl my_http_server_controllers::controllers::documentation::DataTypeProvider for #struct_name {
-            fn get_data_type() -> my_http_server_controllers::controllers::documentation::data_types::HttpDataType {
+        impl my_http_server::controllers::documentation::DataTypeProvider for #struct_name {
+            fn get_data_type() -> my_http_server::controllers::documentation::data_types::HttpDataType {
                 #use_documentation;
 
                 let mut __es = data_types::HttpEnumStructure{

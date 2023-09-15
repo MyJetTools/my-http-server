@@ -23,7 +23,7 @@ pub fn generate_get_http_data_structure(
     };
 
     let result = quote::quote! {
-        pub fn get_http_data_structure()->my_http_server_controllers::controllers::documentation::data_types::HttpObjectStructure{
+        pub fn get_http_data_structure()->my_http_server::controllers::documentation::data_types::HttpObjectStructure{
             #use_documentation;
 
             let mut __hos = data_types::HttpObjectStructure::new(#struct_name_as_str, #generic_name);

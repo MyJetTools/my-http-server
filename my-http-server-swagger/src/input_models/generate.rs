@@ -58,7 +58,7 @@ pub fn generate(ast: &syn::DeriveInput) -> (TokenStream, bool) {
                 #http_input
             }
 
-            pub async fn parse_http_input(http_route: &my_http_server_controllers::controllers::HttpRoute, ctx: &mut #http_ctx)->Result<Self,#http_fail_result>{
+            pub async fn parse_http_input(http_route: &my_http_server::controllers::HttpRoute, ctx: &mut #http_ctx)->Result<Self,#http_fail_result>{
                 #parse_http_input
             }
 
