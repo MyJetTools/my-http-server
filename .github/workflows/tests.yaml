@@ -23,10 +23,10 @@ jobs:
       - name: Test static-files 
         run: |
           cargo build --features static-files       
-      - name: Test my-telemetry 
+      - name: Test with-telemetry
         run: |
-          cargo build --features my-telemetry    
-      - name: Test my-telemetry 
+          cargo build --features with-telemetry    
+      - name: Test cache-headers-before-receive-body 
         run: |
           cargo build --features cache-headers-before-receive-body                    
       - name: Test Build      
