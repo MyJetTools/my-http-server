@@ -43,8 +43,8 @@ impl ControllersMiddleware {
         }
     }
 
-    pub fn update_authorization_map(&mut self, authorization: AuthorizationMap) {
-        self.authorization_map = authorization;
+    pub fn update_authorization_map(&mut self, authorization: ControllersAuthorization) {
+        self.authorization_map.global_authorization = Some(authorization);
     }
 
     pub fn update_auth_error_factory(
