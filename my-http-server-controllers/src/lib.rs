@@ -1,2 +1,3 @@
-pub mod controllers;
+mod controllers;
+pub use controllers::*;
 pub mod swagger;
