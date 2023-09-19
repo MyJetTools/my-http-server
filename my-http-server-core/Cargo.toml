@@ -7,7 +7,6 @@ edition = "2021"
 
 [features]
 default = []
-static-files = []
 cache-headers-before-receive-body = []
 with-telemetry = ["dep:my-telemetry"]
 

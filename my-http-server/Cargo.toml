@@ -18,9 +18,13 @@ with-telemetry = [
 
 ]
 
+static-files = ["static-files-middleware"]
+
+
 [dependencies]
 my-http-server-swagger = { optional = true, path = "../my-http-server-swagger" }
 my-http-server-web-sockets = { optional = true, path = "../my-http-server-web-sockets" }
 my-http-server-signalr-middleware = { optional = true, path = "../my-http-server-signalr-middleware" }
 my-http-server-controllers = { optional = true, path = "../my-http-server-controllers" }
 my-http-server-core = { path = "../my-http-server-core" }
+static-files-middleware = { path = "../static-files-middleware", optional = true }

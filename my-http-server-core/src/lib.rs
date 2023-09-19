@@ -25,10 +25,6 @@ mod web_content_type;
 
 mod body_data_reader;
 mod form_data_reader;
-#[cfg(feature = "static-files")]
-mod static_files_middleware;
-#[cfg(feature = "static-files")]
-pub use static_files_middleware::*;
 
 pub use http_ctx::HttpContext;
 pub use http_fail_result::HttpFailResult;

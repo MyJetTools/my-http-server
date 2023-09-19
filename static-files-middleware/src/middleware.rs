@@ -1,6 +1,6 @@
-use crate::{
-    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpOkResult, HttpOutput,
-    HttpPath, HttpServerMiddleware, WebContentType,
+use my_http_server_core::{
+    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath, HttpServerMiddleware,
+    HttpServerRequestFlow, WebContentType,
 };
 
 pub struct FilesMapping {
@@ -87,10 +87,7 @@ impl StaticFilesMiddleware {
                             content: file_content,
                         };
 
-                        return Some(Ok(HttpOkResult {
-                            write_telemetry: false,
-                            output,
-                        }));
+                        return Some(output.into_ok_result(false));
                     }
                 }
             }
@@ -106,10 +103,7 @@ impl StaticFilesMiddleware {
                     content: file_content,
                 };
 
-                return Some(Ok(HttpOkResult {
-                    write_telemetry: false,
-                    output,
-                }));
+                return Some(output.into_ok_result(false));
             }
             Err(_) => {
                 return self.handle_not_found(file_folder).await;
@@ -132,10 +126,7 @@ impl StaticFilesMiddleware {
                     content: file_content,
                 };
 
-                return Some(Ok(HttpOkResult {
-                    write_telemetry: false,
-                    output,
-                }));
+                return Some(output.into_ok_result(false));
             }
             Err(_) => {
                 return None;

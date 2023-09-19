@@ -159,7 +159,10 @@ pub async fn handle_requests(
     };
 
     match result {
-        Ok(mut ok_result) => {
+        Ok(ok_result) => {
+            #[cfg(feature = "with-telemetry")]
+            let mut ok_result = ok_result;
+
             if ok_result.write_telemetry {
                 #[cfg(feature = "with-telemetry")]
                 {
@@ -182,7 +185,10 @@ pub async fn handle_requests(
 
             Ok(ok_result.into())
         }
-        Err(mut err_result) => {
+        Err(err_result) => {
+            #[cfg(feature = "with-telemetry")]
+            let mut err_result = err_result;
+
             if err_result.write_telemetry {
                 if err_result.write_to_log {
                     let mut ctx = HashMap::new();
