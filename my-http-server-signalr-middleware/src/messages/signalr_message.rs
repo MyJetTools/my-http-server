@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use my_json::json_reader::JsonFirstLineReader;
 
-pub struct SignalrMessage<'s> {
+pub struct SignalRMessage<'s> {
     pub headers: Option<HashMap<String, String>>,
     pub invocation_id: Option<&'s str>,
     pub target: &'s str,
     pub arguments: &'s [u8],
 }
 
-impl<'s> SignalrMessage<'s> {
+impl<'s> SignalRMessage<'s> {
     pub fn parse(payload: &'s str) -> Self {
         let mut invocation_id = None;
         let mut target = None;

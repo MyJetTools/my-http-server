@@ -8,9 +8,9 @@ mod process_connect;
 mod process_disconnect;
 mod signal_r_connection;
 mod signal_r_connections_list;
+mod signal_r_liveness_loop;
 mod signal_r_message_publisher;
 mod signal_r_publishers_builder;
-mod signalr_liveness_loop;
 mod tags;
 mod web_socket_callbacks;
 pub use middleware::*;
@@ -26,8 +26,8 @@ pub use signal_r_publishers_builder::*;
 pub use tags::Tags;
 pub use tags::*;
 pub use web_socket_callbacks::WebSocketCallbacks;
-mod singal_r_param;
-pub use singal_r_param::*;
+mod signal_r_param;
+pub use signal_r_param::*;
 #[cfg(feature = "with-telemetry")]
 mod signal_r_telemetry;
 #[cfg(feature = "with-telemetry")]

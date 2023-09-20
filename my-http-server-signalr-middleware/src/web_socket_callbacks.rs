@@ -10,12 +10,12 @@ use my_telemetry::MyTelemetryContext;
 use my_telemetry::TelemetryEventTagsBuilder;
 
 use crate::{
-    messages::SignalrMessage, MySignalrCallbacks, MySignalrConnection, SignalrConnectionsList,
+    messages::SignalRMessage, MySignalRCallbacks, MySignalRConnection, SignalRConnectionsList,
 };
 
 pub struct WebSocketCallbacks<TCtx: Send + Sync + Default + 'static> {
-    pub signalr_list: Arc<SignalrConnectionsList<TCtx>>,
-    pub my_signal_r_callbacks: Arc<dyn MySignalrCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
+    pub signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
+    pub my_signal_r_callbacks: Arc<dyn MySignalRCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
 }
 
 #[async_trait::async_trait]
@@ -43,15 +43,15 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
             let connection_token = connection_token.unwrap();
 
             match self
-                .signalr_list
+                .signal_r_list
                 .assign_web_socket(connection_token.value, my_web_socket.clone())
                 .await
             {
-                Some(signalr_connection) => {
-                    tokio::spawn(super::signalr_liveness_loop::start(
+                Some(signal_r_connection) => {
+                    tokio::spawn(super::signal_r_liveness_loop::start(
                         self.my_signal_r_callbacks.clone(),
-                        self.signalr_list.clone(),
-                        signalr_connection,
+                        self.signal_r_list.clone(),
+                        signal_r_connection,
                         disconnect_timeout,
                     ));
                 }
@@ -75,14 +75,14 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
         #[cfg(feature = "debug_ws")]
         println!("disconnected web_socket:{}", my_web_socket.id);
         let find_result = self
-            .signalr_list
+            .signal_r_list
             .get_by_web_socket_id(my_web_socket.id)
             .await;
 
-        if let Some(signalr_connection) = find_result {
+        if let Some(signal_r_connection) = find_result {
             crate::process_disconnect(
-                &self.signalr_list,
-                &signalr_connection,
+                &self.signal_r_list,
+                &signal_r_connection,
                 &self.my_signal_r_callbacks,
             )
             .await;
@@ -93,15 +93,15 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
         println!("Websocket{}, MSG: {:?}", my_web_socket.id, message);
 
         let signal_r = self
-            .signalr_list
+            .signal_r_list
             .get_by_web_socket_id(my_web_socket.id)
             .await;
 
-        if let Some(signalr_connection) = signal_r.as_ref() {
-            signalr_connection.update_incoming_activity();
+        if let Some(signal_r_connection) = signal_r.as_ref() {
+            signal_r_connection.update_incoming_activity();
 
             if let WebSocketMessage::String(value) = &message {
-                if signalr_connection.get_has_greeting() {
+                if signal_r_connection.get_has_greeting() {
                     let packet_type = get_payload_type(value);
 
                     if packet_type == "1" {
@@ -111,14 +111,14 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                         #[cfg(feature = "with-telemetry")]
                         let started = rust_extensions::date_time::DateTimeAsMicroseconds::now();
 
-                        let message = SignalrMessage::parse(value);
+                        let message = SignalRMessage::parse(value);
 
                         #[cfg(feature = "with-telemetry")]
                         let ctx_spawned = ctx.clone();
 
                         let signal_r_callbacks = self.my_signal_r_callbacks.clone();
 
-                        let connection_spawned = signalr_connection.clone();
+                        let connection_spawned = signal_r_connection.clone();
 
                         let target = message.target.to_string();
 
@@ -172,10 +172,10 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                     }
 
                     if packet_type == "6" {
-                        signalr_connection.send_ping_payload().await;
+                        signal_r_connection.send_ping_payload().await;
                     }
                 } else {
-                    read_first_payload(signalr_connection, value).await
+                    read_first_payload(signal_r_connection, value).await
                 }
             }
         }
@@ -196,7 +196,7 @@ fn get_payload_type(payload: &str) -> &str {
 }
 
 async fn read_first_payload<TCtx: Send + Sync + Default + 'static>(
-    signalr_connection: &Arc<MySignalrConnection<TCtx>>,
+    signal_r_connection: &Arc<MySignalRConnection<TCtx>>,
     payload: &str,
 ) {
     let json_reader = JsonFirstLineReader::new(payload.as_bytes());
@@ -216,7 +216,7 @@ async fn read_first_payload<TCtx: Send + Sync + Default + 'static>(
     }
 
     if protocol == true && version == true {
-        signalr_connection.set_has_greeting();
-        signalr_connection.send_raw_payload("{}".to_string()).await;
+        signal_r_connection.set_has_greeting();
+        signal_r_connection.send_raw_payload("{}".to_string()).await;
     }
 }

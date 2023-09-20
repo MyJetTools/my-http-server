@@ -22,7 +22,7 @@ pub struct MySignalrConnectionSingleThreaded {
     long_pooling: Option<TaskCompletion<String, String>>,
 }
 
-pub struct MySignalrConnection<TCtx: Send + Sync + 'static> {
+pub struct MySignalRConnection<TCtx: Send + Sync + 'static> {
     single_threaded: Mutex<MySignalrConnectionSingleThreaded>,
     pub connection_id: String,
     pub connection_token: Option<String>,
@@ -35,7 +35,7 @@ pub struct MySignalrConnection<TCtx: Send + Sync + 'static> {
     pub ctx: TCtx,
 }
 
-impl<TCtx: Send + Sync + Default + 'static> MySignalrConnection<TCtx> {
+impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
     pub fn new(
         connection_id: String,
         connection_token: Option<String>,

@@ -9,33 +9,33 @@ use rust_extensions::Logger;
 use tokio::sync::Mutex;
 
 use crate::{
-    my_signal_r_actions::MySignalrActions, MiddlewareBuilder, SignalrConnectionsList,
+    my_signal_r_actions::MySignalRActions, MiddlewareBuilder, SignalRConnectionsList,
     WebSocketCallbacks,
 };
 
-pub struct MySignalrMiddleware<TCtx: Send + Sync + Default + 'static> {
+pub struct MySignalRMiddleware<TCtx: Send + Sync + Default + 'static> {
     pub hub_name: String,
     negotiate_path: HttpPath,
     socket_id: Mutex<i64>,
     web_socket_callback: Arc<WebSocketCallbacks<TCtx>>,
-    signalr_list: Arc<SignalrConnectionsList<TCtx>>,
-    actions: Arc<MySignalrActions<TCtx>>,
+    signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
+    actions: Arc<MySignalRActions<TCtx>>,
     disconnect_timeout: std::time::Duration,
 }
 
-impl<TCtx: Send + Sync + Default + 'static> MySignalrMiddleware<TCtx> {
+impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
     pub fn new_with_builder(
         hub_name: &str,
-        signalr_list: Arc<SignalrConnectionsList<TCtx>>,
+        signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> MiddlewareBuilder<TCtx> {
-        MiddlewareBuilder::new(hub_name.to_string(), signalr_list, logger)
+        MiddlewareBuilder::new(hub_name.to_string(), signal_r_list, logger)
     }
 
     pub fn new(
         hub_name: &str,
-        signalr_list: Arc<SignalrConnectionsList<TCtx>>,
-        actions: MySignalrActions<TCtx>,
+        signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
+        actions: MySignalRActions<TCtx>,
         disconnect_timeout: std::time::Duration,
     ) -> Self {
         let hub_name = hub_name.to_lowercase();
@@ -44,10 +44,10 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalrMiddleware<TCtx> {
 
         Self {
             negotiate_path: compile_negotiate_uri(hub_name.as_str()),
-            signalr_list: signalr_list.clone(),
+            signal_r_list: signal_r_list.clone(),
             hub_name,
             web_socket_callback: Arc::new(WebSocketCallbacks {
-                signalr_list,
+                signal_r_list,
                 my_signal_r_callbacks: actions.clone(),
             }),
             socket_id: Mutex::new(0),
@@ -81,9 +81,13 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalrMiddleware<TCtx> {
             Err(_) => 0,
         };
 
-        let (_, response) =
-            crate::process_connect(&self.actions, &self.signalr_list, negotiation_version, None)
-                .await;
+        let (_, response) = crate::process_connect(
+            &self.actions,
+            &self.signal_r_list,
+            negotiation_version,
+            None,
+        )
+        .await;
         HttpOutput::Content {
             headers: None,
             content_type: Some(WebContentType::Text),
@@ -95,7 +99,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalrMiddleware<TCtx> {
 }
 
 #[async_trait::async_trait]
-impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalrMiddleware<TCtx> {
+impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalRMiddleware<TCtx> {
     async fn handle_request(
         &self,
         ctx: &mut HttpContext,

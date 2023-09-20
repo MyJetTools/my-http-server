@@ -3,14 +3,14 @@ use std::sync::Arc;
 use rust_extensions::Logger;
 
 use crate::{
-    my_signal_r_actions::MySignalrActions, MySignalrActionCallbacks, MySignalrMiddleware,
-    MySignalrTransportCallbacks, SignalrConnectionsList, SignalrContractDeserializer,
+    my_signal_r_actions::MySignalRActions, MySignalRActionCallbacks, MySignalRMiddleware,
+    MySignalRTransportCallbacks, SignalRConnectionsList, SignalRContractDeserializer,
 };
 
 pub struct MiddlewareBuilder<TCtx: Send + Sync + Default + 'static> {
     hub_name: String,
-    signal_r_list: Arc<SignalrConnectionsList<TCtx>>,
-    actions: MySignalrActions<TCtx>,
+    signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
+    actions: MySignalRActions<TCtx>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
     disconnect_timeout: std::time::Duration,
 }
@@ -18,13 +18,13 @@ pub struct MiddlewareBuilder<TCtx: Send + Sync + Default + 'static> {
 impl<TCtx: Send + Sync + Default + 'static> MiddlewareBuilder<TCtx> {
     pub fn new(
         hub_name: String,
-        signalr_list: Arc<SignalrConnectionsList<TCtx>>,
+        signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> Self {
         Self {
             hub_name,
-            signal_r_list: signalr_list,
-            actions: MySignalrActions::new(),
+            signal_r_list,
+            actions: MySignalRActions::new(),
             logger,
             disconnect_timeout: std::time::Duration::from_secs(60),
         }
@@ -38,7 +38,7 @@ impl<TCtx: Send + Sync + Default + 'static> MiddlewareBuilder<TCtx> {
     pub fn with_transport_callback(
         mut self,
         transport_callback: Arc<
-            dyn MySignalrTransportCallbacks<TCtx = TCtx> + Send + Sync + 'static,
+            dyn MySignalRTransportCallbacks<TCtx = TCtx> + Send + Sync + 'static,
         >,
     ) -> Self {
         if self.actions.transport_callbacks.is_some() {
@@ -50,20 +50,20 @@ impl<TCtx: Send + Sync + Default + 'static> MiddlewareBuilder<TCtx> {
     }
 
     pub fn with_action<
-        TContract: SignalrContractDeserializer<Item = TContract> + Send + Sync + 'static,
-        TMySignalrPayloadCallbacks: MySignalrActionCallbacks<TContract, TCtx = TCtx> + Send + Sync + 'static,
+        TContract: SignalRContractDeserializer<Item = TContract> + Send + Sync + 'static,
+        TMySignalRPayloadCallbacks: MySignalRActionCallbacks<TContract, TCtx = TCtx> + Send + Sync + 'static,
     >(
         mut self,
         action_name: String,
-        action: TMySignalrPayloadCallbacks,
+        action: TMySignalRPayloadCallbacks,
     ) -> Self {
         self.actions
             .add_action(action_name, action, self.logger.clone());
         self
     }
 
-    pub fn build(self) -> MySignalrMiddleware<TCtx> {
-        MySignalrMiddleware::new(
+    pub fn build(self) -> MySignalRMiddleware<TCtx> {
+        MySignalRMiddleware::new(
             self.hub_name.as_str(),
             self.signal_r_list,
             self.actions,

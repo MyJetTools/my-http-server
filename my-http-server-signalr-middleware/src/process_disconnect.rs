@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
-use crate::{MySignalrCallbacks, MySignalrConnection, SignalrConnectionsList};
+use crate::{MySignalRCallbacks, MySignalRConnection, SignalRConnectionsList};
 
 pub async fn process_disconnect<TCtx: Send + Sync + Default + 'static>(
-    sockets_list: &Arc<SignalrConnectionsList<TCtx>>,
-    signalr_connection: &Arc<MySignalrConnection<TCtx>>,
-    connect_events: &Arc<dyn MySignalrCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
+    sockets_list: &Arc<SignalRConnectionsList<TCtx>>,
+    signal_r_connection: &Arc<MySignalRConnection<TCtx>>,
+    connect_events: &Arc<dyn MySignalRCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
 ) {
     let removed_connection = sockets_list
-        .remove(signalr_connection.get_list_index())
+        .remove(signal_r_connection.get_list_index())
         .await;
 
     if let Some(removed_connection) = removed_connection {
         #[cfg(feature = "debug_ws")]
         println!(
-            "Signalr {} is diconnectd with connection token {:?}",
+            "SignalR {} is disconnected with connection token {:?}",
             removed_connection.connection_id, removed_connection.connection_token
         );
         connect_events.disconnected(&removed_connection).await;

@@ -2,17 +2,17 @@ use std::{sync::Arc, time::Duration};
 
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 
-use crate::{MySignalrCallbacks, MySignalrConnection, SignalrConnectionsList};
+use crate::{MySignalRCallbacks, MySignalRConnection, SignalRConnectionsList};
 
 pub async fn start<TCtx: Send + Sync + Default + 'static>(
-    connect_events: Arc<dyn MySignalrCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
-    sockets_list: Arc<SignalrConnectionsList<TCtx>>,
-    my_socket_io_connection: Arc<MySignalrConnection<TCtx>>,
+    connect_events: Arc<dyn MySignalRCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
+    sockets_list: Arc<SignalRConnectionsList<TCtx>>,
+    my_socket_io_connection: Arc<MySignalRConnection<TCtx>>,
     ping_disconnect: Duration,
 ) {
     #[cfg(feature = "debug_ws")]
     println!(
-        "Signalr {} with connection token {:?} started livness loop",
+        "SignalR {} with connection token {:?} started liveness loop",
         my_socket_io_connection.connection_id, my_socket_io_connection.connection_token
     );
 
@@ -25,7 +25,7 @@ pub async fn start<TCtx: Send + Sync + Default + 'static>(
         if now.duration_since(last_incoming).as_positive_or_zero() > ping_disconnect {
             #[cfg(feature = "debug_ws")]
             println!(
-                "Signalr {} with connection token {:?} looks like dead. Disconnecting",
+                "SignalR {} with connection token {:?} looks like dead. Disconnecting",
                 my_socket_io_connection.connection_id, my_socket_io_connection.connection_token
             );
             break;

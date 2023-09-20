@@ -4,18 +4,18 @@ use my_http_server_core::HttpFailResult;
 use rust_extensions::Logger;
 
 use crate::{
-    MySignalrActionCallbacks, MySignalrCallbacks, MySignalrCallbacksInstance, MySignalrConnection,
-    MySignalrPayloadCallbacks, MySignalrTransportCallbacks, SignalrContractDeserializer,
+    MySignalRActionCallbacks, MySignalRCallbacks, MySignalRCallbacksInstance, MySignalRConnection,
+    MySignalRPayloadCallbacks, MySignalRTransportCallbacks, SignalRContractDeserializer,
 };
 
-pub struct MySignalrActions<TCtx: Send + Sync + Default + 'static> {
+pub struct MySignalRActions<TCtx: Send + Sync + Default + 'static> {
     pub transport_callbacks:
-        Option<Arc<dyn MySignalrTransportCallbacks<TCtx = TCtx> + Send + Sync + 'static>>,
+        Option<Arc<dyn MySignalRTransportCallbacks<TCtx = TCtx> + Send + Sync + 'static>>,
     actions:
-        HashMap<String, Arc<dyn MySignalrPayloadCallbacks<TCtx = TCtx> + Send + Sync + 'static>>,
+        HashMap<String, Arc<dyn MySignalRPayloadCallbacks<TCtx = TCtx> + Send + Sync + 'static>>,
 }
 
-impl<TCtx: Send + Sync + Default + 'static> MySignalrActions<TCtx> {
+impl<TCtx: Send + Sync + Default + 'static> MySignalRActions<TCtx> {
     pub fn new() -> Self {
         Self {
             actions: HashMap::new(),
@@ -24,19 +24,19 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalrActions<TCtx> {
     }
 
     pub fn add_action<
-        TContract: SignalrContractDeserializer<Item = TContract> + Send + Sync + 'static,
-        TMySignalrPayloadCallbacks: MySignalrActionCallbacks<TContract, TCtx = TCtx> + Send + Sync + 'static,
+        TContract: SignalRContractDeserializer<Item = TContract> + Send + Sync + 'static,
+        TMySignalRPayloadCallbacks: MySignalRActionCallbacks<TContract, TCtx = TCtx> + Send + Sync + 'static,
     >(
         &mut self,
         action: String,
-        callback: TMySignalrPayloadCallbacks,
+        callback: TMySignalRPayloadCallbacks,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) {
         if self.actions.contains_key(&action) {
-            panic!("Signalr action already registered: {}", action);
+            panic!("SignalR action already registered: {}", action);
         }
 
-        let instance = MySignalrCallbacksInstance {
+        let instance = MySignalRCallbacksInstance {
             action_name: action.to_string(),
             callback: Arc::new(callback),
             logger,
@@ -47,12 +47,12 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalrActions<TCtx> {
 }
 
 #[async_trait::async_trait]
-impl<TCtx: Send + Sync + Default + 'static> MySignalrCallbacks for MySignalrActions<TCtx> {
+impl<TCtx: Send + Sync + Default + 'static> MySignalRCallbacks for MySignalRActions<TCtx> {
     type TCtx = TCtx;
 
     async fn connected(
         &self,
-        connection: &Arc<MySignalrConnection<Self::TCtx>>,
+        connection: &Arc<MySignalRConnection<Self::TCtx>>,
     ) -> Result<(), HttpFailResult> {
         if let Some(c) = self.transport_callbacks.as_ref() {
             c.connected(connection).await
@@ -60,20 +60,20 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalrCallbacks for MySignalrActi
             Ok(())
         }
     }
-    async fn disconnected(&self, connection: &Arc<MySignalrConnection<Self::TCtx>>) {
+    async fn disconnected(&self, connection: &Arc<MySignalRConnection<Self::TCtx>>) {
         if let Some(c) = self.transport_callbacks.as_ref() {
             c.disconnected(connection).await
         }
     }
 
-    async fn on_ping(&self, connection: &Arc<MySignalrConnection<Self::TCtx>>) {
+    async fn on_ping(&self, connection: &Arc<MySignalRConnection<Self::TCtx>>) {
         if let Some(c) = self.transport_callbacks.as_ref() {
             c.on_ping(connection).await
         }
     }
     async fn on(
         &self,
-        signalr_connection: Arc<MySignalrConnection<Self::TCtx>>,
+        signal_r_connection: Arc<MySignalRConnection<Self::TCtx>>,
         headers: Option<HashMap<String, String>>,
         action_name: String,
         data: Vec<u8>,
@@ -82,7 +82,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalrCallbacks for MySignalrActi
         if let Some(action) = self.actions.get(action_name.as_str()) {
             action
                 .on(
-                    &signalr_connection,
+                    &signal_r_connection,
                     headers,
                     &action_name,
                     &data,

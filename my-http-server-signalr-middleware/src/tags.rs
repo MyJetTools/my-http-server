@@ -35,7 +35,7 @@ impl Tags {
             }
         }
 
-        // Fill Tags to conection
+        // Fill Tags to connection
 
         if !self.tags_to_connection.contains_key(key) {
             self.tags_to_connection
