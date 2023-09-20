@@ -5,6 +5,6 @@ members = [
     "my-http-server-core",
     "my-http-server-swagger",
     "my-http-server-web-sockets",
-    "my-http-server-signalr-middleware",
+    "my-http-server-signal-r-middleware",
     "static-files-middleware",
 ]
