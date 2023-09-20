@@ -9,6 +9,8 @@ pub fn generate(
     let attrs = ParamsList::new(attr.into(), || None)?;
 
     let action_name = attrs.get_from_single_or_named("action_name")?;
+    let action_name = action_name.unwrap_as_string_value()?;
+    let action_name = action_name.as_str();
 
     let struct_name = &ast.ident;
 
@@ -16,19 +18,21 @@ pub fn generate(
         #ast
 
         impl my_http_server::signal_r::SignalRContractSerializer for  #struct_name {
-            const ACTION_NAME: &'static str = action_name;
+            const ACTION_NAME: &'static str = #action_name;
+            type Item = #struct_name;
 
             fn serialize(self) -> Vec<Vec<u8>> {
                 let json = serde_json::to_vec(&self);
                 return vec![json.unwrap()];
             }
 
-            fn deserialize<'s>(src: &'s [Vec<u8>]) -> Self {
+            fn deserialize<'s>(src: &'s [Vec<u8>]) -> Result<Self::Item, String> {
                 if src.len() != 1 {
-                    panic!(
-                        "Invalid messages amount during deserialization for action: {}",
+                    return Err(format!(
+                        "Invalid messages amount {} during deserialization for action: {}",
+                        src.len(),
                         Self::ACTION_NAME
-                    );
+                    ));
                 }
 
                 let payload = src.get(0).unwrap();
@@ -36,11 +40,11 @@ pub fn generate(
                 let result = serde_json::from_slice(payload);
 
                 if let Err(err) = &result {
-                    panic!(
+                    return Err(format!(
                         "Invalid message during deserialization for action: {}. Error: {}",
                         Self::ACTION_NAME,
                         err
-                    );
+                    ));
                 }
 
                 result.unwrap()

@@ -4,8 +4,8 @@ use my_http_server_core::HttpFailResult;
 use rust_extensions::Logger;
 
 use crate::{
-    MySignalRActionCallbacks, MySignalRCallbacks, MySignalRCallbacksInstance, MySignalRConnection,
-    MySignalRPayloadCallbacks, MySignalRTransportCallbacks, SignalRContractDeserializer,
+    MySignalRActionSubscriber, MySignalRCallbacks, MySignalRCallbacksInstance, MySignalRConnection,
+    MySignalRPayloadCallbacks, MySignalRTransportCallbacks, SignalRContractSerializer,
 };
 
 pub struct MySignalRActions<TCtx: Send + Sync + Default + 'static> {
@@ -24,25 +24,27 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRActions<TCtx> {
     }
 
     pub fn add_action<
-        TContract: SignalRContractDeserializer<Item = TContract> + Send + Sync + 'static,
-        TMySignalRPayloadCallbacks: MySignalRActionCallbacks<TContract, TCtx = TCtx> + Send + Sync + 'static,
+        TContract: SignalRContractSerializer<Item = TContract> + Send + Sync + 'static,
+        TMySignalRPayloadCallbacks: MySignalRActionSubscriber<TContract, TCtx = TCtx> + Send + Sync + 'static,
     >(
         &mut self,
-        action: String,
         callback: TMySignalRPayloadCallbacks,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) {
-        if self.actions.contains_key(&action) {
-            panic!("SignalR action already registered: {}", action);
+        if self.actions.contains_key(TContract::ACTION_NAME) {
+            panic!(
+                "SignalR action already registered: {}",
+                TContract::ACTION_NAME
+            );
         }
 
         let instance = MySignalRCallbacksInstance {
-            action_name: action.to_string(),
             callback: Arc::new(callback),
             logger,
         };
 
-        self.actions.insert(action, Arc::new(instance));
+        self.actions
+            .insert(TContract::ACTION_NAME.to_string(), Arc::new(instance));
     }
 }
 
@@ -84,7 +86,6 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRCallbacks for MySignalRActi
                 .on(
                     &signal_r_connection,
                     headers,
-                    &action_name,
                     &data,
                     #[cfg(feature = "with-telemetry")]
                     ctx,

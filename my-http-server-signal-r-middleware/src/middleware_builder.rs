@@ -3,8 +3,8 @@ use std::sync::Arc;
 use rust_extensions::Logger;
 
 use crate::{
-    my_signal_r_actions::MySignalRActions, MySignalRActionCallbacks, MySignalRMiddleware,
-    MySignalRTransportCallbacks, SignalRConnectionsList, SignalRContractDeserializer,
+    my_signal_r_actions::MySignalRActions, MySignalRActionSubscriber, MySignalRMiddleware,
+    MySignalRTransportCallbacks, SignalRConnectionsList, SignalRContractSerializer,
 };
 
 pub struct MiddlewareBuilder<TCtx: Send + Sync + Default + 'static> {
@@ -50,15 +50,13 @@ impl<TCtx: Send + Sync + Default + 'static> MiddlewareBuilder<TCtx> {
     }
 
     pub fn with_action<
-        TContract: SignalRContractDeserializer<Item = TContract> + Send + Sync + 'static,
-        TMySignalRPayloadCallbacks: MySignalRActionCallbacks<TContract, TCtx = TCtx> + Send + Sync + 'static,
+        TContract: SignalRContractSerializer<Item = TContract> + Send + Sync + 'static,
+        TMySignalRPayloadCallbacks: MySignalRActionSubscriber<TContract, TCtx = TCtx> + Send + Sync + 'static,
     >(
         mut self,
-        action_name: String,
         action: TMySignalRPayloadCallbacks,
     ) -> Self {
-        self.actions
-            .add_action(action_name, action, self.logger.clone());
+        self.actions.add_action(action, self.logger.clone());
         self
     }
 

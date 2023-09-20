@@ -41,7 +41,6 @@ pub trait MySignalRPayloadCallbacks {
         &self,
         signal_r_connection: &Arc<MySignalRConnection<Self::TCtx>>,
         headers: Option<HashMap<String, String>>,
-        action_name: &str,
         data: &[u8],
         #[cfg(feature = "with-telemetry")] ctx: &mut crate::SignalRTelemetry,
     );
