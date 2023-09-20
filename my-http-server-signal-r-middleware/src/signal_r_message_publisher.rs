@@ -1,17 +1,13 @@
 use std::sync::Arc;
 
-use crate::{MySignalRConnection, SignalRConnectionsList, SignalRParam};
+use crate::{MySignalRConnection, SignalRConnectionsList, SignalRContractSerializer, SignalRParam};
 
-pub trait SignalRContractSerializer {
-    fn serialize(self) -> Vec<Vec<u8>>;
-}
 pub struct SignalRMessagePublisher<
     TContract: SignalRContractSerializer + Send + Sync + 'static,
     TCtx: Default + Send + Sync + 'static,
 > {
     signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
     itm: std::marker::PhantomData<TContract>,
-    action_name: String,
 }
 
 impl<
@@ -19,9 +15,8 @@ impl<
         TCtx: Default + Send + Sync + 'static,
     > SignalRMessagePublisher<TContract, TCtx>
 {
-    pub fn new(action_name: String, signal_r_list: Arc<SignalRConnectionsList<TCtx>>) -> Self {
+    pub fn new(signal_r_list: Arc<SignalRConnectionsList<TCtx>>) -> Self {
         Self {
-            action_name,
             signal_r_list,
             itm: std::marker::PhantomData,
         }
@@ -34,7 +29,7 @@ impl<
             for connection in connections {
                 let params = SignalRParam::Raw(payload.as_slice());
 
-                connection.send(self.action_name.as_str(), &params).await;
+                connection.send(TContract::ACTION_NAME, &params).await;
             }
         }
     }
@@ -45,8 +40,9 @@ impl<
         contract: TContract,
     ) {
         let payload = contract.serialize();
+
         let params = SignalRParam::Raw(payload.as_slice());
-        connection.send(self.action_name.as_str(), &params).await;
+        connection.send(TContract::ACTION_NAME, &params).await;
     }
 
     pub async fn send_to_tagged_connections(&self, key: &str, contract: TContract) {
@@ -55,7 +51,7 @@ impl<
 
             for connection in connections {
                 let params = SignalRParam::Raw(payload.as_slice());
-                connection.send(self.action_name.as_str(), &params).await;
+                connection.send(TContract::ACTION_NAME, &params).await;
             }
         }
     }
@@ -75,7 +71,7 @@ impl<
 
             for connection in connections {
                 let params = SignalRParam::Raw(payload.as_slice());
-                connection.send(self.action_name.as_str(), &params).await;
+                connection.send(TContract::ACTION_NAME, &params).await;
             }
         }
     }

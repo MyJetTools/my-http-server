@@ -12,8 +12,7 @@ impl<TCtx: Send + Sync + Default + 'static> SignalRPublishersBuilder<TCtx> {
     }
     pub fn get_publisher<TContract: SignalRContractSerializer + Send + Sync + 'static>(
         &self,
-        action_name: String,
     ) -> SignalRMessagePublisher<TContract, TCtx> {
-        return SignalRMessagePublisher::new(action_name, self.signal_r_list.clone());
+        return SignalRMessagePublisher::new(self.signal_r_list.clone());
     }
 }
