@@ -21,12 +21,12 @@ pub fn generate(
             const ACTION_NAME: &'static str = #action_name;
             type Item = #struct_name;
 
-            fn serialize(self) -> Vec<Vec<u8>> {
+            fn serialize(&self) -> Vec<Vec<u8>> {
                 let json = serde_json::to_vec(&self);
                 return vec![json.unwrap()];
             }
 
-            fn deserialize<'s>(src: &'s [Vec<u8>]) -> Result<Self::Item, String> {
+            fn deserialize(src: &[&[u8]]) -> Result<Self::Item, String> {
                 if src.len() != 1 {
                     return Err(format!(
                         "Invalid messages amount {} during deserialization for action: {}",
