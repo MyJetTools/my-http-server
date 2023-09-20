@@ -17,13 +17,13 @@ use tokio::sync::RwLock;
 
 use crate::SignalRParam;
 
-pub struct MySignalrConnectionSingleThreaded {
+pub struct MySignalRConnectionSingleThreaded {
     web_socket: Option<Arc<MyWebSocket>>,
     long_pooling: Option<TaskCompletion<String, String>>,
 }
 
 pub struct MySignalRConnection<TCtx: Send + Sync + 'static> {
-    single_threaded: Mutex<MySignalrConnectionSingleThreaded>,
+    single_threaded: Mutex<MySignalRConnectionSingleThreaded>,
     pub connection_id: String,
     pub connection_token: Option<String>,
     pub created: DateTimeAsMicroseconds,
@@ -44,7 +44,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
     ) -> Self {
         let has_web_socket = web_socket.is_some();
         Self {
-            single_threaded: Mutex::new(MySignalrConnectionSingleThreaded {
+            single_threaded: Mutex::new(MySignalRConnectionSingleThreaded {
                 web_socket,
                 long_pooling: None,
             }),
@@ -185,7 +185,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
         if let Some(old_websocket) = write_access.web_socket.replace(web_socket) {
             old_websocket
                 .send_message(hyper_tungstenite::tungstenite::Message::Text(format!(
-                    "Signalr WebSocket {} has been kicked by Websocket {} ",
+                    "SignalR WebSocket {} has been kicked by Websocket {} ",
                     old_websocket.id, new_id
                 )))
                 .await;
