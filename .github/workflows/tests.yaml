@@ -1,35 +1,89 @@
-
 name: Test it
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "*" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "*" ]
 
 jobs:
-  test:
-
+  build-default:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: Test Default build  
-        run: |
-          cargo build   
-      - name: Test static-files 
-        run: |
-          cargo build --features static-files       
-      - name: Test with-telemetry
-        run: |
-          cargo build --features with-telemetry    
-      - name: Test cache-headers-before-receive-body 
-        run: |
-          cargo build --features cache-headers-before-receive-body                    
-      - name: Test Build      
-        run: |
-          cargo test
-          
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --release
+  build-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --all-features
+  build-controllers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --features controllers
+  build-macros:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --features macros
+  build-websocket:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --features websocket
+  build-signal-r:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --features signal-r
+  build-with-telemetry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --features with-telemetry
+  build-static-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1     
+      - run: cargo build --features static-files

@@ -7,15 +7,17 @@ edition = "2021"
 
 [features]
 default = []
-full = ["controllers", "macros", "websocket", "signal-r", "with-telemetry"]
+full = ["controllers", "macros", "websocket", "signal-r", "with-telemetry", "static-files"]
 controllers = ["my-http-server-controllers"]
 macros = ["my-http-server-swagger", "my-http-server-controllers"]
 websocket = ["my-http-server-web-sockets"]
-signal-r = ["my-http-server-web-sockets", "my-http-server-signal-r-middleware"]
+signal-r = [
+    "my-http-server-signal-r-middleware",
+    "signal-r-macros",
+]
 with-telemetry = [
     "my-http-server-core/with-telemetry",
     "my-http-server-signal-r-middleware?/with-telemetry",
-
 ]
 
 static-files = ["static-files-middleware"]
@@ -27,4 +29,5 @@ my-http-server-web-sockets = { optional = true, path = "../my-http-server-web-so
 my-http-server-signal-r-middleware = { optional = true, path = "../my-http-server-signal-r-middleware" }
 my-http-server-controllers = { optional = true, path = "../my-http-server-controllers" }
 my-http-server-core = { path = "../my-http-server-core" }
+signal-r-macros = { optional = true, path = "../signal-r-macros" }
 static-files-middleware = { path = "../static-files-middleware", optional = true }
