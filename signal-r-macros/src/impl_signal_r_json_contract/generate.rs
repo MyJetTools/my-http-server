@@ -47,7 +47,8 @@ pub fn generate(
                     ));
                 }
 
-                result.unwrap()
+                let result: Self = result.unwrap();
+                Ok(result)
             }
         }
     };
