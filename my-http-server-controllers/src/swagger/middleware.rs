@@ -5,21 +5,26 @@ use my_http_server_core::{
     HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpServerMiddleware,
     HttpServerRequestFlow, WebContentType,
 };
+use rust_extensions::StrOrString;
 
 use super::super::controllers::ControllersMiddleware;
 
 pub struct SwaggerMiddleware {
     controllers: Arc<ControllersMiddleware>,
-    title: String,
-    version: String,
+    title: StrOrString<'static>,
+    version: StrOrString<'static>,
 }
 
 impl SwaggerMiddleware {
-    pub fn new(controllers: Arc<ControllersMiddleware>, title: String, version: String) -> Self {
+    pub fn new(
+        controllers: Arc<ControllersMiddleware>,
+        title: impl Into<StrOrString<'static>>,
+        version: impl Into<StrOrString<'static>>,
+    ) -> Self {
         Self {
             controllers,
-            title,
-            version,
+            title: title.into(),
+            version: version.into(),
         }
     }
 }
@@ -140,7 +145,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             let scheme = ctx.request.get_scheme();
             let host = ctx.request.get_host();
 
-            let global_fail_resulsts = if let Some(factory) = &self.controllers.auth_error_factory {
+            let global_fail_results = if let Some(factory) = &self.controllers.auth_error_factory {
                 factory.get_global_http_fail_result_types()
             } else {
                 None
@@ -151,11 +156,11 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Json),
                 content: super::swagger_yaml::builder::build(
                     self.controllers.as_ref(),
-                    self.title.as_ref(),
-                    self.version.as_ref(),
+                    self.title.as_str(),
+                    self.version.as_str(),
                     host,
                     scheme.as_ref(),
-                    global_fail_resulsts,
+                    global_fail_results,
                 ),
             };
 
