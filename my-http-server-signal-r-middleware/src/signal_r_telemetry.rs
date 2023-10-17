@@ -12,7 +12,7 @@ impl SignalRTelemetry {
         Self {
             ctx,
             tags: TelemetryEventTagsBuilder::new(),
-            write_telemetry: false,
+            write_telemetry: true,
         }
     }
     pub fn get_ctx(&self) -> &my_telemetry::MyTelemetryContext {

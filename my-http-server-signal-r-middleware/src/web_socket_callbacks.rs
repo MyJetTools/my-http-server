@@ -139,24 +139,23 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                                 .await;
 
                             #[cfg(feature = "with-telemetry")]
-                            let write_telemetry = signal_r_telemetry.get_write_telemetry();
-
-                            #[cfg(feature = "with-telemetry")]
-                            (signal_r_telemetry.tags, write_telemetry)
+                            (signal_r_telemetry)
                         })
                         .await;
 
                         #[cfg(feature = "with-telemetry")]
                         match _result {
-                            Ok((tags, write_telemetry)) => {
-                                if write_telemetry {
+                            Ok(my_telemetry) => {
+                                if my_telemetry.get_write_telemetry() {
                                     my_telemetry::TELEMETRY_INTERFACE
                                         .write_success(
                                             &ctx,
                                             started,
-                                            message.target.to_string(),
+                                            format!("[SignalR] {}", message.target),
                                             format!("Executed Ok",),
-                                            tags.add_ip(my_web_socket.addr.ip().to_string())
+                                            my_telemetry
+                                                .tags
+                                                .add_ip(my_web_socket.addr.ip().to_string())
                                                 .build(),
                                         )
                                         .await;
