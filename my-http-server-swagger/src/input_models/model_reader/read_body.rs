@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use types_reader::PropertyType;
 
-use crate::input_models::InputField;
+use crate::input_models::{http_input_props::get_cache_headers, InputField};
 
 pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, syn::Error> {
     let data_src = quote!(__reader);
@@ -34,19 +34,6 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
     };
 
     Ok(result)
-}
-
-fn get_cache_headers(input_fields: &[InputField]) -> bool {
-    for input_field in input_fields {
-        if input_field
-            .attr_params
-            .try_get_named_param("cache_headers")
-            .is_some()
-        {
-            return true;
-        }
-    }
-    false
 }
 
 fn generate_reading(

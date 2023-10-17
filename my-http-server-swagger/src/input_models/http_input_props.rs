@@ -186,6 +186,55 @@ impl<'s> HttpInputProperties<'s> {
 
         result
     }
+
+    pub fn has_cache_headers_mark(&self) -> bool {
+        if let Some(body_fields) = &self.body_fields {
+            if get_cache_headers(body_fields) {
+                return true;
+            }
+        }
+
+        if let Some(form_data_fields) = &self.form_data_fields {
+            if get_cache_headers(form_data_fields) {
+                return true;
+            }
+        }
+
+        if let Some(header_fields) = &self.header_fields {
+            if get_cache_headers(header_fields) {
+                return true;
+            }
+        }
+
+        if let Some(query_string_fields) = &self.query_string_fields {
+            if get_cache_headers(query_string_fields) {
+                return true;
+            }
+        }
+
+        if let Some(path_fields) = &self.path_fields {
+            if get_cache_headers(path_fields) {
+                return true;
+            }
+        }
+
+        if let Some(body_raw_field) = &self.body_raw_field {
+            if body_raw_field.has_cache_headers_mark() {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
+pub fn get_cache_headers(input_fields: &[InputField]) -> bool {
+    for input_field in input_fields {
+        if input_field.has_cache_headers_mark() {
+            return true;
+        }
+    }
+    false
 }
 
 fn check_duplicated(items: &[InputField]) -> Result<(), syn::Error> {

@@ -99,6 +99,12 @@ impl<'s> InputField<'s> {
         self.attr_params.try_get_named_param("default").is_some()
     }
 
+    pub fn has_cache_headers_mark(&self) -> bool {
+        self.attr_params
+            .try_get_named_param("cache_headers")
+            .is_some()
+    }
+
     fn is_str(&self) -> bool {
         match &self.property.ty {
             PropertyType::Str => true,
