@@ -37,7 +37,6 @@ pub struct HttpRequest {
     x_forwarded_proto: Option<String>,
     x_forwarded_for: Option<String>,
     host: Option<String>,
-    #[cfg(feature = "cache-headers-before-receive-body")]
     cached_headers: Option<crate::CachedHeaders>,
 }
 
@@ -76,7 +75,6 @@ impl HttpRequest {
             x_forwarded_for,
             host,
             content_type_header: None,
-            #[cfg(feature = "cache-headers-before-receive-body")]
             cached_headers: None,
         }
     }
@@ -104,7 +102,7 @@ impl HttpRequest {
         Some(result)
     }
 
-    async fn init_body(&mut self) -> Result<(), HttpFailResult> {
+    async fn init_body(&mut self, cache_headers: bool) -> Result<(), HttpFailResult> {
         if self.content_type_header.is_none() {
             if let Some(value) = self.get_optional_header("content-type") {
                 self.content_type_header = Some(value.as_string()?);
@@ -122,9 +120,10 @@ impl HttpRequest {
         let mut result = RequestData::None;
         std::mem::swap(&mut self.req, &mut result);
 
-        #[cfg(feature = "cache-headers-before-receive-body")]
-        if let RequestData::AsRaw(req) = &mut result {
-            self.cached_headers = Some(crate::CachedHeaders::new(req));
+        if cache_headers {
+            if let RequestData::AsRaw(req) = &mut result {
+                self.cached_headers = Some(crate::CachedHeaders::new(req));
+            }
         }
 
         if let RequestData::AsRaw(req) = result {
@@ -142,8 +141,11 @@ impl HttpRequest {
         Ok(())
     }
 
-    pub async fn get_body(&mut self) -> Result<&HttpRequestBody, HttpFailResult> {
-        self.init_body().await?;
+    pub async fn get_body(
+        &mut self,
+        cache_headers: bool,
+    ) -> Result<&HttpRequestBody, HttpFailResult> {
+        self.init_body(cache_headers).await?;
 
         match &self.req {
             RequestData::AsRaw(_) => {
@@ -160,8 +162,11 @@ impl HttpRequest {
         }
     }
 
-    pub async fn receive_body(&mut self) -> Result<HttpRequestBody, HttpFailResult> {
-        self.init_body().await?;
+    pub async fn receive_body(
+        &mut self,
+        cache_headers: bool,
+    ) -> Result<HttpRequestBody, HttpFailResult> {
+        self.init_body(cache_headers).await?;
 
         let mut result = RequestData::None;
         std::mem::swap(&mut self.req, &mut result);
@@ -236,7 +241,7 @@ impl HttpRequest {
 
     pub fn get_header(&self, header_name: &str) -> Option<&str> {
         let header_name = header_name.to_lowercase();
-        #[cfg(feature = "cache-headers-before-receive-body")]
+
         if let Some(cached_headers) = &self.cached_headers {
             match cached_headers.get(&header_name) {
                 Some(header_value) => return Some(header_value.to_str().unwrap()),

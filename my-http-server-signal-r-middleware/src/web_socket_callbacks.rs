@@ -137,23 +137,30 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                                     &mut signal_r_telemetry,
                                 )
                                 .await;
+
                             #[cfg(feature = "with-telemetry")]
-                            signal_r_telemetry.tags
+                            let write_telemetry = signal_r_telemetry.get_write_telemetry();
+
+                            #[cfg(feature = "with-telemetry")]
+                            (signal_r_telemetry.tags, write_telemetry)
                         })
                         .await;
 
                         #[cfg(feature = "with-telemetry")]
                         match _result {
-                            Ok(tags) => {
-                                my_telemetry::TELEMETRY_INTERFACE
-                                    .write_success(
-                                        &ctx,
-                                        started,
-                                        message.target.to_string(),
-                                        format!("Executed Ok",),
-                                        tags.add_ip(my_web_socket.addr.ip().to_string()).build(),
-                                    )
-                                    .await;
+                            Ok((tags, write_telemetry)) => {
+                                if write_telemetry {
+                                    my_telemetry::TELEMETRY_INTERFACE
+                                        .write_success(
+                                            &ctx,
+                                            started,
+                                            message.target.to_string(),
+                                            format!("Executed Ok",),
+                                            tags.add_ip(my_web_socket.addr.ip().to_string())
+                                                .build(),
+                                        )
+                                        .await;
+                                }
                             }
                             Err(err) => {
                                 my_telemetry::TELEMETRY_INTERFACE
