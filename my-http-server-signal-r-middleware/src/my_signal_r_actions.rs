@@ -93,7 +93,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRCallbacks for MySignalRActi
                 .await;
         } else {
             #[cfg(feature = "with-telemetry")]
-            ctx.do_not_write_this_event()
+            ctx.do_not_track_this_event()
         }
     }
 }

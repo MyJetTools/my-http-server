@@ -27,7 +27,7 @@ impl SignalRTelemetry {
         self.tags.add_as_ref(key, value);
     }
 
-    pub fn do_not_write_this_event(&mut self) {
+    pub fn do_not_track_this_event(&mut self) {
         self.write_telemetry = false;
     }
 
