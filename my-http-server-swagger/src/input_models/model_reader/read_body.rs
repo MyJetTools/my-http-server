@@ -22,7 +22,7 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
 
     let result = quote! {
         let #init_fields ={
-            let __body = ctx.request.get_body().await?;
+            let __body = ctx.request.get_body(false).await?;
             let __reader = __body.get_body_data_reader()?;
             #(#reading_fields)*
             #init_fields
