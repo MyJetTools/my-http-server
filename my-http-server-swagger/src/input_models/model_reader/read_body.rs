@@ -20,9 +20,11 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
 
     let init_fields = super::utils::get_fields_to_read(input_fields)?;
 
+    let cache_headers = get_cache_headers(input_fields);
+
     let result = quote! {
         let #init_fields ={
-            let __body = ctx.request.get_body(false).await?;
+            let __body = ctx.request.get_body(#cache_headers).await?;
             let __reader = __body.get_body_data_reader()?;
             #(#reading_fields)*
             #init_fields
@@ -32,6 +34,19 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
     };
 
     Ok(result)
+}
+
+fn get_cache_headers(input_fields: &[InputField]) -> bool {
+    for input_field in input_fields {
+        if input_field
+            .attr_params
+            .try_get_named_param("cache_headers")
+            .is_some()
+        {
+            return true;
+        }
+    }
+    false
 }
 
 fn generate_reading(
