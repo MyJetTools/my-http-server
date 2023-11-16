@@ -1,5 +1,5 @@
 use crate::{HttpFailResult, WebContentType};
-use hyper::{Body, Response};
+use hyper::{body::Bytes, Response};
 
 impl From<hyper::Error> for HttpFailResult {
     fn from(src: hyper::Error) -> Self {
@@ -15,12 +15,12 @@ impl From<hyper::Error> for HttpFailResult {
     }
 }
 
-impl Into<Response<Body>> for HttpFailResult {
-    fn into(self) -> Response<Body> {
+impl Into<Response<Bytes>> for HttpFailResult {
+    fn into(self) -> Response<Bytes> {
         Response::builder()
             .header("Content-Type", self.content_type.as_str())
             .status(self.status_code)
-            .body(Body::from(self.content))
+            .body(Bytes::from(self.content))
             .unwrap()
     }
 }

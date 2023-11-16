@@ -36,17 +36,18 @@ impl HttpServerMiddleware for SwaggerMiddleware {
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        if ctx.request.http_path.is_root() {
+        let http_path = ctx.request.get_http_path();
+        if http_path.is_root() {
             return get_next.next(ctx).await;
         }
 
-        if let Some(value) = ctx.request.http_path.get_segment_value_as_str(0) {
+        if let Some(value) = http_path.get_segment_value_as_str(0) {
             if value != "swagger" {
                 return get_next.next(ctx).await;
             }
         }
 
-        if ctx.request.http_path.segments_amount() == 1 {
+        if http_path.segments_amount() == 1 {
             let scheme = ctx.request.get_scheme();
             let host = ctx.request.get_host();
             let new_url = format!("{}://{}/swagger/index.html", scheme, host);
@@ -59,11 +60,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             return output.into_ok_result(false);
         }
 
-        if ctx
-            .request
-            .http_path
-            .has_value_at_index_case_insensitive(1, "index.html")
-        {
+        if http_path.has_value_at_index_case_insensitive(1, "index.html") {
             let output = HttpOutput::Content {
                 headers: None,
                 content_type: Some(WebContentType::Html),
@@ -72,11 +69,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             return output.into_ok_result(false);
         }
 
-        if ctx
-            .request
-            .http_path
-            .has_value_at_index_case_insensitive(1, "swagger-ui.css")
-        {
+        if http_path.has_value_at_index_case_insensitive(1, "swagger-ui.css") {
             let output = HttpOutput::Content {
                 headers: None,
                 content_type: Some(WebContentType::Css),
@@ -85,11 +78,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             return output.into_ok_result(false);
         }
 
-        if ctx
-            .request
-            .http_path
-            .has_value_at_index_case_insensitive(1, "swagger-ui-bundle.js")
-        {
+        if http_path.has_value_at_index_case_insensitive(1, "swagger-ui-bundle.js") {
             let output = HttpOutput::Content {
                 headers: None,
                 content_type: Some(WebContentType::JavaScript),
@@ -98,11 +87,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             return output.into_ok_result(false);
         }
 
-        if ctx
-            .request
-            .http_path
-            .has_value_at_index_case_insensitive(1, "swagger-ui-standalone-preset.js")
-        {
+        if http_path.has_value_at_index_case_insensitive(1, "swagger-ui-standalone-preset.js") {
             let output = HttpOutput::Content {
                 headers: None,
                 content_type: Some(WebContentType::JavaScript),
@@ -111,11 +96,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             return output.into_ok_result(false);
         }
 
-        if ctx
-            .request
-            .http_path
-            .has_value_at_index_case_insensitive(1, "favicon-32x32.png")
-        {
+        if http_path.has_value_at_index_case_insensitive(1, "favicon-32x32.png") {
             let output = HttpOutput::Content {
                 headers: None,
                 content_type: Some(WebContentType::Png),
@@ -124,11 +105,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             return output.into_ok_result(false);
         }
 
-        if ctx
-            .request
-            .http_path
-            .has_value_at_index_case_insensitive(1, "favicon-16x16.png")
-        {
+        if http_path.has_value_at_index_case_insensitive(1, "favicon-16x16.png") {
             let output = HttpOutput::Content {
                 headers: None,
                 content_type: Some(WebContentType::Png),
@@ -137,11 +114,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             return output.into_ok_result(false);
         }
 
-        if ctx
-            .request
-            .http_path
-            .has_values_at_index_case_insensitive(1, &["v1", "swagger.yaml"])
-        {
+        if http_path.has_values_at_index_case_insensitive(1, &["v1", "swagger.yaml"]) {
             let scheme = ctx.request.get_scheme();
             let host = ctx.request.get_host();
 

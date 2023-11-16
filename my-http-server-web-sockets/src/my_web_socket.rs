@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::atomic::AtomicBool};
 
-use futures::{stream::SplitSink, SinkExt};
+use futures::stream::SplitSink;
 use hyper::upgrade::Upgraded;
 use hyper_tungstenite::{
     tungstenite::{Error, Message},
@@ -36,7 +36,10 @@ impl MyWebSocket {
     async fn send_message_and_if_conntext(&self, msg: Message) -> Result<(), Error> {
         let mut write_access = self.write_stream.lock().await;
         if let Some(stream) = &mut *write_access {
+            todo!("Restore");
+            /*
             return stream.send(msg).await;
+            */
         }
 
         Ok(())
@@ -68,11 +71,15 @@ impl MyWebSocket {
             .store(false, std::sync::atomic::Ordering::SeqCst);
         let mut write_access = self.write_stream.lock().await;
         if let Some(mut item) = write_access.take() {
-            let result = item.close().await;
+            todo!("Restore");
+
+            /*
+             let result = item.close().await;
 
             if let Err(err) = result {
                 println!("Can not close websocket {}. Reason: {:?}", self.id, err);
             }
+                 */
         }
     }
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{HttpFailResult, WebContentType};
-use hyper::{Body, Response};
+use hyper::{body::Bytes, Response};
 use serde::Serialize;
 
 pub enum HttpOutput {
@@ -23,7 +23,7 @@ pub enum HttpOutput {
         content: Vec<u8>,
     },
 
-    Raw(Response<Body>),
+    Raw(Response<Bytes>),
 }
 
 impl HttpOutput {
@@ -206,8 +206,8 @@ impl Into<Result<HttpOkResult, HttpFailResult>> for HttpOkResult {
     }
 }
 
-impl Into<Response<Body>> for HttpOkResult {
-    fn into(self) -> Response<Body> {
+impl Into<Response<Bytes>> for HttpOkResult {
+    fn into(self) -> Response<Bytes> {
         let status_code = self.get_status_code();
 
         return match self.output {
@@ -228,22 +228,22 @@ impl Into<Response<Body>> for HttpOkResult {
 
                     builder
                         .status(status_code)
-                        .body(Body::from(content))
+                        .body(Bytes::from(content))
                         .unwrap()
                 }
                 None => Response::builder()
                     .status(status_code)
-                    .body(Body::from(content))
+                    .body(Bytes::from(content))
                     .unwrap(),
             },
             HttpOutput::Redirect { url, permanent: _ } => Response::builder()
                 .status(status_code)
                 .header("Location", url)
-                .body(Body::empty())
+                .body(Bytes::new())
                 .unwrap(),
             HttpOutput::Empty => Response::builder()
                 .status(status_code)
-                .body(Body::empty())
+                .body(Bytes::new())
                 .unwrap(),
 
             HttpOutput::Raw(body) => body,
@@ -258,9 +258,15 @@ impl Into<Response<Body>> for HttpOkResult {
 
                 builder
                     .status(status_code)
-                    .body(Body::from(content))
+                    .body(Bytes::from(content))
                     .unwrap()
             }
         };
+    }
+}
+
+impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkResult {
+    fn into(self) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
+        todo!("Implement")
     }
 }

@@ -24,7 +24,9 @@ url-utils = { tag = "0.1.1", git = "https://github.com/MyJetTools/url-utils.git"
 tokio = { version = "*", features = ["full"] }
 
 lazy_static = "*"
-hyper = { version = "0.14.27", features = ["full"] }
+hyper = { version = "*", features = ["full"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 async-trait = "*"
+http-body-util = "*"
+hyper-util = { git = "https://github.com/hyperium/hyper-util.git" }

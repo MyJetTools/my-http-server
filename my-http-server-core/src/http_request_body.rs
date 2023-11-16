@@ -8,13 +8,13 @@ use crate::{
     WebContentType,
 };
 
-pub enum BodyContentType {
+pub enum BodyModelFormat {
     Json,
     UrlEncoded,
     Unknown,
 }
 
-impl BodyContentType {
+impl BodyModelFormat {
     pub fn detect(raw_body: &[u8]) -> Self {
         for b in raw_body {
             if *b <= 32 {
@@ -22,9 +22,9 @@ impl BodyContentType {
             }
 
             if *b == '{' as u8 || *b == '[' as u8 {
-                return BodyContentType::Json;
+                return BodyModelFormat::Json;
             } else {
-                return BodyContentType::UrlEncoded;
+                return BodyModelFormat::UrlEncoded;
             }
         }
         Self::Unknown
@@ -34,12 +34,12 @@ impl BodyContentType {
 pub struct HttpRequestBody {
     pub content_type: Option<String>,
     raw_body: Vec<u8>,
-    body_content_type: BodyContentType,
+    body_content_type: BodyModelFormat,
 }
 
 impl HttpRequestBody {
     pub fn new(body: Vec<u8>, content_type: Option<String>) -> Self {
-        let body_content_type = BodyContentType::detect(body.as_slice());
+        let body_content_type = BodyModelFormat::detect(body.as_slice());
         Self {
             raw_body: body,
             body_content_type,
@@ -85,12 +85,12 @@ impl HttpRequestBody {
             }
         }
         match self.body_content_type {
-            BodyContentType::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
-            BodyContentType::UrlEncoded => {
+            BodyModelFormat::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
+            BodyModelFormat::UrlEncoded => {
                 let body_as_str = self.as_str()?;
                 get_body_data_reader_as_url_encoded(body_as_str)
             }
-            BodyContentType::Unknown => {
+            BodyModelFormat::Unknown => {
                 return Err(HttpFailResult::as_not_supported_content_type(
                     "Unknown body content type".to_string(),
                 ))

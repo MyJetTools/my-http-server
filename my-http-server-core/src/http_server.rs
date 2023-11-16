@@ -1,8 +1,8 @@
-use hyper::{
-    server::conn::AddrStream,
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
-};
+use http_body_util::Full;
+use hyper::body::Bytes;
+use hyper::server::conn::http1;
+use hyper::{service::service_fn, Response};
+use hyper_util::rt::TokioIo;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
 #[cfg(feature = "with-telemetry")]
@@ -12,6 +12,7 @@ use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
 
+use crate::MyHttpServerHyperRequest;
 use crate::{
     request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpRequest, HttpServerData,
     HttpServerMiddleware,
@@ -78,36 +79,73 @@ pub async fn start(
     app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) {
-    let http_server_data_spawned = http_server_data.clone();
+    /*
+                  let http_server_data_spawned = http_server_data.clone();
 
-    let make_service = make_service_fn(move |conn: &AddrStream| {
-        let http_server_data = http_server_data_spawned.clone();
+                  let make_service = make_service_fn(move |conn: &AddrStream| {
+                      let http_server_data = http_server_data_spawned.clone();
 
-        let logger_to_move = logger.clone();
-        let addr = conn.remote_addr();
+                      let logger_to_move = logger.clone();
+                      let addr = conn.remote_addr();
 
-        async move {
-            Ok::<_, hyper::Error>(service_fn(move |req| {
-                handle_requests(req, http_server_data.clone(), addr, logger_to_move.clone())
-            }))
-        }
-    });
+                      async move {
+                          Ok::<_, hyper::Error>(service_fn(move |req| {
+                              handle_requests(req, http_server_data.clone(), addr, logger_to_move.clone())
+                          }))
+                      }
+                  });
 
-    let server = Server::bind(&addr).serve(make_service);
 
-    let server = server.with_graceful_shutdown(shutdown_signal(app_states));
+               let server = Server::bind(&addr).serve(make_service);
 
-    if let Err(e) = server.await {
-        eprintln!("Http Server error: {}", e);
+           let server = server.with_graceful_shutdown(shutdown_signal(app_states));
+
+       if let Err(e) = server.await {
+           eprintln!("Http Server error: {}", e);
+       }
+    */
+
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+
+    loop {
+        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let io = TokioIo::new(stream);
+        let http_server_data = http_server_data.clone();
+        let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
+
+        tokio::task::spawn(async move {
+            let http_server_data = http_server_data.clone();
+            let logger = logger.clone();
+            let socket_addr = socket_addr.clone();
+
+            if let Err(err) = http1::Builder::new()
+                .serve_connection(
+                    io,
+                    service_fn(move |req| {
+                        let req = MyHttpServerHyperRequest::new(req);
+                        let resp = handle_requests(
+                            req,
+                            http_server_data.clone(),
+                            socket_addr.clone(),
+                            logger.clone(),
+                        );
+                        resp
+                    }),
+                )
+                .await
+            {
+                println!("Error serving connection: {:?}", err);
+            }
+        });
     }
 }
 
 pub async fn handle_requests(
-    req: Request<Body>,
+    req: MyHttpServerHyperRequest,
     http_server_data: Arc<HttpServerData>,
     addr: SocketAddr,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
-) -> hyper::Result<Response<Body>> {
+) -> hyper::Result<Response<Full<Bytes>>> {
     let req = HttpRequest::new(req, addr);
     let mut request_ctx = HttpContext::new(req);
 
@@ -230,6 +268,7 @@ pub async fn handle_requests(
                         .await;
                 }
             }
+
             Ok(err_result.into())
         }
     }

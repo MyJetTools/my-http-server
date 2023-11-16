@@ -11,6 +11,6 @@ default = []
 my-http-server-core = { path = "../my-http-server-core" }
 tokio = { version = "*", features = ["full"] }
 async-trait = "*"
-hyper = { version = "0.14.27", features = ["full"] }
+hyper = { version = "*", features = ["full"] }
 rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
 serde = { version = "*", features = ["derive"] }

@@ -158,3 +158,9 @@ impl HttpFailResult {
         }
     }
 }
+
+impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpFailResult {
+    fn into(self) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
+        todo!("Implement")
+    }
+}

@@ -6,24 +6,30 @@ use hyper_tungstenite::{
     tungstenite::{Error, Message},
     WebSocketStream,
 };
-use my_http_server_core::{HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
+use my_http_server_core::{
+    HttpFailResult, HttpOkResult, HttpOutput, MyHttpServerHyperRequest, WebContentType,
+};
 
 use crate::{my_web_socket_callback::WebSocketMessage, MyWebSocket, MyWebSocketCallback};
 
 pub async fn handle_web_socket_upgrade<
     TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static,
 >(
-    req: &mut hyper::Request<hyper::Body>,
+    req: &hyper::Request<hyper::body::Incoming>,
     callback: Arc<TMyWebSocketCallback>,
     id: i64,
     addr: std::net::SocketAddr,
     disconnect_timeout: Duration,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    let query_string = if let Some(query_string) = req.uri().query() {
+    todo!("Restore")
+    /*
+    let query_string = if let Some(query_string) = req.get_uri().query() {
         Some(query_string.to_string())
     } else {
         None
     };
+
+    let req = req.unwrap_as_request().await;
 
     let upgrade_result = hyper_tungstenite::upgrade(req, None);
 
@@ -72,6 +78,7 @@ pub async fn handle_web_socket_upgrade<
     });
 
     HttpOutput::Raw(response).into_ok_result(false)
+     */
 }
 
 /// Handle a websocket connection.
@@ -80,6 +87,8 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     mut read_stream: SplitStream<WebSocketStream<Upgraded>>,
     callback: Arc<TMyWebSocketCallback>,
 ) -> Result<(), Error> {
+    todo!("Restore")
+    /*
     while let Some(message) = read_stream.next().await {
         let result = match message? {
             Message::Text(msg) => {
@@ -111,6 +120,7 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     }
 
     Ok(())
+     */
 }
 
 async fn send_message<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(

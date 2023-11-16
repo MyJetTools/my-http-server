@@ -1,13 +1,17 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    http_path::HttpPath, HttpFailResult, HttpRequestBody, InputParamValue, RequestIp,
-    UrlEncodedData,
+    HttpFailResult, HttpPath, HttpRequestBody, InputParamValue, MyHttpServerHyperRequest,
+    RequestIp, UrlEncodedData,
 };
-use hyper::{Body, Method, Request, Uri};
+
+use hyper::Method;
+
+const X_FORWARDED_FOR_HEADER: &str = "X-Forwarded-For";
+const X_FORWARDED_PROTO: &str = "X-Forwarded-Proto";
 
 pub enum RequestData {
-    AsRaw(Request<Body>),
+    AsRaw(MyHttpServerHyperRequest),
     AsHttpBody(HttpRequestBody),
     None,
 }
@@ -27,60 +31,24 @@ impl RequestData {
     }
 }
 pub struct HttpRequest {
-    pub method: Method,
-    pub uri: Uri,
-    pub req: RequestData,
-    pub http_path: HttpPath,
+    req: MyHttpServerHyperRequest,
     pub addr: SocketAddr,
     pub content_type_header: Option<String>,
     key_values: Option<HashMap<String, Vec<u8>>>,
-    x_forwarded_proto: Option<String>,
-    x_forwarded_for: Option<String>,
-    host: Option<String>,
-    cached_headers: Option<crate::CachedHeaders>,
 }
 
 impl HttpRequest {
-    pub fn new(req: Request<Body>, addr: SocketAddr) -> Self {
-        let uri = req.uri().clone();
-
-        let method = req.method().clone();
-
-        let x_forwarded_for = if let Some(value) = req.headers().get("X-Forwarded-For") {
-            Some(value.to_str().unwrap().to_string())
-        } else {
-            None
-        };
-
-        let x_forwarded_proto = if let Some(value) = req.headers().get("X-Forwarded-Proto") {
-            Some(value.to_str().unwrap().to_string())
-        } else {
-            None
-        };
-
-        let host = if let Some(value) = req.headers().get("host") {
-            Some(value.to_str().unwrap().to_string())
-        } else {
-            None
-        };
-
+    pub fn new(req: MyHttpServerHyperRequest, addr: SocketAddr) -> Self {
         Self {
-            http_path: HttpPath::from_str(req.uri().path()),
-            req: RequestData::AsRaw(req),
+            req,
             addr,
-            uri,
-            method,
             key_values: None,
-            x_forwarded_proto,
-            x_forwarded_for,
-            host,
             content_type_header: None,
-            cached_headers: None,
         }
     }
 
     pub fn get_query_string(&self) -> Result<UrlEncodedData, HttpFailResult> {
-        if let Some(query) = self.uri.query() {
+        if let Some(query) = self.req.get_uri().query() {
             let result = UrlEncodedData::from_query_string(query)?;
             Ok(result)
         } else {
@@ -102,98 +70,86 @@ impl HttpRequest {
         Some(result)
     }
 
-    async fn init_body(&mut self, cache_headers: bool) -> Result<(), HttpFailResult> {
-        if self.content_type_header.is_none() {
-            if let Some(value) = self.get_optional_header("content-type") {
-                self.content_type_header = Some(value.as_string()?);
-            }
-        }
+    /*
+       async fn init_body(&mut self, cache_headers: bool) -> Result<(), HttpFailResult> {
+           if self.content_type_header.is_none() {
+               if let Some(value) = self.get_optional_header("content-type") {
+                   self.content_type_header = Some(value.as_string()?);
+               }
+           }
 
-        if self.req.is_http_body() {
-            return Ok(());
-        }
+           if self.req.is_http_body() {
+               return Ok(());
+           }
 
-        if self.req.is_none() {
-            return Ok(());
-        }
+           if self.req.is_none() {
+               return Ok(());
+           }
 
-        let mut result = RequestData::None;
-        std::mem::swap(&mut self.req, &mut result);
+           let mut result = RequestData::None;
+           std::mem::swap(&mut self.req, &mut result);
 
-        if cache_headers {
-            if let RequestData::AsRaw(req) = &mut result {
-                self.cached_headers = Some(crate::CachedHeaders::new(req));
-            }
-        }
+           if cache_headers {
+               if let RequestData::AsRaw(req) = &mut result {
+                   self.cached_headers = Some(crate::CachedHeaders::new(req));
+               }
+           }
 
-        if let RequestData::AsRaw(req) = result {
-            let body = req.into_body();
-            let full_body = hyper::body::to_bytes(body).await?;
+           if let RequestData::AsRaw(req) = result {
+               let (parts, incoming) = req.into_parts();
 
-            let body = full_body.into_iter().collect::<Vec<u8>>();
+               let body = read_bytes(incoming).await;
 
-            self.req = RequestData::AsHttpBody(HttpRequestBody::new(
-                body,
-                self.content_type_header.take(),
-            ));
-        }
+               self.req = RequestData::AsHttpBody(HttpRequestBody::new(
+                   body,
+                   self.content_type_header.take(),
+               ));
+           }
 
-        Ok(())
+           Ok(())
+       }
+    */
+
+    pub async fn get_body(&mut self) -> Result<&HttpRequestBody, HttpFailResult> {
+        self.req.get_body().await
     }
 
-    pub async fn get_body(
-        &mut self,
-        cache_headers: bool,
-    ) -> Result<&HttpRequestBody, HttpFailResult> {
-        self.init_body(cache_headers).await?;
+    /*
+        pub async fn receive_body(
+            &mut self,
+            cache_headers: bool,
+        ) -> Result<HttpRequestBody, HttpFailResult> {
+            self.init_body(cache_headers).await?;
 
-        match &self.req {
-            RequestData::AsRaw(_) => {
-                panic!("Somehow we are here");
-            }
-            RequestData::AsHttpBody(result) => {
-                return Ok(result);
-            }
-            RequestData::None => {
-                panic!(
-                    "You are trying to get access to body for a second time which is not allowed"
-                );
-            }
-        }
-    }
+            let mut result = RequestData::None;
+            std::mem::swap(&mut self.req, &mut result);
 
-    pub async fn receive_body(
-        &mut self,
-        cache_headers: bool,
-    ) -> Result<HttpRequestBody, HttpFailResult> {
-        self.init_body(cache_headers).await?;
-
-        let mut result = RequestData::None;
-        std::mem::swap(&mut self.req, &mut result);
-
-        match result {
-            RequestData::AsRaw(_) => {
-                panic!("Somehow we are here");
-            }
-            RequestData::AsHttpBody(result) => {
-                return Ok(result);
-            }
-            RequestData::None => {
-                panic!(
-                    "You are trying to get access to body for a second time which is not allowed"
-                );
+            match result {
+                RequestData::AsRaw(_) => {
+                    panic!("Somehow we are here");
+                }
+                RequestData::AsHttpBody(result) => {
+                    return Ok(result);
+                }
+                RequestData::None => {
+                    panic!(
+                        "You are trying to get access to body for a second time which is not allowed"
+                    );
+                }
             }
         }
-    }
 
-    pub fn set_body(&mut self, body: HttpRequestBody) {
-        self.req = RequestData::AsHttpBody(body);
-    }
 
+
+        pub fn set_body(&mut self, body: HttpRequestBody) {
+            self.req = RequestData::AsHttpBody(body);
+        }
+    */
     pub fn get_path(&self) -> &str {
-        self.uri.path()
+        self.req.get_uri().path()
     }
 
+    /*
     fn get_headers(&self) -> &hyper::HeaderMap<hyper::header::HeaderValue> {
         if let RequestData::AsRaw(req) = &self.req {
             return req.headers();
@@ -201,9 +157,13 @@ impl HttpRequest {
 
         panic!("Headers can no be read after reading body");
     }
+     */
 
     pub fn get_ip(&self) -> RequestIp {
-        if let Some(x_forwarded_for) = &self.x_forwarded_for {
+        if let Some(x_forwarded_for) = &self
+            .req
+            .get_header_as_str_case_sensitive(X_FORWARDED_FOR_HEADER)
+        {
             let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
             return RequestIp::Forwarded(result);
         }
@@ -215,7 +175,7 @@ impl HttpRequest {
         &self,
         header_name: &str,
     ) -> Result<InputParamValue, HttpFailResult> {
-        match self.get_header(header_name) {
+        match self.req.get_header_case_insensitive(header_name) {
             Some(value) => Ok(InputParamValue::Raw {
                 value,
                 src: "header",
@@ -230,8 +190,12 @@ impl HttpRequest {
         }
     }
 
+    pub fn get_http_path(&self) -> &HttpPath {
+        self.req.get_http_path()
+    }
+
     pub fn get_optional_header(&self, header_name: &str) -> Option<InputParamValue> {
-        let value = self.get_header(header_name)?;
+        let value = self.req.get_header_case_insensitive(header_name)?;
 
         Some(InputParamValue::Raw {
             value,
@@ -239,46 +203,25 @@ impl HttpRequest {
         })
     }
 
-    pub fn get_header(&self, header_name: &str) -> Option<&str> {
-        let header_name = header_name.to_lowercase();
-
-        if let Some(cached_headers) = &self.cached_headers {
-            match cached_headers.get(&header_name) {
-                Some(header_value) => return Some(header_value.to_str().unwrap()),
-                None => return None,
-            }
-        }
-
-        for (key, value) in self.get_headers() {
-            if key.as_str().to_lowercase() == header_name {
-                match value.to_str() {
-                    Ok(value) => return Some(value),
-                    Err(_) => return None,
-                }
-            }
-        }
-
-        None
-    }
-
-    pub fn get_method(&self) -> &Method {
-        &self.method
+    pub fn get_method(&self) -> Method {
+        self.req.get_method()
     }
 
     pub fn get_host(&self) -> &str {
-        if let Some(host) = &self.host {
-            return host;
+        if let Some(value) = self.req.get_header_case_insensitive("host") {
+            return value;
         }
-
         panic!("Host is not set");
     }
 
     pub fn get_scheme(&self) -> &str {
-        if let Some(x_forwarded_proto) = &self.x_forwarded_proto {
-            return x_forwarded_proto;
+        if let Some(x_forwarded_proto) =
+            self.req.get_header_as_str_case_sensitive(X_FORWARDED_PROTO)
+        {
+            return std::str::from_utf8(x_forwarded_proto.as_bytes()).unwrap();
         }
 
-        let scheme = self.uri.scheme();
+        let scheme = self.req.get_uri().scheme();
 
         match scheme {
             Some(scheme) => {
@@ -286,5 +229,13 @@ impl HttpRequest {
             }
             None => "http",
         }
+    }
+
+    pub fn unwrap_raw_request(&self) -> &hyper::Request<hyper::body::Incoming> {
+        self.req.unwrap_as_request()
+    }
+
+    pub fn try_unwrap_raw_request(&self) -> Option<&hyper::Request<hyper::body::Incoming>> {
+        self.req.try_unwrap_as_request()
     }
 }

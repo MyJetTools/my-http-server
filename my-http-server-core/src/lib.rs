@@ -50,3 +50,6 @@ pub use body_data_reader::*;
 pub use cached_headers::*;
 pub use form_data_reader::*;
 pub use input_param_value::*;
+
+mod my_http_server_hyper_request;
+pub use my_http_server_hyper_request::*;
