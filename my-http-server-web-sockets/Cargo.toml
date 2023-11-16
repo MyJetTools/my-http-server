@@ -10,6 +10,6 @@ edition = "2021"
 my-http-server-core = { path = "../my-http-server-core" }
 tokio = { version = "*", features = ["full"] }
 async-trait = "*"
-hyper = { version = "*", features = ["full"] }
+hyper = { version = "0.14.27", features = ["full"] }
 hyper-tungstenite = "*"
 futures = "*"
