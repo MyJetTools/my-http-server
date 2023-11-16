@@ -10,7 +10,7 @@ rust-extensions = { tag = "1.0.4", git = "https://github.com/MyJetTools/rust-ext
 
 tokio = { version = "*", features = ["full"] }
 lazy_static = "*"
-hyper = { version = "*", features = ["full"] }
+hyper = { version = "0.14.27", features = ["full"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 async-trait = "*"
