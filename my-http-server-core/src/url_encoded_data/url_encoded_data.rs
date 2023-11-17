@@ -1,11 +1,7 @@
-use std::str::FromStr;
-
-use url_utils::{
-    url_decoder::UrlDecodeError,
-    url_encoded_data_reader::{UrlEncodedDataReader, UrlEncodedValueAsString},
-};
+use url_utils::{url_decoder::UrlDecodeError, url_encoded_data_reader::UrlEncodedDataReader};
 
 use crate::HttpFailResult;
+use url_utils::url_encoded_data_reader::UrlEncodedValue;
 
 pub enum UrlEncodedData<'s> {
     Body(UrlEncodedDataReader<'s>),
@@ -28,18 +24,15 @@ impl<'s> UrlEncodedData<'s> {
         Self::QueryStringEmpty
     }
 
-    pub fn get_required(
-        &'s self,
-        name: &str,
-    ) -> Result<&'s UrlEncodedValueAsString<'s>, HttpFailResult> {
+    pub fn get_required(&'s self, name: &str) -> Result<UrlEncodedValue<'s>, HttpFailResult> {
         match self {
             UrlEncodedData::Body(src) => {
                 let result = src.get_required(name);
-                return super::convert_error(result, self.get_source_as_string());
+                return super::convert_error(name, result, self.get_source_as_string());
             }
             UrlEncodedData::QueryString(src) => {
                 let result = src.get_required(name);
-                return super::convert_error(result, self.get_source_as_string());
+                return super::convert_error(name, result, self.get_source_as_string());
             }
             UrlEncodedData::QueryStringEmpty => Err(HttpFailResult::required_parameter_is_missing(
                 name,
@@ -48,7 +41,7 @@ impl<'s> UrlEncodedData<'s> {
         }
     }
 
-    pub fn get_optional(&'s self, name: &str) -> Option<&'s UrlEncodedValueAsString<'s>> {
+    pub fn get_optional(&'s self, name: &str) -> Option<UrlEncodedValue<'s>> {
         match self {
             UrlEncodedData::Body(src) => src.get_optional(name),
             UrlEncodedData::QueryString(src) => src.get_optional(name),
@@ -56,30 +49,17 @@ impl<'s> UrlEncodedData<'s> {
         }
     }
 
-    pub fn get_vec_of_string(&'s self, name: &str) -> Result<Vec<String>, HttpFailResult> {
+    pub fn get_vec(
+        &'s self,
+        name: &'static str,
+    ) -> Result<Vec<UrlEncodedValue<'s>>, HttpFailResult> {
         match self {
             UrlEncodedData::Body(src) => {
-                let result = src.get_vec_of_string(name)?;
+                let result = src.get_vec(name);
                 return Ok(result);
             }
             UrlEncodedData::QueryString(src) => {
-                let result = src.get_vec_of_string(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::QueryStringEmpty => {
-                return Ok(vec![]);
-            }
-        }
-    }
-
-    pub fn get_vec<TResult: FromStr>(&'s self, name: &str) -> Result<Vec<TResult>, HttpFailResult> {
-        match self {
-            UrlEncodedData::Body(src) => {
-                let result = src.get_vec(name)?;
-                return Ok(result);
-            }
-            UrlEncodedData::QueryString(src) => {
-                let result: Vec<TResult> = src.get_vec(name)?;
+                let result = src.get_vec(name);
                 return Ok(result);
             }
             UrlEncodedData::QueryStringEmpty => {

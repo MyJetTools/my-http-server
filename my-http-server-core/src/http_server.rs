@@ -7,15 +7,14 @@ use hyper_util::rt::TokioIo;
 use my_telemetry::TelemetryEventTagsBuilder;
 #[cfg(feature = "with-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
-use rust_extensions::{ApplicationStates, Logger};
+use rust_extensions::{ApplicationStates, Logger, StrOrString};
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
 use std::sync::Arc;
 
-use crate::MyHttpServerHyperRequest;
 use crate::{
-    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpRequest, HttpServerData,
-    HttpServerMiddleware,
+    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpRequest,
+    HttpServerMiddleware, HttpServerMiddlewares,
 };
 
 pub struct MyHttpServer {
@@ -60,13 +59,13 @@ impl MyHttpServer {
             None,
         );
 
-        let http_server_data = HttpServerData {
+        let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
         };
 
         tokio::spawn(start(
             self.addr.clone(),
-            Arc::new(http_server_data),
+            Arc::new(http_server_middlewares),
             app_states,
             logger,
         ));
@@ -75,46 +74,20 @@ impl MyHttpServer {
 
 pub async fn start(
     addr: SocketAddr,
-    http_server_data: Arc<HttpServerData>,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
     app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) {
-    /*
-                  let http_server_data_spawned = http_server_data.clone();
-
-                  let make_service = make_service_fn(move |conn: &AddrStream| {
-                      let http_server_data = http_server_data_spawned.clone();
-
-                      let logger_to_move = logger.clone();
-                      let addr = conn.remote_addr();
-
-                      async move {
-                          Ok::<_, hyper::Error>(service_fn(move |req| {
-                              handle_requests(req, http_server_data.clone(), addr, logger_to_move.clone())
-                          }))
-                      }
-                  });
-
-
-               let server = Server::bind(&addr).serve(make_service);
-
-           let server = server.with_graceful_shutdown(shutdown_signal(app_states));
-
-       if let Err(e) = server.await {
-           eprintln!("Http Server error: {}", e);
-       }
-    */
-
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     loop {
         let (stream, socket_addr) = listener.accept().await.unwrap();
         let io = TokioIo::new(stream);
-        let http_server_data = http_server_data.clone();
+        let http_server_middlewares = http_server_middlewares.clone();
         let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
 
         tokio::task::spawn(async move {
-            let http_server_data = http_server_data.clone();
+            let http_server_middlewares = http_server_middlewares.clone();
             let logger = logger.clone();
             let socket_addr = socket_addr.clone();
 
@@ -122,10 +95,9 @@ pub async fn start(
                 .serve_connection(
                     io,
                     service_fn(move |req| {
-                        let req = MyHttpServerHyperRequest::new(req);
                         let resp = handle_requests(
                             req,
-                            http_server_data.clone(),
+                            http_server_middlewares.clone(),
                             socket_addr.clone(),
                             logger.clone(),
                         );
@@ -141,26 +113,29 @@ pub async fn start(
 }
 
 pub async fn handle_requests(
-    req: MyHttpServerHyperRequest,
-    http_server_data: Arc<HttpServerData>,
+    req: hyper::Request<hyper::body::Incoming>,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
     addr: SocketAddr,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> hyper::Result<Response<Full<Bytes>>> {
     let req = HttpRequest::new(req, addr);
+
+    let method = req.method.clone();
+
     let mut request_ctx = HttpContext::new(req);
 
     #[cfg(feature = "with-telemetry")]
     let ctx = request_ctx.telemetry_context.clone();
 
-    let path = request_ctx.request.get_path().to_string();
-    let method = request_ctx.request.get_method().to_string();
-    let ip = request_ctx.request.get_ip().to_string();
+    let path = StrOrString::create_as_short_string_or_string(request_ctx.request.get_path());
+    let ip =
+        StrOrString::create_as_short_string_or_string(request_ctx.request.get_ip().get_real_ip());
 
     #[cfg(feature = "with-telemetry")]
     let started = DateTimeAsMicroseconds::now();
 
     let result = tokio::spawn(async move {
-        let mut flows = HttpServerRequestFlow::new(http_server_data.middlewares.clone());
+        let mut flows = HttpServerRequestFlow::new(http_server_middlewares.middlewares.clone());
         let result = flows.next(&mut request_ctx).await;
         (result, request_ctx)
     });
@@ -182,9 +157,9 @@ pub async fn handle_requests(
                 .await;
 
             let mut ctx = HashMap::new();
-            ctx.insert("path".to_string(), path.to_string());
+            ctx.insert("path".to_string(), path.as_str().to_string());
             ctx.insert("method".to_string(), method.to_string());
-            ctx.insert("ip".to_string(), ip);
+            ctx.insert("ip".to_string(), ip.to_string());
 
             logger.write_error(
                 "HttpRequest".to_string(),
@@ -192,7 +167,7 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            panic!("Http Server error: [{}]{}", method, path);
+            panic!("Http Server error: [{}]{}", method, path.to_string());
         }
     };
 
@@ -231,7 +206,7 @@ pub async fn handle_requests(
                 if err_result.write_to_log {
                     let mut ctx = HashMap::new();
                     ctx.insert("path".to_string(), path.to_string());
-                    ctx.insert("method".to_string(), method.to_string());
+                    ctx.insert("method".to_string(), request_ctx.request.method.to_string());
                     ctx.insert("ip".to_string(), ip.to_string());
                     ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
 

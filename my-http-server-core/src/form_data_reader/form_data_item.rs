@@ -5,8 +5,8 @@ use crate::ContentDispositionParser;
 #[derive(Debug)]
 pub enum FormDataItem<'s> {
     ValueAsString {
-        value: &'s str,
         name: &'s str,
+        value: &'s str,
     },
     File {
         name: &'s str,

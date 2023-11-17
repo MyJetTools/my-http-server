@@ -4,9 +4,11 @@ use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    body_data_reader::BodyDataReader, HttpFailResult, JsonEncodedData, UrlEncodedData,
-    WebContentType,
+    body_data_reader::BodyDataReader, FormDataReader, HttpFailResult, JsonEncodedData,
+    UrlEncodedData, WebContentType,
 };
+
+const SRC_BODY: &str = "Body";
 
 pub enum BodyModelFormat {
     Json,
@@ -77,13 +79,20 @@ impl HttpRequestBody {
         }
     }
 
-    pub fn get_body_data_reader(&self) -> Result<BodyDataReader, HttpFailResult> {
+    pub fn get_form_data_reader(&self) -> Result<FormDataReader, HttpFailResult> {
         if let Some(content_type) = self.content_type.as_ref() {
             if extract_boundary(content_type.as_bytes()).is_some() {
-                let reader = BodyDataReader::create_as_form_data(&self.raw_body);
+                let reader = FormDataReader::new(&self.raw_body);
                 return Ok(reader);
             }
         }
+
+        return Err(HttpFailResult::as_not_supported_content_type(
+            "Expected form data body content".to_string(),
+        ));
+    }
+
+    pub fn get_body_data_reader(&self) -> Result<BodyDataReader, HttpFailResult> {
         match self.body_content_type {
             BodyModelFormat::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
             BodyModelFormat::UrlEncoded => {
@@ -124,7 +133,7 @@ impl<T: DeserializeOwned> TryInto<Vec<T>> for HttpRequestBody {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<Vec<T>, Self::Error> {
-        crate::input_param_value::parse_json_value(self.as_slice())
+        crate::convert_from_str::to_json("RawBody".into(), self.as_slice(), "HttpBody")
     }
 }
 
@@ -132,7 +141,7 @@ impl<T: DeserializeOwned> TryInto<HashMap<String, T>> for HttpRequestBody {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<HashMap<String, T>, Self::Error> {
-        crate::input_param_value::parse_json_value(self.as_slice())
+        crate::convert_from_str::to_json("RawBody", self.as_slice(), "Body")
     }
 }
 
@@ -173,13 +182,7 @@ impl TryInto<u8> for HttpRequestBody {
     fn try_into(self) -> Result<u8, Self::Error> {
         let str = self.as_str()?;
 
-        match str.parse::<u8>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse u8. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -187,14 +190,7 @@ impl TryInto<i8> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i8, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<i8>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse u8. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -202,14 +198,7 @@ impl TryInto<u16> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u16, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<u16>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse u16. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -217,14 +206,7 @@ impl TryInto<i16> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i16, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<i16>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse u16. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -232,14 +214,7 @@ impl TryInto<u32> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u32, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<u32>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse u32. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -247,14 +222,7 @@ impl TryInto<i32> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i32, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<i32>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse u32. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -262,14 +230,7 @@ impl TryInto<u64> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u64, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<u64>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse u64. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -277,14 +238,7 @@ impl TryInto<i64> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i64, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<i64>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse i64. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -292,14 +246,7 @@ impl TryInto<usize> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<usize, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<usize>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse usize. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -307,14 +254,7 @@ impl TryInto<isize> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<isize, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<isize>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse isize. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -322,14 +262,7 @@ impl TryInto<f32> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f32, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<f32>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse f32. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 
@@ -337,14 +270,7 @@ impl TryInto<f64> for HttpRequestBody {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f64, Self::Error> {
         let str = self.as_str()?;
-
-        match str.parse::<f64>() {
-            Ok(result) => Ok(result),
-            Err(err) => Err(HttpFailResult::as_validation_error(format!(
-                "Can not parse f64. {:?}",
-                err
-            ))),
-        }
+        crate::convert_from_str::to_simple_value("HttpBody", str, SRC_BODY)
     }
 }
 

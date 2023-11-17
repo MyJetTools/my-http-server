@@ -1,18 +1,11 @@
-use crate::{
-    types::FileContent, url_encoded_data::UrlEncodedData, FormDataReader, HttpFailResult,
-    JsonEncodedData,
-};
-
-use super::InputParamValue;
+use crate::{url_encoded_data::UrlEncodedData, EncodedParamValue, HttpFailResult, JsonEncodedData};
 
 pub const BODY_JSON_SRC: &str = "body json";
 pub const BODY_URL_SRC: &str = "body url/encoded";
-pub const FORM_DATA_SRC: &str = "body url/encoded";
 
 pub enum BodyDataReaderInner<'s> {
     UrlEncoded(UrlEncodedData<'s>),
     JsonEncoded(JsonEncodedData<'s>),
-    FormData(FormDataReader<'s>),
 }
 pub struct BodyDataReader<'s> {
     inner: BodyDataReaderInner<'s>,
@@ -31,99 +24,45 @@ impl<'s> BodyDataReader<'s> {
         }
     }
 
-    pub fn create_as_form_data(body: &'s [u8]) -> Self {
-        Self {
-            inner: BodyDataReaderInner::FormData(FormDataReader::new(body)),
-        }
-    }
-
-    pub fn get_required(&'s self, name: &'s str) -> Result<InputParamValue<'s>, HttpFailResult> {
+    pub fn get_required(
+        &'s self,
+        name: &'static str,
+    ) -> Result<EncodedParamValue<'s>, HttpFailResult> {
         match &self.inner {
             BodyDataReaderInner::UrlEncoded(src) => {
                 let value = src.get_required(name)?;
-                Ok(InputParamValue::UrlEncodedValueAsStringRef {
+                Ok(EncodedParamValue::UrlEncodedValue {
                     value,
                     src: BODY_URL_SRC,
                 })
             }
             BodyDataReaderInner::JsonEncoded(src) => {
                 let value = src.get_required(name)?;
-                Ok(InputParamValue::JsonEncodedData {
+                Ok(EncodedParamValue::JsonEncodedData {
+                    name: name,
                     value,
                     src: BODY_JSON_SRC,
                 })
             }
-            BodyDataReaderInner::FormData(src) => {
-                let item = src.get_required(name)?;
-                match item {
-                    crate::FormDataItem::ValueAsString { value, name: _ } => {
-                        return Ok(InputParamValue::Raw {
-                            value,
-                            src: "form data",
-                        })
-                    }
-                    crate::FormDataItem::File {
-                        name: _,
-                        file_name,
-                        content_type,
-                        content,
-                    } => {
-                        return Ok(InputParamValue::File {
-                            file: FileContent {
-                                content_type: content_type.to_string(),
-                                file_name: file_name.to_string(),
-                                content: content.to_vec(),
-                            },
-                            src: "form data",
-                        });
-                    }
-                }
-            }
         }
     }
 
-    pub fn get_optional(&'s self, name: &'s str) -> Option<InputParamValue<'s>> {
+    pub fn get_optional(&'s self, name: &'static str) -> Option<EncodedParamValue<'s>> {
         match &self.inner {
             BodyDataReaderInner::UrlEncoded(result) => {
                 let value = result.get_optional(name)?;
-                Some(InputParamValue::UrlEncodedValueAsStringRef {
+                Some(EncodedParamValue::UrlEncodedValue {
                     value,
                     src: BODY_URL_SRC,
                 })
             }
             BodyDataReaderInner::JsonEncoded(result) => {
                 let value = result.get_optional(name)?;
-                Some(InputParamValue::JsonEncodedData {
+                Some(EncodedParamValue::JsonEncodedData {
+                    name: name.into(),
                     value,
                     src: BODY_JSON_SRC,
                 })
-            }
-            BodyDataReaderInner::FormData(src) => {
-                let item = src.get_optional(name)?;
-
-                match item {
-                    crate::FormDataItem::ValueAsString { value, name: _ } => {
-                        return Some(InputParamValue::Raw {
-                            value,
-                            src: "form data",
-                        })
-                    }
-                    crate::FormDataItem::File {
-                        name: _,
-                        file_name,
-                        content_type,
-                        content,
-                    } => {
-                        return Some(InputParamValue::File {
-                            file: FileContent {
-                                content_type: content_type.to_string(),
-                                file_name: file_name.to_string(),
-                                content: content.to_vec(),
-                            },
-                            src: "form data",
-                        });
-                    }
-                }
             }
         }
     }

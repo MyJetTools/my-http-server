@@ -208,7 +208,7 @@ impl HttpServerMiddleware for ControllersMiddleware {
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        match ctx.request.get_method() {
+        match ctx.request.method {
             Method::GET => {
                 {
                     if let Some(result) = self

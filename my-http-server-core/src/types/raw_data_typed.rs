@@ -1,19 +1,33 @@
 use std::marker::PhantomData;
 
+use rust_extensions::StrOrString;
 use serde::de::DeserializeOwned;
 
-use crate::{HttpFailResult, HttpRequestBody, InputParamValue};
+use crate::{HttpFailResult, HttpRequestBody};
 
-pub struct RawDataTyped<T: DeserializeOwned> {
+pub struct RawDataTyped<'s, T: DeserializeOwned> {
+    name: StrOrString<'s>,
     data: Vec<u8>,
     ty: PhantomData<T>,
+    src: &'static str,
 }
 
-impl<T: DeserializeOwned> RawDataTyped<T> {
-    pub fn new(data: Vec<u8>) -> Self {
+impl<'s, T: DeserializeOwned> RawDataTyped<'s, T> {
+    pub fn new(name: StrOrString<'s>, data: Vec<u8>, src: &'static str) -> Self {
         Self {
+            name,
             data,
             ty: PhantomData,
+            src,
+        }
+    }
+
+    pub fn from_slice(name: StrOrString<'s>, data: &[u8], src: &'static str) -> Self {
+        Self {
+            name,
+            data: data.to_vec(),
+            ty: PhantomData,
+            src,
         }
     }
 
@@ -22,39 +36,20 @@ impl<T: DeserializeOwned> RawDataTyped<T> {
     }
 
     pub fn deserialize_json(&self) -> Result<T, HttpFailResult> {
-        crate::input_param_value::parse_json_value(&self.data)
+        crate::convert_from_str::to_json("RawDataType", &self.data, self.src)
     }
 }
 
-impl<T: DeserializeOwned> AsRef<[u8]> for RawDataTyped<T> {
+impl<'s, T: DeserializeOwned> AsRef<[u8]> for RawDataTyped<'s, T> {
     fn as_ref(&self) -> &[u8] {
         self.data.as_ref()
     }
 }
 
-impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for InputParamValue<'_> {
-    type Error = HttpFailResult;
-    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
-        match self {
-            InputParamValue::UrlEncodedValueAsStringRef { src, .. } => {
-                Ok(RawDataTyped::new(src.as_bytes().to_vec()))
-            }
-            InputParamValue::UrlEncodedValueAsString { src, .. } => {
-                Ok(RawDataTyped::new(src.as_bytes().to_vec()))
-            }
-            InputParamValue::JsonEncodedData { src, .. } => {
-                Ok(RawDataTyped::new(src.as_bytes().to_vec()))
-            }
-            InputParamValue::Raw { src, .. } => Ok(RawDataTyped::new(src.as_bytes().to_vec())),
-            InputParamValue::File { file, src: _ } => Ok(RawDataTyped::new(file.content)),
-        }
-    }
-}
-
-impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for HttpRequestBody {
+impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<'s, T>> for HttpRequestBody {
     type Error = HttpFailResult;
 
-    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
-        Ok(RawDataTyped::new(self.get_body()))
+    fn try_into(self) -> Result<RawDataTyped<'s, T>, Self::Error> {
+        Ok(RawDataTyped::new("RawBody".into(), self.get_body(), "Body"))
     }
 }

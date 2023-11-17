@@ -92,7 +92,7 @@ impl HttpActions {
         auth_error_factory: &Option<Arc<dyn AuthErrorFactory + Send + Sync + 'static>>,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         for action in &self.actions {
-            if action.http_route.is_my_path(&ctx.request.get_http_path()) {
+            if action.http_route.is_my_path(&ctx.request.http_path) {
                 match authorization_map.is_authorized(
                     action,
                     &ctx.credentials,

@@ -1,4 +1,4 @@
-use crate::WebContentType;
+use crate::{http_headers_to_use::*, WebContentType};
 
 #[derive(Debug, Clone)]
 pub struct HttpFailResult {
@@ -161,6 +161,11 @@ impl HttpFailResult {
 
 impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpFailResult {
     fn into(self) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
-        todo!("Implement")
+        let full_body = http_body_util::Full::new(hyper::body::Bytes::from(self.content));
+        let builder = hyper::Response::builder()
+            .status(self.status_code)
+            .header(CONTENT_TYPE_HEADER, self.content_type.as_str());
+
+        builder.body(full_body).unwrap()
     }
 }

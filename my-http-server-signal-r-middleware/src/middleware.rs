@@ -105,17 +105,21 @@ impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalRMi
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let http_path = ctx.request.get_http_path();
-        if !http_path.has_value_at_index_case_insensitive(0, &self.hub_name) {
+        if !ctx
+            .request
+            .http_path
+            .has_value_at_index_case_insensitive(0, &self.hub_name)
+        {
             return get_next.next(ctx).await;
         }
 
         if ctx
             .request
-            .get_optional_header("sec-websocket-key")
+            .headers
+            .try_get_case_insensitive("sec-websocket-key")
             .is_some()
         {
-            if let Some(request) = &mut ctx.request.try_unwrap_raw_request() {
+            if let Some(request) = &mut ctx.request.data.try_unwrap_as_request() {
                 let id = self.get_socket_id().await;
                 return my_http_server_web_sockets::handle_web_socket_upgrade(
                     request,
@@ -130,12 +134,8 @@ impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalRMi
             return get_next.next(ctx).await;
         }
 
-        if ctx.request.get_method() == Method::POST {
-            if ctx
-                .request
-                .get_http_path()
-                .is_the_same_to(&self.negotiate_path)
-            {
+        if ctx.request.method == Method::POST {
+            if ctx.request.http_path.is_the_same_to(&self.negotiate_path) {
                 return self.handle_negotiate_request(ctx).await;
             }
         }

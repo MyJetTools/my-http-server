@@ -142,11 +142,13 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let http_path = ctx.request.get_http_path();
         if let Some(mappings) = &self.file_folders {
             for mapping in mappings {
-                if http_path.is_starting_with(&mapping.uri_prefix) {
-                    let path = http_path.as_str_from_segment(mapping.uri_prefix.segments_amount());
+                if ctx.request.http_path.is_starting_with(&mapping.uri_prefix) {
+                    let path = ctx
+                        .request
+                        .http_path
+                        .as_str_from_segment(mapping.uri_prefix.segments_amount());
 
                     if let Some(result) =
                         self.handle_folder(mapping.folder_path.as_str(), path).await
@@ -160,7 +162,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         if let Some(result) = self
             .handle_folder(
                 super::files::DEFAULT_FOLDER,
-                http_path.as_str_from_segment(0),
+                ctx.request.http_path.as_str_from_segment(0),
             )
             .await
         {

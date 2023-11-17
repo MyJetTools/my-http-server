@@ -6,9 +6,7 @@ use hyper_tungstenite::{
     tungstenite::{Error, Message},
     WebSocketStream,
 };
-use my_http_server_core::{
-    HttpFailResult, HttpOkResult, HttpOutput, MyHttpServerHyperRequest, WebContentType,
-};
+use my_http_server_core::{HttpFailResult, HttpOkResult};
 
 use crate::{my_web_socket_callback::WebSocketMessage, MyWebSocket, MyWebSocketCallback};
 
