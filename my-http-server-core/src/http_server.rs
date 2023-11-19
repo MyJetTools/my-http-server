@@ -158,10 +158,10 @@ pub async fn handle_requests(
                 .write_fail(
                     &ctx,
                     started,
-                    format!("[{}]{}", method, path),
+                    format!("[{}]{}", method, path.as_str().to_string()),
                     format!("Panic: {:?}", err),
                     TelemetryEventTagsBuilder::new()
-                        .add_ip(ip.to_string())
+                        .add_ip(ip.as_str().to_string())
                         .build(),
                 )
                 .await;
@@ -169,7 +169,7 @@ pub async fn handle_requests(
             let mut ctx = HashMap::new();
             ctx.insert("path".to_string(), path.as_str().to_string());
             ctx.insert("method".to_string(), method.to_string());
-            ctx.insert("ip".to_string(), ip.to_string());
+            ctx.insert("ip".to_string(), ip.as_str().to_string());
 
             logger.write_error(
                 "HttpRequest".to_string(),
@@ -198,7 +198,7 @@ pub async fn handle_requests(
                         .write_success(
                             &ctx,
                             started,
-                            format!("[{}]{}", method, path),
+                            format!("[{}]{}", method, path.as_str().to_string()),
                             format!("Status code: {}", ok_result.output.get_status_code()),
                             tags.into(),
                         )
@@ -215,9 +215,9 @@ pub async fn handle_requests(
             if err_result.write_telemetry {
                 if err_result.write_to_log {
                     let mut ctx = HashMap::new();
-                    ctx.insert("path".to_string(), path.to_string());
+                    ctx.insert("path".to_string(), path.as_str().to_string());
                     ctx.insert("method".to_string(), request_ctx.request.method.to_string());
-                    ctx.insert("ip".to_string(), ip.to_string());
+                    ctx.insert("ip".to_string(), ip.as_str().to_string());
                     ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
 
                     if let Some(credentials) = &request_ctx.credentials {
@@ -246,7 +246,7 @@ pub async fn handle_requests(
                         .write_fail(
                             &ctx,
                             started,
-                            format!("[{}]{}", method, path),
+                            format!("[{}]{}", method, path.as_str()),
                             format!("Status code: {}", err_result.status_code),
                             tags.into(),
                         )
