@@ -10,8 +10,8 @@ use crate::{
 };
 
 pub struct HeaderValue<'s> {
-    name: &'static str,
-    value: &'s [u8],
+    pub name: &'static str,
+    pub value: &'s [u8],
 }
 
 impl<'s> HeaderValue<'s> {
@@ -94,6 +94,14 @@ impl TryInto<u8> for HeaderValue<'_> {
     fn try_into(self) -> Result<u8, Self::Error> {
         let value = self.as_str()?;
         crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
+    }
+}
+
+impl TryInto<bool> for HeaderValue<'_> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<bool, Self::Error> {
+        let value = self.as_str()?;
+        crate::convert_from_str::to_bool(self.name, value, SRC_HEADER)
     }
 }
 
