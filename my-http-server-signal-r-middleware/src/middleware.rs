@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use hyper::Method;
-use my_http_server_core::{
-    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath, HttpServerMiddleware,
-    HttpServerRequestFlow, WebContentType,
-};
+use my_http_server_core::*;
 use rust_extensions::Logger;
 use tokio::sync::Mutex;
 
@@ -73,7 +70,8 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
         let negotiation_version = match query_string_result {
             Ok(value) => {
                 if let Some(result) = value.get_optional("negotiateVersion") {
-                    result.value.parse::<usize>().unwrap()
+                    let value = result.as_str()?;
+                    value.as_str().parse::<usize>().unwrap()
                 } else {
                     0
                 }
@@ -115,23 +113,18 @@ impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalRMi
 
         if ctx
             .request
-            .headers
+            .get_headers()
             .try_get_case_insensitive("sec-websocket-key")
             .is_some()
         {
-            if let Some(request) = &mut ctx.request.data.try_unwrap_as_request() {
-                let id = self.get_socket_id().await;
-                return my_http_server_web_sockets::handle_web_socket_upgrade(
-                    request,
-                    self.web_socket_callback.clone(),
-                    id,
-                    ctx.request.addr,
-                    self.disconnect_timeout,
-                )
-                .await;
-            }
-
-            return get_next.next(ctx).await;
+            let id = self.get_socket_id().await;
+            return my_http_server_web_sockets::handle_web_socket_upgrade(
+                &mut ctx.request,
+                self.web_socket_callback.clone(),
+                id,
+                self.disconnect_timeout,
+            )
+            .await;
         }
 
         if ctx.request.method == Method::POST {

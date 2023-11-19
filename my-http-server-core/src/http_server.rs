@@ -8,7 +8,7 @@ use my_telemetry::TelemetryEventTagsBuilder;
 #[cfg(feature = "with-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use rust_extensions::{ApplicationStates, Logger, StrOrString};
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, net::SocketAddr};
 
 use std::sync::Arc;
 
@@ -81,20 +81,30 @@ pub async fn start(
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
     loop {
+        if app_states.is_shutting_down() {
+            break;
+        }
+
         let (stream, socket_addr) = listener.accept().await.unwrap();
         let io = TokioIo::new(stream);
         let http_server_middlewares = http_server_middlewares.clone();
         let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
+        let app_states = app_states.clone();
 
         tokio::task::spawn(async move {
             let http_server_middlewares = http_server_middlewares.clone();
             let logger = logger.clone();
             let socket_addr = socket_addr.clone();
+            let app_states = app_states.clone();
 
             if let Err(err) = http1::Builder::new()
                 .serve_connection(
                     io,
                     service_fn(move |req| {
+                        if app_states.is_shutting_down() {
+                            panic!("Application is shutting down");
+                        }
+
                         let resp = handle_requests(
                             req,
                             http_server_middlewares.clone(),
@@ -246,13 +256,6 @@ pub async fn handle_requests(
 
             Ok(err_result.into())
         }
-    }
-}
-
-async fn shutdown_signal(app: Arc<dyn ApplicationStates + Send + Sync + 'static>) {
-    let duration = Duration::from_secs(1);
-    while !app.is_shutting_down() {
-        tokio::time::sleep(duration).await;
     }
 }
 

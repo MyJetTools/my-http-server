@@ -4,10 +4,11 @@ use rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::de::DeserializeOwned;
 
 use crate::{
+    data_src::SRC_HEADER,
     types::{RawData, RawDataTyped},
     HttpFailResult,
 };
-pub const HEADER_SRC: &str = "Header";
+
 pub struct HeaderValue<'s> {
     name: &'static str,
     value: &'s [u8],
@@ -31,7 +32,7 @@ impl<'s> HeaderValue<'s> {
             Ok(result) => Ok(result),
             Err(_) => Err(HttpFailResult::invalid_value_to_parse(format!(
                 "Can not parse header value in {}",
-                HEADER_SRC
+                SRC_HEADER
             ))),
         }
     }
@@ -44,19 +45,15 @@ where
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<HashMap<String, TValue>, Self::Error> {
-        crate::convert_from_str::to_json(self.name, self.value, HEADER_SRC)
+        crate::convert_from_str::to_json(self.name, self.value, SRC_HEADER)
     }
 }
 
-impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<'s, T>> for HeaderValue<'s> {
+impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<T>> for HeaderValue<'s> {
     type Error = HttpFailResult;
 
-    fn try_into(self) -> Result<RawDataTyped<'s, T>, Self::Error> {
-        Ok(RawDataTyped::new(
-            self.name.into(),
-            self.value.to_vec(),
-            HEADER_SRC,
-        ))
+    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
+        Ok(RawDataTyped::new(self.value.to_vec(), SRC_HEADER))
     }
 }
 
@@ -88,7 +85,7 @@ impl TryInto<DateTimeAsMicroseconds> for HeaderValue<'_> {
 
     fn try_into(self) -> Result<DateTimeAsMicroseconds, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_date_time(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_date_time(self.name, value, SRC_HEADER)
     }
 }
 
@@ -96,7 +93,7 @@ impl TryInto<u8> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u8, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -104,7 +101,7 @@ impl TryInto<i8> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i8, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -112,7 +109,7 @@ impl TryInto<u16> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u16, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -120,7 +117,7 @@ impl TryInto<i16> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i16, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -128,7 +125,7 @@ impl TryInto<u32> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u32, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -136,7 +133,7 @@ impl TryInto<i32> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i32, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -144,7 +141,7 @@ impl TryInto<u64> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u64, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -152,7 +149,7 @@ impl TryInto<i64> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i64, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -160,7 +157,7 @@ impl TryInto<usize> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<usize, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -168,7 +165,7 @@ impl TryInto<isize> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<isize, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -176,7 +173,7 @@ impl TryInto<f32> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f32, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }
 
@@ -184,6 +181,6 @@ impl TryInto<f64> for HeaderValue<'_> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f64, Self::Error> {
         let value = self.as_str()?;
-        crate::convert_from_str::to_simple_value(self.name, value, HEADER_SRC)
+        crate::convert_from_str::to_simple_value(self.name, value, SRC_HEADER)
     }
 }

@@ -4,11 +4,9 @@ use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    body_data_reader::BodyDataReader, FormDataReader, HttpFailResult, JsonEncodedData,
+    data_src::*, form_data_reader::FormDataReader, BodyDataReader, HttpFailResult, JsonEncodedData,
     UrlEncodedData, WebContentType,
 };
-
-const SRC_BODY: &str = "Body";
 
 pub enum BodyModelFormat {
     Json,

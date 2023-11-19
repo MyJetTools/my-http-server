@@ -32,7 +32,7 @@ fn read_header_field(input_field: &InputField) -> Result<proc_macro2::TokenStrea
         let default_value = input_field.get_default_value_opt_case()?;
 
         let result = quote::quote! {
-            if let Some(value) = ctx.request.get_optional_header(#input_field_name) {
+            if let Some(value) = ctx.request.get_headers().try_get_case_insensitive(#input_field_name) {
                 Some(value.try_into()?)
             } else {
                 #default_value
@@ -43,15 +43,14 @@ fn read_header_field(input_field: &InputField) -> Result<proc_macro2::TokenStrea
     }
 
     if !input_field.has_default_value() {
-        let result =
-            quote::quote!(ctx.request.get_required_header(#input_field_name)?.try_into()?;);
+        let result = quote::quote!(ctx.request.get_headers().get_required_case_insensitive(#input_field_name)?.try_into()?;);
         return Ok(result);
     }
 
     let default_value = input_field.get_default_value_non_opt_case()?;
 
     let result = quote::quote! {
-        if let Some(value) = ctx.request.get_optional_header(#input_field_name) {
+        if let Some(value) = ctx.request.get_headers().try_get_case_insensitive(#input_field_name) {
             value.try_into()?
         } else {
             #default_value

@@ -79,3 +79,39 @@ pub fn verify_default_value(input_field: &InputField, ty: &PropertyType) -> Resu
         }
     }
 }
+
+pub enum ReadParamSrc {
+    QueryString,
+}
+
+impl ReadParamSrc {
+    pub fn to_token_stream(&self) -> TokenStream {
+        match self {
+            Self::QueryString => quote::quote!(my_http_server::data_src::SRC_QUERY_STRING),
+        }
+    }
+}
+
+pub fn read_param_as_array(
+    data_src: &TokenStream,
+    input_field_name: &str,
+    src: ReadParamSrc,
+) -> TokenStream {
+    let src_as_token_stream = src.to_token_stream();
+    quote::quote! {
+        {
+            let items = #data_src.get_vec(#input_field_name)?;
+            let mut result = Vec::with_capacity(items.len());
+
+            for value in items {
+                let encoded = my_http_server::EncodedParamValue::from_url_encoded_data(
+                    value,
+                    #src_as_token_stream,
+                );
+                result.push(encoded.try_into()?);
+            }
+
+            result
+        };
+    }
+}

@@ -18,13 +18,13 @@ pub fn convert_error<TOk>(
             }
             ReadingEncodedDataError::CanNotParseValue(value) => {
                 return Err(HttpFailResult::invalid_value_to_parse(format!(
-                    "Can no parse {} value from {}",
-                    name, data_source
+                    "Can no parse {} value {} from {}",
+                    name, value, data_source
                 )));
             }
             ReadingEncodedDataError::UrlDecodeError(err) => {
                 return Err(HttpFailResult::as_fatal_error(format!(
-                    "Parameter {} has problem with UrlDecodeError in datasource: {}. Err: {:?}",
+                    "Parameter {} has problem with UrlDecodeError in {}. Err: {:?}",
                     name, data_source, err,
                 )));
             }

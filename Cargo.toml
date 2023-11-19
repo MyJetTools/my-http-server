@@ -3,9 +3,10 @@ members = [
     "my-http-server",
     "my-http-server-controllers",
     "my-http-server-core",
-    "my-http-server-swagger",
+    "my-http-server-macros",
     "my-http-server-web-sockets",
     "my-http-server-signal-r-middleware",
     "static-files-middleware",
     "signal-r-macros",
+    "my-http-server-test",
 ]

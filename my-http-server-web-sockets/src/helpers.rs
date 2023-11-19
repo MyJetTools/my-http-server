@@ -1,35 +1,36 @@
 use std::{sync::Arc, time::Duration};
 
-use futures::{stream::SplitStream, StreamExt};
+use futures::stream::SplitStream;
+use futures::StreamExt;
 use hyper::upgrade::Upgraded;
-use hyper_tungstenite::{
-    tungstenite::{Error, Message},
-    WebSocketStream,
-};
-use my_http_server_core::{HttpFailResult, HttpOkResult};
+use hyper_util::rt::TokioIo;
+use my_http_server_core::HttpRequest;
+use my_http_server_core::{HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
+
+use tokio_tungstenite::WebSocketStream;
+use tungstenite::Message;
 
 use crate::{my_web_socket_callback::WebSocketMessage, MyWebSocket, MyWebSocketCallback};
 
 pub async fn handle_web_socket_upgrade<
     TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static,
 >(
-    req: &hyper::Request<hyper::body::Incoming>,
+    req: &mut HttpRequest,
     callback: Arc<TMyWebSocketCallback>,
     id: i64,
-    addr: std::net::SocketAddr,
     disconnect_timeout: Duration,
 ) -> Result<HttpOkResult, HttpFailResult> {
-    todo!("Restore")
-    /*
     let query_string = if let Some(query_string) = req.get_uri().query() {
         Some(query_string.to_string())
     } else {
         None
     };
 
-    let req = req.unwrap_as_request().await;
+    let addr = req.addr.clone();
 
-    let upgrade_result = hyper_tungstenite::upgrade(req, None);
+    let req = req.take_incoming_body();
+
+    let upgrade_result = crate::web_sockets_upgrade::upgrade(req).await;
 
     if let Err(err) = upgrade_result {
         let content = format!("Can not upgrade websocket. Reason: {}", err);
@@ -43,50 +44,52 @@ pub async fn handle_web_socket_upgrade<
         ));
     }
 
-    let (response, web_socket) = upgrade_result.unwrap();
+    let (upgraded, response) = upgrade_result.unwrap();
 
-    tokio::spawn(async move {
-        let web_socket = web_socket.await.unwrap();
+    if let Some(upgraded) = upgraded {
+        tokio::spawn(async move {
+            let upgraded = TokioIo::new(upgraded);
 
-        let (write, read_stream) = web_socket.split();
+            let ws_stream = tokio_tungstenite::accept_async(upgraded).await.unwrap();
 
-        let my_web_socket = MyWebSocket::new(id, write, addr, query_string);
-        let my_web_socket = Arc::new(my_web_socket);
+            let (ws_sender, ws_receiver) = ws_stream.split();
 
-        callback
-            .connected(my_web_socket.clone(), disconnect_timeout)
-            .await
-            .unwrap();
+            let my_web_socket = MyWebSocket::new(id, addr, ws_sender, query_string);
 
-        let serve_socket_result = tokio::spawn(serve_websocket(
-            my_web_socket.clone(),
-            read_stream,
-            callback.clone(),
-        ))
-        .await;
+            let my_web_socket = Arc::new(my_web_socket);
 
-        callback.disconnected(my_web_socket.clone()).await;
+            callback
+                .connected(my_web_socket.clone(), disconnect_timeout)
+                .await
+                .unwrap();
 
-        if let Err(err) = serve_socket_result {
-            println!(
-                "Execution of websocket {} is finished with panic. {}",
-                id, err
-            );
-        }
-    });
+            let serve_socket_result = tokio::spawn(serve_websocket(
+                my_web_socket.clone(),
+                ws_receiver,
+                callback.clone(),
+            ))
+            .await;
+
+            callback.disconnected(my_web_socket.clone()).await;
+
+            if let Err(err) = serve_socket_result {
+                println!(
+                    "Execution of websocket {} is finished with panic. {}",
+                    id, err
+                );
+            }
+        });
+    }
 
     HttpOutput::Raw(response).into_ok_result(false)
-     */
 }
 
 /// Handle a websocket connection.
 async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
     my_web_socket: Arc<MyWebSocket>,
-    mut read_stream: SplitStream<WebSocketStream<Upgraded>>,
+    mut read_stream: SplitStream<WebSocketStream<TokioIo<Upgraded>>>,
     callback: Arc<TMyWebSocketCallback>,
-) -> Result<(), Error> {
-    todo!("Restore")
-    /*
+) -> Result<(), tungstenite::Error> {
     while let Some(message) = read_stream.next().await {
         let result = match message? {
             Message::Text(msg) => {
@@ -118,7 +121,6 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     }
 
     Ok(())
-     */
 }
 
 async fn send_message<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(

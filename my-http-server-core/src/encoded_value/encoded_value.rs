@@ -20,6 +20,9 @@ pub enum EncodedParamValue<'s> {
 }
 
 impl<'s> EncodedParamValue<'s> {
+    pub fn from_url_encoded_data(value: UrlEncodedValue<'s>, src: &'static str) -> Self {
+        Self::UrlEncodedValue { value, src }
+    }
     pub fn get_name(&self) -> &str {
         match self {
             Self::UrlEncodedValue { value, .. } => value.get_name(),
@@ -34,7 +37,7 @@ impl<'s> EncodedParamValue<'s> {
             }
 
             Self::JsonEncodedData {
-                name,
+                name: _,
                 value,
                 src: _,
             } => value.as_string(),
@@ -48,7 +51,7 @@ impl<'s> EncodedParamValue<'s> {
                 return crate::url_encoded_data::convert_error(value.get_name(), result, src);
             }
             Self::JsonEncodedData {
-                name,
+                name: _,
                 value,
                 src: _,
             } => value.parse(),
@@ -59,7 +62,7 @@ impl<'s> EncodedParamValue<'s> {
         match self {
             Self::UrlEncodedValue { value, src: _ } => Ok(value.value),
             Self::JsonEncodedData {
-                name,
+                name: _,
                 value,
                 src: _,
             } => value.as_raw_str(),
@@ -92,7 +95,7 @@ impl<'s> EncodedParamValue<'s> {
                 Ok(StrOrString::create_as_string(value.as_string()?))
             }
             Self::JsonEncodedData {
-                name,
+                name: _,
                 value,
                 src: _,
             } => Ok(StrOrString::create_as_str(value.as_raw_str()?)),

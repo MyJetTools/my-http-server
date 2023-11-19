@@ -146,7 +146,7 @@ impl DataTypeProvider for RawData {
     }
 }
 
-impl<'s, T: DeserializeOwned + DataTypeProvider> DataTypeProvider for RawDataTyped<'s, T> {
+impl<T: DeserializeOwned + DataTypeProvider> DataTypeProvider for RawDataTyped<T> {
     fn get_data_type() -> HttpDataType {
         T::get_data_type()
     }

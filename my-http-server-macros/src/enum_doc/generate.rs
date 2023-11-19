@@ -116,7 +116,7 @@ pub fn generate(ast: &syn::DeriveInput, as_integer: bool) -> Result<TokenStream,
             }
         }
 
-        impl<'s> TryInto<#struct_name> for my_http_server::InputParamValue<'s>{
+        impl<'s> TryInto<#struct_name> for my_http_server::EncodedParamValue<'s>{
             type Error = my_http_server::HttpFailResult;
 
             fn try_into(self) -> Result<#struct_name, Self::Error> {

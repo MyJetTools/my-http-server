@@ -5,6 +5,8 @@ use types_reader::PropertyType;
 
 use crate::input_models::InputField;
 
+use super::utils::ReadParamSrc;
+
 pub fn generate_reading_query_fields(
     input_fields: &[InputField],
 ) -> Result<proc_macro2::TokenStream, syn::Error> {
@@ -54,7 +56,7 @@ fn reading_query_string(
 
             let result = quote::quote! {
                 let #let_input_param = if let Some(value) = #data_src.get_optional(#input_field_name) {
-                    let value = my_http_server::InputParamValue::from(value);
+
                     Some(value.try_into()?)
                 } else {
                     #default_value
@@ -63,28 +65,24 @@ fn reading_query_string(
 
             return Ok(result);
         }
-        PropertyType::VecOf(sub_type) => {
+        PropertyType::VecOf(_) => {
             let struct_field_name = input_field.property.get_field_name_ident();
 
-            if sub_type.is_string() {
-                let input_field_name = input_field.get_input_field_name()?;
+            let input_field_name = input_field.get_input_field_name()?;
 
-                let item = quote::quote! {
-                  let #struct_field_name = #data_src.get_vec_of_string(#input_field_name)?;
-                }
-                .into();
+            let read_param_as_array = super::utils::read_param_as_array(
+                data_src,
+                input_field_name,
+                ReadParamSrc::QueryString,
+            );
 
-                return Ok(item);
-            } else {
-                let input_field_name = input_field.get_input_field_name()?;
+            let item = quote::quote! {
+              let #struct_field_name = #read_param_as_array
 
-                let item = quote::quote! {
-                   let #struct_field_name = #data_src.get_vec(#input_field_name)?;
-                }
-                .into();
-
-                return Ok(item);
             }
+            .into();
+
+            return Ok(item);
         }
         PropertyType::Struct(..) => {
             if let Some(default_value) = input_field.get_default_value()? {
@@ -105,7 +103,6 @@ fn reading_query_string(
                 let result = quote::quote! {
                    let #let_input_param = match #data_src.get_optional(#input_field_name){
                     Some(value) =>{
-                        let value = my_http_server::InputParamValue::from(value);
                         value.try_into()?
                     },
                     None => {
@@ -131,7 +128,6 @@ fn reading_query_string(
                 let result = quote::quote! {
                    let #let_input_param = match #data_src.get_optional(#input_field_name){
                     Some(value) =>{
-                        let value = my_http_server::InputParamValue::from(value);
                         value.try_into()?
                     },
                     None => {
@@ -178,7 +174,7 @@ fn generate_reading_required(
 
                 let result = quote::quote! {
                     let #let_input_param = if let Some(value) = #data_src.get_optional(#input_field_name){
-                        my_http_server::InputParamValue::from(value).try_into()?
+                        value.try_into()?
                     }else{
                         #else_data
                     };
@@ -190,7 +186,7 @@ fn generate_reading_required(
     } else {
         let ty = input_field.property.ty.get_token_stream();
         return Ok(
-            quote::quote!(let #struct_field_name: #ty = my_http_server::InputParamValue::from(#data_src.get_required(#input_field_name)?).try_into()?;),
+            quote::quote!(let #struct_field_name: #ty = #data_src.get_required(#input_field_name)?.try_into()?;),
         );
     }
 }

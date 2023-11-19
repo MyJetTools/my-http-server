@@ -26,6 +26,10 @@ impl HttpInputSource {
             Self::BodyRaw => quote:: quote!(#http_parameter_input_src::BodyRaw),
         }
     }
+
+    pub fn is_form_data(&self) -> bool {
+        matches!(self, Self::FormData)
+    }
 }
 
 pub enum DefaultValue<'s> {
@@ -97,12 +101,6 @@ impl<'s> InputField<'s> {
 
     pub fn has_default_value(&self) -> bool {
         self.attr_params.try_get_named_param("default").is_some()
-    }
-
-    pub fn has_cache_headers_mark(&self) -> bool {
-        self.attr_params
-            .try_get_named_param("cache_headers")
-            .is_some()
     }
 
     fn is_str(&self) -> bool {

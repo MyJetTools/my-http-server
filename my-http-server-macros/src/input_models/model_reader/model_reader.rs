@@ -42,7 +42,7 @@ pub fn generate(name: &Ident, properties: &HttpInputProperties) -> Result<TokenS
         let struct_field_name = body_raw_field
             .property
             .get_struct_field_name_as_token_stream();
-        let read_value = read_from_body_raw(&body_raw_field, properties.has_cache_headers_mark())?;
+        let read_value = read_from_body_raw(&body_raw_field)?;
         fields_to_return.push(quote!(#struct_field_name: #read_value));
     };
 
@@ -100,16 +100,13 @@ pub fn generate(name: &Ident, properties: &HttpInputProperties) -> Result<TokenS
     Ok(result)
 }
 
-fn read_from_body_raw(
-    input_field: &InputField,
-    cache_headers: bool,
-) -> Result<TokenStream, syn::Error> {
+fn read_from_body_raw(input_field: &InputField) -> Result<TokenStream, syn::Error> {
     if input_field.property.ty.is_option() {
         let field_name = input_field.get_input_field_name()?;
 
         let result = quote!({
 
-            let body = ctx.request.receive_body(#cache_headers).await?;
+            let body = ctx.request.receive_body().await?;
             let body_reader = body.get_body_data_reader()?;
 
             if let Some(value) = body_reader.get_optional(#field_name){
@@ -120,6 +117,6 @@ fn read_from_body_raw(
         });
         return Ok(result);
     }
-    let result = quote!(ctx.request.receive_body(#cache_headers).await?.try_into()?);
+    let result = quote!(ctx.request.receive_body().await?.try_into()?);
     return Ok(result);
 }

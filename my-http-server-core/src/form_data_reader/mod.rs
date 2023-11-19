@@ -5,4 +5,4 @@ mod form_data_reader;
 pub use content_disposition_parser::*;
 pub use form_data_item::*;
 pub use form_data_reader::*;
-pub mod form_data_mappers;
+pub mod mappers;

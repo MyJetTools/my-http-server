@@ -12,36 +12,28 @@ pub struct HttpRequest {
     pub addr: SocketAddr,
     pub content_type_header: Option<String>,
     key_values: Option<HashMap<String, Vec<u8>>>,
-    uri: Uri,
-    pub headers: HttpRequestHeaders,
     pub method: Method,
     pub http_path: HttpPath,
 }
 
 impl HttpRequest {
     pub fn new(req: hyper::Request<hyper::body::Incoming>, addr: SocketAddr) -> Self {
-        let (parts, body) = req.into_parts();
+        let method = req.method().clone();
 
-        let headers = parts.headers;
-        let method = parts.method;
-        let uri = parts.uri;
-
-        let http_path = HttpPath::from_str(uri.path());
+        let http_path = HttpPath::from_str(req.uri().path());
 
         Self {
-            data: RequestData::Incoming(body.into()),
+            data: RequestData::Incoming(Some(req)),
             addr,
             key_values: None,
             content_type_header: None,
-            uri,
-            headers: HttpRequestHeaders::new(headers),
             method,
             http_path,
         }
     }
 
     pub fn get_query_string(&self) -> Result<UrlEncodedData, HttpFailResult> {
-        if let Some(query) = self.uri.query() {
+        if let Some(query) = self.data.uri().query() {
             let result = UrlEncodedData::from_query_string(query)?;
             Ok(result)
         } else {
@@ -68,13 +60,22 @@ impl HttpRequest {
         Ok(result.unwrap())
     }
 
+    pub async fn receive_body(&mut self) -> Result<HttpRequestBody, HttpFailResult> {
+        self.data.receive_body().await
+    }
+
+    pub fn take_incoming_body(&mut self) -> hyper::Request<hyper::body::Incoming> {
+        self.data.take_incoming_body()
+    }
+
     pub fn get_path(&self) -> &str {
-        self.uri.path()
+        self.data.uri().path()
     }
 
     pub fn get_ip(&self) -> RequestIp {
         if let Some(x_forwarded_for) = self
-            .headers
+            .data
+            .headers()
             .try_get_case_sensitive_as_str(X_FORWARDED_FOR_HEADER)
         {
             let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
@@ -85,21 +86,30 @@ impl HttpRequest {
     }
 
     pub fn get_host<'s>(&'s self) -> &str {
-        if let Some(value) = self.headers.try_get_case_sensitive_as_str("host") {
+        if let Some(value) = self.data.headers().try_get_case_sensitive_as_str("host") {
             return value;
         }
         panic!("Host is not set");
     }
 
+    pub fn get_headers(&self) -> &impl HttpRequestHeaders {
+        self.data.headers()
+    }
+
+    pub fn get_uri(&self) -> &Uri {
+        self.data.uri()
+    }
+
     pub fn get_scheme(&self) -> &str {
         if let Some(x_forwarded_proto) = self
-            .headers
+            .data
+            .headers()
             .try_get_case_sensitive_as_str(X_FORWARDED_PROTO)
         {
             return x_forwarded_proto;
         }
 
-        let scheme = self.uri.scheme();
+        let scheme = self.data.uri().scheme();
 
         match scheme {
             Some(scheme) => {

@@ -157,20 +157,18 @@ where
     }
 }
 
-impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<'s, T>> for EncodedParamValue<'s> {
+impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<T>> for EncodedParamValue<'s> {
     type Error = HttpFailResult;
-    fn try_into(self) -> Result<RawDataTyped<'s, T>, Self::Error> {
+    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
         match self {
-            Self::UrlEncodedValue { value, src } => Ok(RawDataTyped::from_slice(
-                value.get_name().to_string().into(),
-                value.value.as_bytes(),
+            Self::UrlEncodedValue { value, src } => {
+                Ok(RawDataTyped::from_slice(value.value.as_bytes(), src))
+            }
+            Self::JsonEncodedData {
+                name: _,
+                value,
                 src,
-            )),
-            Self::JsonEncodedData { name, value, src } => Ok(RawDataTyped::from_slice(
-                name.into(),
-                value.as_bytes()?,
-                src,
-            )),
+            } => Ok(RawDataTyped::from_slice(value.as_bytes()?, src)),
         }
     }
 }

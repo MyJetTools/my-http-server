@@ -1,8 +1,6 @@
 use crate::{url_encoded_data::UrlEncodedData, EncodedParamValue, HttpFailResult, JsonEncodedData};
 
-pub const BODY_JSON_SRC: &str = "body json";
-pub const BODY_URL_SRC: &str = "body url/encoded";
-
+use crate::data_src::*;
 pub enum BodyDataReaderInner<'s> {
     UrlEncoded(UrlEncodedData<'s>),
     JsonEncoded(JsonEncodedData<'s>),
@@ -29,19 +27,13 @@ impl<'s> BodyDataReader<'s> {
         name: &'static str,
     ) -> Result<EncodedParamValue<'s>, HttpFailResult> {
         match &self.inner {
-            BodyDataReaderInner::UrlEncoded(src) => {
-                let value = src.get_required(name)?;
-                Ok(EncodedParamValue::UrlEncodedValue {
-                    value,
-                    src: BODY_URL_SRC,
-                })
-            }
+            BodyDataReaderInner::UrlEncoded(src) => src.get_required(name),
             BodyDataReaderInner::JsonEncoded(src) => {
                 let value = src.get_required(name)?;
                 Ok(EncodedParamValue::JsonEncodedData {
                     name: name,
                     value,
-                    src: BODY_JSON_SRC,
+                    src: SRC_BODY_JSON,
                 })
             }
         }
@@ -49,19 +41,13 @@ impl<'s> BodyDataReader<'s> {
 
     pub fn get_optional(&'s self, name: &'static str) -> Option<EncodedParamValue<'s>> {
         match &self.inner {
-            BodyDataReaderInner::UrlEncoded(result) => {
-                let value = result.get_optional(name)?;
-                Some(EncodedParamValue::UrlEncodedValue {
-                    value,
-                    src: BODY_URL_SRC,
-                })
-            }
+            BodyDataReaderInner::UrlEncoded(result) => result.get_optional(name),
             BodyDataReaderInner::JsonEncoded(result) => {
                 let value = result.get_optional(name)?;
                 Some(EncodedParamValue::JsonEncodedData {
                     name: name.into(),
                     value,
-                    src: BODY_JSON_SRC,
+                    src: SRC_BODY_JSON,
                 })
             }
         }

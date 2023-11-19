@@ -1,5 +1,5 @@
 [package]
-name = "my-http-server-swagger"
+name = "my-http-server-macros"
 version = "0.6.1"
 edition = "2021"
 

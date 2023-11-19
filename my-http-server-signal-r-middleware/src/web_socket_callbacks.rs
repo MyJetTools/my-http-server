@@ -44,7 +44,10 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
 
             match self
                 .signal_r_list
-                .assign_web_socket(connection_token.value, my_web_socket.clone())
+                .assign_web_socket(
+                    connection_token.get_raw_str().unwrap(),
+                    my_web_socket.clone(),
+                )
                 .await
             {
                 Some(signal_r_connection) => {
@@ -59,7 +62,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                     my_web_socket
                         .send_message(Message::Text(format!(
                             "SignalR with connection_token {} is not found",
-                            connection_token.value,
+                            connection_token.get_raw_str().unwrap(),
                         )))
                         .await;
 

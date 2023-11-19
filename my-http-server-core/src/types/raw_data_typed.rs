@@ -1,30 +1,26 @@
 use std::marker::PhantomData;
 
-use rust_extensions::StrOrString;
 use serde::de::DeserializeOwned;
 
 use crate::{HttpFailResult, HttpRequestBody};
 
-pub struct RawDataTyped<'s, T: DeserializeOwned> {
-    name: StrOrString<'s>,
+pub struct RawDataTyped<T: DeserializeOwned> {
     data: Vec<u8>,
     ty: PhantomData<T>,
     src: &'static str,
 }
 
-impl<'s, T: DeserializeOwned> RawDataTyped<'s, T> {
-    pub fn new(name: StrOrString<'s>, data: Vec<u8>, src: &'static str) -> Self {
+impl<T: DeserializeOwned> RawDataTyped<T> {
+    pub fn new(data: Vec<u8>, src: &'static str) -> Self {
         Self {
-            name,
             data,
             ty: PhantomData,
             src,
         }
     }
 
-    pub fn from_slice(name: StrOrString<'s>, data: &[u8], src: &'static str) -> Self {
+    pub fn from_slice(data: &[u8], src: &'static str) -> Self {
         Self {
-            name,
             data: data.to_vec(),
             ty: PhantomData,
             src,
@@ -40,16 +36,16 @@ impl<'s, T: DeserializeOwned> RawDataTyped<'s, T> {
     }
 }
 
-impl<'s, T: DeserializeOwned> AsRef<[u8]> for RawDataTyped<'s, T> {
+impl<T: DeserializeOwned> AsRef<[u8]> for RawDataTyped<T> {
     fn as_ref(&self) -> &[u8] {
         self.data.as_ref()
     }
 }
 
-impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<'s, T>> for HttpRequestBody {
+impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for HttpRequestBody {
     type Error = HttpFailResult;
 
-    fn try_into(self) -> Result<RawDataTyped<'s, T>, Self::Error> {
-        Ok(RawDataTyped::new("RawBody".into(), self.get_body(), "Body"))
+    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
+        Ok(RawDataTyped::new(self.get_body(), "Body"))
     }
 }

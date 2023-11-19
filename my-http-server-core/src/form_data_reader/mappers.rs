@@ -1,14 +1,16 @@
+use std::collections::HashMap;
+
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::de::DeserializeOwned;
 
 use crate::{
+    data_src::*,
+    form_data_reader::FormDataItem,
     types::{FileContent, RawData, RawDataTyped},
-    FormDataItem, HttpFailResult,
+    HttpFailResult,
 };
 
-const SRC_FORM_DATA: &str = "FormData";
-
-impl TryInto<String> for FormDataItem<'_> {
+impl<'s> TryInto<String> for &'s FormDataItem<'s> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<String, Self::Error> {
         match self {
@@ -25,7 +27,7 @@ impl TryInto<String> for FormDataItem<'_> {
     }
 }
 
-impl<'s> TryInto<&'s str> for FormDataItem<'s> {
+impl<'s> TryInto<&'s str> for &'s FormDataItem<'s> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<&'s str, Self::Error> {
         match self {
@@ -43,7 +45,7 @@ impl<'s> TryInto<&'s str> for FormDataItem<'s> {
     }
 }
 
-impl TryInto<DateTimeAsMicroseconds> for FormDataItem<'_> {
+impl<'s> TryInto<DateTimeAsMicroseconds> for &'s FormDataItem<'s> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<DateTimeAsMicroseconds, Self::Error> {
         match self {
@@ -62,31 +64,79 @@ impl TryInto<DateTimeAsMicroseconds> for FormDataItem<'_> {
     }
 }
 
-impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<'s, T>> for FormDataItem<'s> {
+impl<'s, TValue> TryInto<HashMap<String, TValue>> for &'s FormDataItem<'s>
+where
+    TValue: DeserializeOwned,
+{
     type Error = HttpFailResult;
 
-    fn try_into(self) -> Result<RawDataTyped<'s, T>, Self::Error> {
+    fn try_into(self) -> Result<HashMap<String, TValue>, Self::Error> {
         match self {
-            FormDataItem::ValueAsString { value, name } => Ok(RawDataTyped::new(
-                name.into(),
-                value.as_bytes().to_vec(),
+            FormDataItem::ValueAsString { value, name } => Ok(crate::convert_from_str::to_json(
+                name,
+                value.as_bytes(),
                 SRC_FORM_DATA,
-            )),
+            )?),
             FormDataItem::File {
                 name,
                 file_name: _,
                 content_type: _,
                 content,
-            } => Ok(RawDataTyped::new(
-                name.into(),
-                content.to_vec(),
+            } => Ok(crate::convert_from_str::to_json(
+                name,
+                content,
                 SRC_FORM_DATA,
-            )),
+            )?),
         }
     }
 }
 
-impl TryInto<RawData> for FormDataItem<'_> {
+impl<'s, TValue> TryInto<Vec<TValue>> for &'s FormDataItem<'s>
+where
+    TValue: DeserializeOwned,
+{
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<Vec<TValue>, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => Ok(crate::convert_from_str::to_json(
+                name,
+                value.as_bytes(),
+                SRC_FORM_DATA,
+            )?),
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content,
+            } => Ok(crate::convert_from_str::to_json(
+                name,
+                content,
+                SRC_FORM_DATA,
+            )?),
+        }
+    }
+}
+
+impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<T>> for FormDataItem<'s> {
+    type Error = HttpFailResult;
+
+    fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name: _ } => {
+                Ok(RawDataTyped::new(value.as_bytes().to_vec(), SRC_FORM_DATA))
+            }
+            FormDataItem::File {
+                name: _,
+                file_name: _,
+                content_type: _,
+                content,
+            } => Ok(RawDataTyped::new(content.to_vec(), SRC_FORM_DATA)),
+        }
+    }
+}
+
+impl<'s> TryInto<RawData> for &'s FormDataItem<'s> {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<RawData, Self::Error> {
@@ -104,7 +154,7 @@ impl TryInto<RawData> for FormDataItem<'_> {
     }
 }
 
-impl TryInto<FileContent> for FormDataItem<'_> {
+impl<'s> TryInto<FileContent> for &'s FormDataItem<'s> {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<FileContent, Self::Error> {
