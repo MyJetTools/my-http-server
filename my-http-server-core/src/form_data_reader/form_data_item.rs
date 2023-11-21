@@ -6,7 +6,7 @@ use crate::form_data_reader::ContentDispositionParser;
 pub enum FormDataItem<'s> {
     ValueAsString {
         name: &'s str,
-        value: &'s str,
+        value: Option<&'s str>,
     },
     File {
         name: &'s str,
@@ -19,7 +19,7 @@ pub enum FormDataItem<'s> {
 impl<'s> FormDataItem<'s> {
     pub fn unwrap_as_string(&'s self) -> &'s str {
         match self {
-            FormDataItem::ValueAsString { value, .. } => value,
+            FormDataItem::ValueAsString { value, .. } => value.unwrap(),
             FormDataItem::File { .. } => {
                 panic!("Can not unwrap FormDataItem as string. It is file")
             }
@@ -114,7 +114,15 @@ impl<'s> FormDataItem<'s> {
             }
         } else {
             Self::ValueAsString {
-                value: std::str::from_utf8(content.unwrap()).unwrap(),
+                value: {
+                    let content = content.unwrap();
+
+                    if content.len() == 0 {
+                        None
+                    } else {
+                        std::str::from_utf8(content).unwrap().into()
+                    }
+                },
                 name: name.unwrap(),
             }
         }
@@ -137,7 +145,7 @@ mod tests {
         match item {
             crate::form_data_reader::FormDataItem::ValueAsString { value, name } => {
                 assert_eq!(name, "dtFrom");
-                assert_eq!(value, "2");
+                assert_eq!(value, Some("2"));
             }
             crate::form_data_reader::FormDataItem::File { .. } => {
                 panic!("Should be value as string");

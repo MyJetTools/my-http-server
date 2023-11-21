@@ -40,10 +40,36 @@ pub fn to_bool(param_name: &str, value: &str, src: &str) -> Result<bool, HttpFai
 
 pub fn to_json<TResult: DeserializeOwned>(
     param_name: &str,
-    value: &[u8],
+    value: &Option<&[u8]>,
     src: &str,
 ) -> Result<TResult, HttpFailResult> {
-    match serde_json::from_slice(value) {
+    if value.is_none() {
+        return Err(HttpFailResult::required_parameter_is_missing(
+            param_name, src,
+        ));
+    }
+
+    match serde_json::from_slice(value.unwrap()) {
+        Ok(result) => Ok(result),
+        Err(_) => Err(HttpFailResult::invalid_value_to_parse(format!(
+            "Can not parse {} as json from {}",
+            param_name, src
+        ))),
+    }
+}
+
+pub fn to_json_from_str<TResult: DeserializeOwned>(
+    param_name: &str,
+    value: &Option<&str>,
+    src: &str,
+) -> Result<TResult, HttpFailResult> {
+    if value.is_none() {
+        return Err(HttpFailResult::required_parameter_is_missing(
+            param_name, src,
+        ));
+    }
+
+    match serde_json::from_slice(value.unwrap().as_bytes()) {
         Ok(result) => Ok(result),
         Err(_) => Err(HttpFailResult::invalid_value_to_parse(format!(
             "Can not parse {} as json from {}",

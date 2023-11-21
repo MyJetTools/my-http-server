@@ -45,7 +45,7 @@ where
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<HashMap<String, TValue>, Self::Error> {
-        crate::convert_from_str::to_json(self.name, self.value, SRC_HEADER)
+        crate::convert_from_str::to_json(self.name, &Some(self.value), SRC_HEADER)
     }
 }
 

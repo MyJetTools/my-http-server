@@ -16,11 +16,24 @@ impl RequestData {
     pub async fn convert_to_body_if_requires(
         &mut self,
     ) -> Result<Option<&HttpRequestBody>, HttpFailResult> {
-        let (uri, headers, bytes) = match self {
+        let (uri, headers, bytes, content_type) = match self {
             Self::Incoming(incoming) => {
                 let incoming = incoming.take().unwrap();
                 let (parts, incoming) = incoming.into_parts();
-                (parts.uri, parts.headers, read_bytes(incoming).await?)
+
+                let headers = parts.headers;
+
+                let content_type = if let Some(content_type) = headers.get("content-type") {
+                    Some(content_type.to_str().unwrap().to_string())
+                } else {
+                    None
+                };
+                (
+                    parts.uri,
+                    headers,
+                    read_bytes(incoming).await?,
+                    content_type,
+                )
             }
             Self::AsBody { body, .. } => match body.as_ref() {
                 Some(itm) => {
@@ -35,7 +48,7 @@ impl RequestData {
             }
         };
 
-        let body = HttpRequestBody::new(bytes, None);
+        let body = HttpRequestBody::new(bytes, content_type);
         *self = Self::AsBody {
             body: Some(body),
             uri,

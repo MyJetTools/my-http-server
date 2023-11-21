@@ -32,7 +32,7 @@ impl<T: DeserializeOwned> RawDataTyped<T> {
     }
 
     pub fn deserialize_json(&self) -> Result<T, HttpFailResult> {
-        crate::convert_from_str::to_json("RawDataType", &self.data, self.src)
+        crate::convert_from_str::to_json("RawDataType", &Some(&self.data), self.src)
     }
 }
 

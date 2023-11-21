@@ -151,7 +151,7 @@ where
                 )))
             }
             Self::JsonEncodedData { name, value, src } => {
-                crate::convert_from_str::to_json(name, value.as_bytes()?, src)
+                crate::convert_from_str::to_json(name, &Some(value.as_bytes()?), src)
             }
         }
     }

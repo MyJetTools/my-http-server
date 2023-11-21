@@ -126,7 +126,7 @@ fn generate_from_form_data(struct_name: &syn::Ident) -> proc_macro2::TokenStream
             use my_http_server::data_src::*;
             match self {
                 my_http_server::FormDataItem::ValueAsString { value, name } => Ok(
-                    my_http_server::convert_from_str::to_json(name, value.as_bytes(), SRC_FORM_DATA)?,
+                    my_http_server::convert_from_str::to_json_from_str(name, value, SRC_FORM_DATA)?,
                 ),
                 my_http_server::FormDataItem::File {
                     name,
@@ -135,7 +135,7 @@ fn generate_from_form_data(struct_name: &syn::Ident) -> proc_macro2::TokenStream
                     content,
                 } => Ok(my_http_server::convert_from_str::to_json(
                     name,
-                    content,
+                    &Some(content),
                     SRC_FORM_DATA,
                 )?),
             }

@@ -73,11 +73,11 @@ impl<'s> EncodedParamValue<'s> {
         match self {
             Self::UrlEncodedValue { value, src } => crate::convert_from_str::to_json(
                 value.get_name(),
-                value.as_string()?.as_bytes(),
+                &Some(value.as_string()?.as_bytes()),
                 src,
             ),
             Self::JsonEncodedData { name, value, src } => {
-                crate::convert_from_str::to_json(name, value.as_bytes()?, src)
+                crate::convert_from_str::to_json(name, &Some(value.as_bytes()?), src)
             }
         }
     }

@@ -131,7 +131,7 @@ impl<T: DeserializeOwned> TryInto<Vec<T>> for HttpRequestBody {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<Vec<T>, Self::Error> {
-        crate::convert_from_str::to_json("RawBody".into(), self.as_slice(), "HttpBody")
+        crate::convert_from_str::to_json("RawBody".into(), &Some(self.as_slice()), "HttpBody")
     }
 }
 
@@ -139,7 +139,7 @@ impl<T: DeserializeOwned> TryInto<HashMap<String, T>> for HttpRequestBody {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<HashMap<String, T>, Self::Error> {
-        crate::convert_from_str::to_json("RawBody", self.as_slice(), "Body")
+        crate::convert_from_str::to_json("RawBody", &Some(self.as_slice()), "Body")
     }
 }
 
