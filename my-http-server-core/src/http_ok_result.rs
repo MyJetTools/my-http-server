@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::{HttpFailResult, WebContentType};
-use hyper::{Body, Response};
+use crate::{http_headers_to_use::CONTENT_TYPE_HEADER, HttpFailResult, WebContentType};
+use hyper::{body::Bytes, Response};
 use serde::Serialize;
 
 pub enum HttpOutput {
@@ -23,7 +23,7 @@ pub enum HttpOutput {
         content: Vec<u8>,
     },
 
-    Raw(Response<Body>),
+    Raw(hyper::Response<http_body_util::Full<hyper::body::Bytes>>),
 }
 
 impl HttpOutput {
@@ -206,8 +206,8 @@ impl Into<Result<HttpOkResult, HttpFailResult>> for HttpOkResult {
     }
 }
 
-impl Into<Response<Body>> for HttpOkResult {
-    fn into(self) -> Response<Body> {
+impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkResult {
+    fn into(self) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
         let status_code = self.get_status_code();
 
         return match self.output {
@@ -218,7 +218,7 @@ impl Into<Response<Body>> for HttpOkResult {
             } => match content_type {
                 Some(content_type) => {
                     let mut builder =
-                        Response::builder().header("Content-Type", content_type.as_str());
+                        Response::builder().header(CONTENT_TYPE_HEADER, content_type.as_str());
 
                     if let Some(headers) = headers {
                         for (key, value) in headers {
@@ -226,24 +226,23 @@ impl Into<Response<Body>> for HttpOkResult {
                         }
                     }
 
-                    builder
-                        .status(status_code)
-                        .body(Body::from(content))
-                        .unwrap()
+                    let full_body = http_body_util::Full::new(hyper::body::Bytes::from(content));
+
+                    builder.body(full_body).unwrap()
                 }
                 None => Response::builder()
                     .status(status_code)
-                    .body(Body::from(content))
+                    .body(create_empty_body())
                     .unwrap(),
             },
             HttpOutput::Redirect { url, permanent: _ } => Response::builder()
                 .status(status_code)
                 .header("Location", url)
-                .body(Body::empty())
+                .body(create_empty_body())
                 .unwrap(),
             HttpOutput::Empty => Response::builder()
                 .status(status_code)
-                .body(Body::empty())
+                .body(create_empty_body())
                 .unwrap(),
 
             HttpOutput::Raw(body) => body,
@@ -256,11 +255,13 @@ impl Into<Response<Body>> for HttpOkResult {
                     ),
                 );
 
-                builder
-                    .status(status_code)
-                    .body(Body::from(content))
-                    .unwrap()
+                let full_body = http_body_util::Full::new(hyper::body::Bytes::from(content));
+                builder.status(status_code).body(full_body).unwrap()
             }
         };
     }
+}
+
+fn create_empty_body() -> http_body_util::Full<Bytes> {
+    http_body_util::Full::new(hyper::body::Bytes::new())
 }

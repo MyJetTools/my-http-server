@@ -1,20 +1,20 @@
-use hyper::{
-    server::conn::AddrStream,
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
-};
+use http_body_util::Full;
+use hyper::body::Bytes;
+use hyper::server::conn::http1;
+use hyper::{service::service_fn, Response};
+use hyper_util::rt::TokioIo;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
 #[cfg(feature = "with-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
-use rust_extensions::{ApplicationStates, Logger};
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use rust_extensions::{ApplicationStates, Logger, StrOrString};
+use std::{collections::HashMap, net::SocketAddr};
 
 use std::sync::Arc;
 
 use crate::{
-    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpRequest, HttpServerData,
-    HttpServerMiddleware,
+    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpRequest,
+    HttpServerMiddleware, HttpServerMiddlewares,
 };
 
 pub struct MyHttpServer {
@@ -59,13 +59,13 @@ impl MyHttpServer {
             None,
         );
 
-        let http_server_data = HttpServerData {
+        let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
         };
 
         tokio::spawn(start(
             self.addr.clone(),
-            Arc::new(http_server_data),
+            Arc::new(http_server_middlewares),
             app_states,
             logger,
         ));
@@ -74,55 +74,78 @@ impl MyHttpServer {
 
 pub async fn start(
     addr: SocketAddr,
-    http_server_data: Arc<HttpServerData>,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
     app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) {
-    let http_server_data_spawned = http_server_data.clone();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
-    let make_service = make_service_fn(move |conn: &AddrStream| {
-        let http_server_data = http_server_data_spawned.clone();
-
-        let logger_to_move = logger.clone();
-        let addr = conn.remote_addr();
-
-        async move {
-            Ok::<_, hyper::Error>(service_fn(move |req| {
-                handle_requests(req, http_server_data.clone(), addr, logger_to_move.clone())
-            }))
+    loop {
+        if app_states.is_shutting_down() {
+            break;
         }
-    });
 
-    let server = Server::bind(&addr).serve(make_service);
+        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let io = TokioIo::new(stream);
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
+        let app_states = app_states.clone();
 
-    let server = server.with_graceful_shutdown(shutdown_signal(app_states));
+        tokio::task::spawn(async move {
+            let http_server_middlewares = http_server_middlewares.clone();
+            let logger = logger.clone();
+            let socket_addr = socket_addr.clone();
+            let app_states = app_states.clone();
 
-    if let Err(e) = server.await {
-        eprintln!("Http Server error: {}", e);
+            if let Err(err) = http1::Builder::new()
+                .serve_connection(
+                    io,
+                    service_fn(move |req| {
+                        if app_states.is_shutting_down() {
+                            panic!("Application is shutting down");
+                        }
+
+                        let resp = handle_requests(
+                            req,
+                            http_server_middlewares.clone(),
+                            socket_addr.clone(),
+                            logger.clone(),
+                        );
+                        resp
+                    }),
+                )
+                .await
+            {
+                println!("Error serving connection: {:?}", err);
+            }
+        });
     }
 }
 
 pub async fn handle_requests(
-    req: Request<Body>,
-    http_server_data: Arc<HttpServerData>,
+    req: hyper::Request<hyper::body::Incoming>,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
     addr: SocketAddr,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
-) -> hyper::Result<Response<Body>> {
+) -> hyper::Result<Response<Full<Bytes>>> {
     let req = HttpRequest::new(req, addr);
+
+    let method = req.method.clone();
+
     let mut request_ctx = HttpContext::new(req);
 
     #[cfg(feature = "with-telemetry")]
     let ctx = request_ctx.telemetry_context.clone();
 
-    let path = request_ctx.request.get_path().to_string();
-    let method = request_ctx.request.get_method().to_string();
-    let ip = request_ctx.request.get_ip().to_string();
+    let path = StrOrString::create_as_short_string_or_string(request_ctx.request.get_path());
+    let ip =
+        StrOrString::create_as_short_string_or_string(request_ctx.request.get_ip().get_real_ip());
 
     #[cfg(feature = "with-telemetry")]
     let started = DateTimeAsMicroseconds::now();
 
     let result = tokio::spawn(async move {
-        let mut flows = HttpServerRequestFlow::new(http_server_data.middlewares.clone());
+        let mut flows = HttpServerRequestFlow::new(http_server_middlewares.middlewares.clone());
         let result = flows.next(&mut request_ctx).await;
         (result, request_ctx)
     });
@@ -135,18 +158,18 @@ pub async fn handle_requests(
                 .write_fail(
                     &ctx,
                     started,
-                    format!("[{}]{}", method, path),
+                    format!("[{}]{}", method, path.as_str().to_string()),
                     format!("Panic: {:?}", err),
                     TelemetryEventTagsBuilder::new()
-                        .add_ip(ip.to_string())
+                        .add_ip(ip.as_str().to_string())
                         .build(),
                 )
                 .await;
 
             let mut ctx = HashMap::new();
-            ctx.insert("path".to_string(), path.to_string());
+            ctx.insert("path".to_string(), path.as_str().to_string());
             ctx.insert("method".to_string(), method.to_string());
-            ctx.insert("ip".to_string(), ip);
+            ctx.insert("ip".to_string(), ip.as_str().to_string());
 
             logger.write_error(
                 "HttpRequest".to_string(),
@@ -154,7 +177,7 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            panic!("Http Server error: [{}]{}", method, path);
+            panic!("Http Server error: [{}]{}", method, path.to_string());
         }
     };
 
@@ -175,7 +198,7 @@ pub async fn handle_requests(
                         .write_success(
                             &ctx,
                             started,
-                            format!("[{}]{}", method, path),
+                            format!("[{}]{}", method, path.as_str().to_string()),
                             format!("Status code: {}", ok_result.output.get_status_code()),
                             tags.into(),
                         )
@@ -192,9 +215,9 @@ pub async fn handle_requests(
             if err_result.write_telemetry {
                 if err_result.write_to_log {
                     let mut ctx = HashMap::new();
-                    ctx.insert("path".to_string(), path.to_string());
-                    ctx.insert("method".to_string(), method.to_string());
-                    ctx.insert("ip".to_string(), ip.to_string());
+                    ctx.insert("path".to_string(), path.as_str().to_string());
+                    ctx.insert("method".to_string(), request_ctx.request.method.to_string());
+                    ctx.insert("ip".to_string(), ip.as_str().to_string());
                     ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
 
                     if let Some(credentials) = &request_ctx.credentials {
@@ -223,22 +246,16 @@ pub async fn handle_requests(
                         .write_fail(
                             &ctx,
                             started,
-                            format!("[{}]{}", method, path),
+                            format!("[{}]{}", method, path.as_str()),
                             format!("Status code: {}", err_result.status_code),
                             tags.into(),
                         )
                         .await;
                 }
             }
+
             Ok(err_result.into())
         }
-    }
-}
-
-async fn shutdown_signal(app: Arc<dyn ApplicationStates + Send + Sync + 'static>) {
-    let duration = Duration::from_secs(1);
-    while !app.is_shutting_down() {
-        tokio::time::sleep(duration).await;
     }
 }
 

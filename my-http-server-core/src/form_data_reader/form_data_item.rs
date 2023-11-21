@@ -1,12 +1,12 @@
 use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
 
-use crate::ContentDispositionParser;
+use crate::form_data_reader::ContentDispositionParser;
 
 #[derive(Debug)]
 pub enum FormDataItem<'s> {
     ValueAsString {
-        value: &'s str,
         name: &'s str,
+        value: &'s str,
     },
     File {
         name: &'s str,
@@ -135,11 +135,11 @@ mod tests {
         let item = super::FormDataItem::parse(&msg);
 
         match item {
-            crate::FormDataItem::ValueAsString { value, name } => {
+            crate::form_data_reader::FormDataItem::ValueAsString { value, name } => {
                 assert_eq!(name, "dtFrom");
                 assert_eq!(value, "2");
             }
-            crate::FormDataItem::File { .. } => {
+            crate::form_data_reader::FormDataItem::File { .. } => {
                 panic!("Should be value as string");
             }
         }
@@ -159,10 +159,10 @@ mod tests {
         let item = super::FormDataItem::parse(&msg);
 
         match item {
-            crate::FormDataItem::ValueAsString { value: _, name: _ } => {
+            crate::form_data_reader::FormDataItem::ValueAsString { value: _, name: _ } => {
                 panic!("Should be value as string");
             }
-            crate::FormDataItem::File {
+            crate::form_data_reader::FormDataItem::File {
                 name,
                 file_name,
                 content_type,

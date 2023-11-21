@@ -125,6 +125,4 @@ mod tests {
             assert_eq!(first_item.value, Some("test-payload.txt"));
         }
     }
-
-
 }

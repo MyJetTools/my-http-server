@@ -1,6 +1,6 @@
 [package]
 name = "my-http-server-core"
-version = "0.6.1"
+version = "0.6.2-rc01"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,12 +19,16 @@ my-json = { tag = "0.2.1", git = "https://github.com/MyJetTools/my-json.git" }
 
 my-telemetry = { tag = "1.0.2", git = "https://github.com/MyJetTools/my-telemetry.git", optional = true }
 
-url-utils = { tag = "0.1.1", git = "https://github.com/MyJetTools/url-utils.git" }
+url-utils = { tag = "0.1.2", git = "https://github.com/MyJetTools/url-utils.git" }
 
 tokio = { version = "*", features = ["full"] }
 
 lazy_static = "*"
-hyper = { version = "0.14.27", features = ["full"] }
+hyper = { version = "*", features = ["full"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 async-trait = "*"
+http-body-util = "*"
+hyper-util = { git = "https://github.com/hyperium/hyper-util.git", features = [
+    "tokio",
+] }

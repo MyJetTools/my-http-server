@@ -1,4 +1,6 @@
-use my_http_server_core::{HttpFailResult, HttpPath, InputParamValue};
+use my_http_server_core::{HttpFailResult, HttpPath};
+
+use crate::PathValue;
 
 use super::HttpRouteSegment;
 
@@ -86,8 +88,8 @@ impl HttpRoute {
     pub fn get_value<'s>(
         &'s self,
         path: &'s HttpPath,
-        key: &str,
-    ) -> Result<InputParamValue<'s>, HttpFailResult> {
+        key: &'static str,
+    ) -> Result<PathValue<'s>, HttpFailResult> {
         if self.keys_amount == 0 {
             return Err(HttpFailResult::new(
                 my_http_server_core::WebContentType::Text,
@@ -104,7 +106,7 @@ impl HttpRoute {
                 HttpRouteSegment::Key(segment_key) => {
                     if segment_key == key {
                         match path.get_segment_value_as_str(index) {
-                            Some(value) => return Ok(InputParamValue::Raw { value, src: "path" }),
+                            Some(value) => return Ok(PathValue::new(key, value)),
                             None => {
                                 panic!("Should not be here");
                             }
@@ -185,14 +187,7 @@ mod tests {
         let path = HttpPath::from_str("/test/1/second");
         assert_eq!(route.is_my_path(&path), true);
 
-        assert_eq!(
-            route
-                .get_value(&path, "key")
-                .unwrap()
-                .get_raw_str()
-                .unwrap(),
-            "1"
-        );
+        assert_eq!(route.get_value(&path, "key").unwrap().as_str(), "1");
     }
 
     #[test]

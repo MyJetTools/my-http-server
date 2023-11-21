@@ -3,6 +3,7 @@ use url_utils::url_encoded_data_reader::ReadingEncodedDataError;
 use crate::HttpFailResult;
 
 pub fn convert_error<TOk>(
+    name: &str,
     result: Result<TOk, ReadingEncodedDataError>,
     data_source: &str,
 ) -> Result<TOk, HttpFailResult> {
@@ -17,14 +18,14 @@ pub fn convert_error<TOk>(
             }
             ReadingEncodedDataError::CanNotParseValue(value) => {
                 return Err(HttpFailResult::invalid_value_to_parse(format!(
-                    "Can no parse value {} from {}",
-                    value, data_source
+                    "Can no parse {} value {} from {}",
+                    name, value, data_source
                 )));
             }
             ReadingEncodedDataError::UrlDecodeError(err) => {
                 return Err(HttpFailResult::as_fatal_error(format!(
-                    "UrlDecodeError in datasource: {}. Err: {:?}",
-                    data_source, err,
+                    "Parameter {} has problem with UrlDecodeError in {}. Err: {:?}",
+                    name, data_source, err,
                 )));
             }
         },

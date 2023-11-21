@@ -3,7 +3,7 @@ use std::str::FromStr;
 use my_json::json_reader::JsonValue;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 
-use crate::{input_param_value::*, HttpFailResult};
+use crate::HttpFailResult;
 
 pub struct JsonEncodedValueAsString<'s> {
     name: &'s str,
@@ -36,7 +36,7 @@ impl<'s> JsonEncodedValueAsString<'s> {
     }
     pub fn as_bool(&self) -> Result<bool, HttpFailResult> {
         match self.json_value.as_str() {
-            Some(result) => parse_bool_value(result, "body json"),
+            Some(result) => crate::convert_from_str::to_bool(self.name, result, "body json"),
             None => Err(HttpFailResult::required_parameter_is_missing(
                 self.name,
                 "body json",
@@ -46,7 +46,7 @@ impl<'s> JsonEncodedValueAsString<'s> {
 
     pub fn as_date_time(&self) -> Result<DateTimeAsMicroseconds, HttpFailResult> {
         match self.json_value.as_str() {
-            Some(result) => parse_date_time(result, "body json"),
+            Some(result) => crate::convert_from_str::to_date_time(self.name, result, "body json"),
             None => Err(HttpFailResult::required_parameter_is_missing(
                 self.name,
                 "body json",
@@ -55,7 +55,7 @@ impl<'s> JsonEncodedValueAsString<'s> {
     }
     pub fn parse<T: FromStr>(&self) -> Result<T, HttpFailResult> {
         match self.json_value.as_str() {
-            Some(value) => parse_into_type(value, "body json"),
+            Some(value) => crate::convert_from_str::to_simple_value(self.name, value, "body json"),
             None => Err(HttpFailResult::required_parameter_is_missing(
                 self.name,
                 "body json",

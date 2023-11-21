@@ -208,8 +208,8 @@ impl HttpServerMiddleware for ControllersMiddleware {
         ctx: &mut HttpContext,
         get_next: &mut HttpServerRequestFlow,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        match ctx.request.get_method() {
-            &Method::GET => {
+        match ctx.request.method {
+            Method::GET => {
                 {
                     if let Some(result) = self
                         .get
@@ -221,7 +221,7 @@ impl HttpServerMiddleware for ControllersMiddleware {
                 }
                 return get_next.next(ctx).await;
             }
-            &Method::POST => {
+            Method::POST => {
                 if let Some(result) = self
                     .post
                     .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
@@ -232,7 +232,7 @@ impl HttpServerMiddleware for ControllersMiddleware {
                     return get_next.next(ctx).await;
                 }
             }
-            &Method::PUT => {
+            Method::PUT => {
                 if let Some(result) = self
                     .put
                     .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
@@ -243,7 +243,7 @@ impl HttpServerMiddleware for ControllersMiddleware {
                     return get_next.next(ctx).await;
                 }
             }
-            &Method::DELETE => {
+            Method::DELETE => {
                 if let Some(result) = self
                     .delete
                     .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)

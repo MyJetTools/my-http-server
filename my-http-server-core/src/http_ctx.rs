@@ -1,9 +1,7 @@
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::MyTelemetryContext;
 
-use crate::HttpRequest;
-
-use crate::RequestCredentials;
+use crate::{HttpRequest, RequestCredentials};
 
 pub struct HttpContext {
     pub request: HttpRequest,

@@ -1,6 +1,6 @@
 [package]
 name = "my-http-server"
-version = "0.6.1"
+version = "0.6.2-rc01"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -16,7 +16,7 @@ full = [
     "static-files",
 ]
 controllers = ["my-http-server-controllers"]
-macros = ["my-http-server-swagger", "my-http-server-controllers"]
+macros = ["my-http-server-macros", "my-http-server-controllers"]
 websocket = ["my-http-server-web-sockets"]
 signal-r = ["my-http-server-signal-r-middleware", "signal-r-macros"]
 with-telemetry = [
@@ -28,7 +28,7 @@ static-files = ["static-files-middleware"]
 
 
 [dependencies]
-my-http-server-swagger = { optional = true, path = "../my-http-server-swagger" }
+my-http-server-macros = { optional = true, path = "../my-http-server-macros" }
 my-http-server-web-sockets = { optional = true, path = "../my-http-server-web-sockets" }
 my-http-server-signal-r-middleware = { optional = true, path = "../my-http-server-signal-r-middleware" }
 my-http-server-controllers = { optional = true, path = "../my-http-server-controllers" }
