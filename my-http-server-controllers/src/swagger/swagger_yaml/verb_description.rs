@@ -52,6 +52,10 @@ pub fn build(
 
         yaml_writer.write("description", action_description.description);
 
+        if action_description.deprecated {
+            yaml_writer.write_bool("deprecated", true);
+        }
+
         compile_produces(yaml_writer, action_description);
 
         super::in_parameters::build(yaml_writer, &action_description);
