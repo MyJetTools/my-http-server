@@ -52,3 +52,5 @@ mod http_headers;
 pub use http_headers::*;
 
 pub mod data_src;
+
+pub extern crate hyper;
