@@ -10,6 +10,7 @@ use super::contracts::*;
     description: "Test of body as model",
     controller: "FormDataTest",
     input_data: "FromDataInputModel",
+    deprecated: true,
     result:[
         {status_code: 202, description: "Ok response"},
     ]

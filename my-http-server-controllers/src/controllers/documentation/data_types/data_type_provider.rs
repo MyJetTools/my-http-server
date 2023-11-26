@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use my_http_server_core::types::*;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
@@ -122,6 +122,19 @@ impl<T: DataTypeProvider> DataTypeProvider for Vec<T> {
 }
 
 impl<TValue: DataTypeProvider> DataTypeProvider for HashMap<String, TValue> {
+    fn get_data_type() -> HttpDataType {
+        match TValue::get_data_type() {
+            HttpDataType::SimpleType(tp) => {
+                HttpDataType::DictionaryOf(ArrayElement::SimpleType(tp))
+            }
+            HttpDataType::Object(obj) => HttpDataType::DictionaryOf(ArrayElement::Object(obj)),
+            HttpDataType::ArrayOf(item) => HttpDataType::DictionaryOfArray(item),
+            _ => panic!("Unsupported data type {:?}", TValue::get_data_type()),
+        }
+    }
+}
+
+impl<TValue: DataTypeProvider> DataTypeProvider for BTreeMap<String, TValue> {
     fn get_data_type() -> HttpDataType {
         match TValue::get_data_type() {
             HttpDataType::SimpleType(tp) => {
