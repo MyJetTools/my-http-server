@@ -57,6 +57,126 @@ impl<'s> TryInto<&'s str> for &'s FormDataItem<'s> {
     }
 }
 
+impl<'s> TryInto<bool> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<bool, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_bool(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to bool",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<u8> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u8, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to u8",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<i8> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i8, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to i8",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<u16> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u16, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to u16",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<i16> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i16, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to i16",
+                name,
+            ))),
+        }
+    }
+}
+
 impl<'s> TryInto<DateTimeAsMicroseconds> for &'s FormDataItem<'s> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<DateTimeAsMicroseconds, Self::Error> {
