@@ -8,12 +8,7 @@ use rust_extensions::StrOrString;
 pub struct PasswordField(String);
 
 fn process_value(src: &str) -> Result<StrOrString, HttpFailResult> {
-    if src.as_bytes().get(0).unwrap() <= &32u8 {
-        return Err(HttpFailResult::as_validation_error(
-            "Password must not be started".to_string(),
-        ));
-    }
-    //Email Validation
+    //Password Validation
 
     if src.len() < 8 {
         return Err(HttpFailResult::as_validation_error(
