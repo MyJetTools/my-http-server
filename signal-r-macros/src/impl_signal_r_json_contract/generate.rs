@@ -1,4 +1,4 @@
-use types_reader::ParamsList;
+use types_reader::TokensObject;
 
 pub fn generate(
     attr: proc_macro::TokenStream,
@@ -6,10 +6,12 @@ pub fn generate(
 ) -> Result<proc_macro::TokenStream, syn::Error> {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
 
-    let attrs = ParamsList::new(attr.into(), || None)?;
+    let attr: proc_macro2::TokenStream = attr.into();
+
+    let attrs = TokensObject::new(attr.into(), &|| None)?;
 
     let action_name = attrs.get_from_single_or_named("action_name")?;
-    let action_name = action_name.unwrap_as_string_value()?;
+    let action_name = action_name.as_string()?;
     let action_name = action_name.as_str();
 
     let struct_name = &ast.ident;

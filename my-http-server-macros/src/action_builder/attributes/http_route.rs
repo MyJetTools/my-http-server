@@ -1,4 +1,4 @@
-use types_reader::ParamValue;
+use types_reader::TokensObject;
 
 use super::{http_method::HttpMethod, ApiData};
 
@@ -7,23 +7,24 @@ pub struct HttpRouteModel<'s> {
     pub route: &'s str,
     pub input_data: Option<&'s str>,
     pub api_data: Option<ApiData<'s>>,
-    pub should_be_authorized: Option<&'s ParamValue>,
+    pub should_be_authorized: Option<&'s TokensObject>,
 }
 
 impl<'s> HttpRouteModel<'s> {
-    pub fn parse(attrs: &'s types_reader::ParamsList) -> Result<Self, syn::Error> {
+    pub fn parse(attrs: &'s types_reader::TokensObject) -> Result<Self, syn::Error> {
         let method = attrs
             .get_named_param("method")?
-            .unwrap_as_string_value()?
-            .as_str();
+            .get_value()?
+            .get_any_value_as_str()?;
 
         let route = attrs
             .get_named_param("route")?
-            .unwrap_as_string_value()?
+            .get_value()?
+            .as_string()?
             .as_str();
 
         let input_data = if let Some(input_data) = attrs.try_get_named_param("input_data") {
-            Some(input_data.unwrap_as_string_value()?.as_str())
+            Some(input_data.get_value()?.get_any_value_as_str()?)
         } else {
             None
         };
@@ -31,7 +32,7 @@ impl<'s> HttpRouteModel<'s> {
         let should_be_authorized = attrs.try_get_named_param("authorized");
 
         let result = if let Some(controller) = attrs.try_get_named_param("controller") {
-            let controller = controller.unwrap_as_string_value()?.as_str();
+            let controller = controller.get_value()?.as_string()?.as_str();
 
             Ok(Self {
                 method: HttpMethod::parse(method),
@@ -60,7 +61,7 @@ impl<'s> HttpRouteModel<'s> {
 
         let should_be_authorized = self.should_be_authorized.unwrap();
 
-        if let Some(string_value) = should_be_authorized.try_unwrap_as_string_value() {
+        if let Some(string_value) = should_be_authorized.get_value()?.try_as_string() {
             let value = string_value.as_str();
 
             if value == "Yes" || value == "[]" {
@@ -75,15 +76,15 @@ impl<'s> HttpRouteModel<'s> {
                 .throw_error("Unsupported value. It should be Yes, No or Array of strings"));
         }
 
-        if let Some(values) = should_be_authorized.try_unwrap_as_vec_of_values() {
+        if let Some(values) = should_be_authorized.try_get_vec() {
             if values.len() == 0 {
                 return Ok(quote::quote!(ShouldBeAuthorized::Yes));
             }
 
             let mut result = Vec::new();
 
-            for itm in values.iter_values() {
-                let itm = itm.unwrap_as_string_value()?.as_str();
+            for itm in values {
+                let itm = itm.get_value()?.as_string()?.as_str();
                 result.push(quote::quote!(#itm));
             }
 

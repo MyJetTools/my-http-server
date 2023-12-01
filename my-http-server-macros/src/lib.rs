@@ -9,6 +9,7 @@ mod as_token_stream;
 mod consts;
 mod enum_doc;
 mod generic_utils;
+mod http_input_field;
 mod http_input_object_structure;
 mod http_object_structure;
 mod input_models;
@@ -91,4 +92,12 @@ pub fn http_route(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn pkg_compile_date_time(_input: TokenStream) -> TokenStream {
     let date = DateTimeAsMicroseconds::now().to_rfc3339();
     TokenStream::from(quote::quote!(#date))
+}
+
+#[proc_macro_attribute]
+pub fn http_input_field(input: TokenStream, item: TokenStream) -> TokenStream {
+    match crate::http_input_field::generate(input, item) {
+        Ok(result) => result.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
 }

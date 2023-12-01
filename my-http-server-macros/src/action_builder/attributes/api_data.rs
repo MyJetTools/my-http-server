@@ -11,25 +11,27 @@ pub struct ApiData<'s> {
 impl<'s> ApiData<'s> {
     pub fn new(
         controller: &'s str,
-        attrs: &'s types_reader::ParamsList,
+        attrs: &'s types_reader::TokensObject,
     ) -> Result<Self, syn::Error> {
         let description = attrs
             .get_named_param("description")?
-            .unwrap_as_string_value()?
+            .get_value()?
+            .as_string()?
             .as_str();
         let summary = attrs
             .get_named_param("summary")?
-            .unwrap_as_string_value()?
+            .get_value()?
+            .as_string()?
             .as_str();
 
         let deprecated = if let Some(value) = attrs.try_get_named_param("deprecated") {
-            value.unwrap_as_bool_value()?.get_value()
+            value.get_value()?.as_bool()?.get_value()
         } else {
             false
         };
 
         let results = if let Some(result) = attrs.try_get_named_param("result") {
-            Some(result.unwrap_as_object_list()?)
+            Some(result.get_vec()?)
         } else {
             None
         };

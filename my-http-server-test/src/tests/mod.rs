@@ -1,8 +1,11 @@
 use my_http_server::macros::MyHttpInput;
+mod test_http_input_password_field;
 
 mod test_defaults;
+mod test_http_input_email_field;
 #[cfg(test)]
 mod test_string_enum_defaults;
+#[cfg(test)]
 mod test_to_lower_case;
 
 //#[derive(MyHttpInput)]

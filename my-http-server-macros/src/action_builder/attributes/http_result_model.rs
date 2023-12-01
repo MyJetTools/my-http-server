@@ -1,4 +1,4 @@
-use types_reader::ParamsList;
+use types_reader::TokensObject;
 
 pub enum HttpResultModel {
     Object(String),
@@ -8,10 +8,10 @@ pub enum HttpResultModel {
 }
 
 impl HttpResultModel {
-    pub fn new(param_list: &ParamsList) -> Result<Option<Self>, syn::Error> {
+    pub fn new(param_list: &TokensObject) -> Result<Option<Self>, syn::Error> {
         match param_list.try_get_named_param("model") {
             Some(result) => Ok(Some(Self::create(
-                result.unwrap_as_string_value()?.as_str(),
+                result.get_value()?.get_any_value_as_str()?,
             ))),
             None => Ok(None),
         }

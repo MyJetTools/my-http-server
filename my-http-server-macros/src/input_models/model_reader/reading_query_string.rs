@@ -158,7 +158,7 @@ fn generate_reading_required(
                 return Ok(result);
             }
             crate::input_models::DefaultValue::Value(default) => {
-                let default = default.get_any_value_as_str()?;
+                let default = default.get_value()?.get_any_value_as_str()?;
                 let else_data = proc_macro2::TokenStream::from_str(default);
 
                 if let Err(err) = else_data {

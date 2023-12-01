@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use proc_macro2::TokenStream;
 use rust_extensions::StrOrString;
-use types_reader::{ParamValue, ParamsList, PropertyType, StructProperty};
+use types_reader::{ObjectValue, PropertyType, StructProperty, TokensObject};
 
 #[derive(Clone)]
 pub enum HttpInputSource {
@@ -33,15 +33,15 @@ impl HttpInputSource {
 }
 
 pub enum DefaultValue<'s> {
-    Empty(&'s ParamValue),
-    Value(&'s ParamValue),
+    Empty(&'s TokensObject),
+    Value(&'s TokensObject),
 }
 
 impl<'s> DefaultValue<'s> {
-    pub fn unwrap_value(&'s self) -> Result<&'s ParamValue, syn::Error> {
+    pub fn unwrap_value(&'s self) -> Result<&'s ObjectValue, syn::Error> {
         match self {
             DefaultValue::Empty(value) => Err(value.throw_error("Default value is not specified")),
-            DefaultValue::Value(value) => Ok(value),
+            DefaultValue::Value(value) => Ok(value.get_value()?),
         }
     }
 
@@ -74,14 +74,14 @@ impl<'s> DefaultValue<'s> {
 #[derive(Clone)]
 pub struct InputField<'s> {
     pub property: &'s StructProperty<'s>,
-    pub attr_params: &'s ParamsList,
+    pub attr_params: &'s TokensObject,
     pub src: HttpInputSource,
 }
 
 impl<'s> InputField<'s> {
     pub fn new(
         property: &'s StructProperty<'s>,
-        attr_params: &'s ParamsList,
+        attr_params: &'s TokensObject,
         src: HttpInputSource,
     ) -> Self {
         Self {
@@ -93,7 +93,7 @@ impl<'s> InputField<'s> {
 
     pub fn get_input_field_name(&self) -> Result<&str, syn::Error> {
         if let Some(value) = self.attr_params.try_get_named_param("name") {
-            Ok(value.unwrap_as_string_value()?.into())
+            Ok(value.get_value()?.as_string()?.into())
         } else {
             Ok(&self.property.name)
         }
@@ -174,7 +174,7 @@ impl<'s> InputField<'s> {
     pub fn get_default_value(&self) -> Result<Option<DefaultValue>, syn::Error> {
         match self.attr_params.try_get_named_param("default") {
             Some(value) => {
-                if value.is_none().is_some() {
+                if value.has_no_value() {
                     return Ok(Some(DefaultValue::Empty(value)));
                 }
 
@@ -195,63 +195,63 @@ impl<'s> InputField<'s> {
             if let PropertyType::OptionOf(pt) = &self.property.ty {
                 match pt.as_ref() {
                     PropertyType::U8 => {
-                        let value = value.unwrap_as_number_value()?.as_u8();
+                        let value = value.as_number()?.as_u8();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::I8 => {
-                        let value = value.unwrap_as_number_value()?.as_i8();
+                        let value = value.as_number()?.as_i8();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::U16 => {
-                        let value = value.unwrap_as_number_value()?.as_u16();
+                        let value = value.as_number()?.as_u16();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::I16 => {
-                        let value = value.unwrap_as_number_value()?.as_i16();
+                        let value = value.as_number()?.as_i16();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::U32 => {
-                        let value = value.unwrap_as_number_value()?.as_u32();
+                        let value = value.as_number()?.as_u32();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::I32 => {
-                        let value = value.unwrap_as_number_value()?.as_i32();
+                        let value = value.as_number()?.as_i32();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::U64 => {
-                        let value = value.unwrap_as_number_value()?.as_u64();
+                        let value = value.as_number()?.as_u64();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::I64 => {
-                        let value = value.unwrap_as_number_value()?.as_i64();
+                        let value = value.as_number()?.as_i64();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::F32 => {
-                        let value = value.unwrap_as_double_value()?.as_f32();
+                        let value = value.as_double()?.as_f32();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::F64 => {
-                        let value = value.unwrap_as_double_value()?.as_f64();
+                        let value = value.as_double()?.as_f64();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::USize => {
-                        let value = value.unwrap_as_number_value()?.as_i64() as usize;
+                        let value = value.as_number()?.as_i64() as usize;
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::ISize => {
-                        let value = value.unwrap_as_number_value()?.as_i64() as isize;
+                        let value = value.as_number()?.as_i64() as isize;
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::String => {
-                        let value = value.unwrap_as_string_value()?.as_str();
+                        let value = value.as_string()?.as_str();
                         return Ok(quote::quote!(Some(#value.to_string())));
                     }
                     PropertyType::Str => {
-                        let value = value.unwrap_as_string_value()?.as_str();
+                        let value = value.as_string()?.as_str();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::Bool => {
-                        let value = value.unwrap_as_bool_value()?.get_value();
+                        let value = value.as_bool()?.get_value();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::DateTime => {
@@ -288,63 +288,63 @@ impl<'s> InputField<'s> {
 
             match &self.property.ty {
                 PropertyType::U8 => {
-                    let value = value.unwrap_as_number_value()?.as_u8();
+                    let value = value.as_number()?.as_u8();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::I8 => {
-                    let value = value.unwrap_as_number_value()?.as_i8();
+                    let value = value.as_number()?.as_i8();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::U16 => {
-                    let value = value.unwrap_as_number_value()?.as_u16();
+                    let value = value.as_number()?.as_u16();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::I16 => {
-                    let value = value.unwrap_as_number_value()?.as_i16();
+                    let value = value.as_number()?.as_i16();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::U32 => {
-                    let value = value.unwrap_as_number_value()?.as_u32();
+                    let value = value.as_number()?.as_u32();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::I32 => {
-                    let value = value.unwrap_as_number_value()?.as_i32();
+                    let value = value.as_number()?.as_i32();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::U64 => {
-                    let value = value.unwrap_as_number_value()?.as_u64();
+                    let value = value.as_number()?.as_u64();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::I64 => {
-                    let value = value.unwrap_as_number_value()?.as_i64();
+                    let value = value.as_number()?.as_i64();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::F32 => {
-                    let value = value.unwrap_as_double_value()?.as_f32();
+                    let value = value.as_double()?.as_f32();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::F64 => {
-                    let value = value.unwrap_as_double_value()?.as_f64();
+                    let value = value.as_double()?.as_f64();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::USize => {
-                    let value = value.unwrap_as_number_value()?.as_i64() as usize;
+                    let value = value.as_number()?.as_i64() as usize;
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::ISize => {
-                    let value = value.unwrap_as_number_value()?.as_i64() as isize;
+                    let value = value.as_number()?.as_i64() as isize;
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::String => {
-                    let value = value.unwrap_as_string_value()?.as_str();
+                    let value = value.as_string()?.as_str();
                     return Ok(quote::quote!(#value.to_string()));
                 }
                 PropertyType::Str => {
-                    let value = value.unwrap_as_string_value()?.as_str();
+                    let value = value.as_string()?.as_str();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::Bool => {
-                    let value = value.unwrap_as_bool_value()?.get_value();
+                    let value = value.as_bool()?.get_value();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::DateTime => {
@@ -372,14 +372,14 @@ impl<'s> InputField<'s> {
 
     pub fn get_description(&self) -> Result<&str, syn::Error> {
         let result = self.attr_params.get_named_param("description")?;
-        Ok(result.unwrap_as_string_value()?.into())
+        Ok(result.get_value()?.as_string()?.as_str())
     }
 
     pub fn validator(&self) -> Result<Option<&str>, syn::Error> {
         let result = self.attr_params.try_get_named_param("validator");
 
         match result {
-            Some(value) => Ok(Some(value.unwrap_as_string_value()?.into())),
+            Some(value) => Ok(Some(value.get_value()?.as_string()?.into())),
             _ => Ok(None),
         }
     }

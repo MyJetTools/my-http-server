@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use types_reader::{ParamValue, StructProperty};
+use types_reader::{ObjectValue, StructProperty};
 
 use crate::input_models::InputField;
 
@@ -8,10 +8,10 @@ pub trait AsTokenStream {
     fn as_token_stream(&self) -> Result<TokenStream, syn::Error>;
 }
 
-impl<'s> AsTokenStream for Option<&'s ParamValue> {
+impl<'s> AsTokenStream for Option<&'s ObjectValue> {
     fn as_token_stream(&self) -> Result<TokenStream, syn::Error> {
         if let Some(value) = self {
-            let value = value.unwrap_as_string_value()?.as_str();
+            let value = value.as_string()?.as_str();
             Ok(quote! {
                 Some(#value)
             })

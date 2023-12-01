@@ -7,7 +7,8 @@ pub trait StructPropertyExt {
 impl<'s> StructPropertyExt for StructProperty<'s> {
     fn get_name(&self) -> Result<&str, syn::Error> {
         if let Ok(value) = self.attrs.get_named_param("serde", "rename") {
-            return Ok(value.unwrap_as_string_value()?);
+            let value = value.get_value()?;
+            return Ok(value.as_string()?.as_str());
         }
 
         Ok(self.name.as_str())

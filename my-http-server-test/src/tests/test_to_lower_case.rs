@@ -20,13 +20,13 @@ pub struct ToLowerCaseFromHeader {
 
 #[derive(MyHttpInput)]
 pub struct DefaultQueryInputModel {
-    #[http_query(name : "noDefault", description=: "Test", to_lowercase)]
+    #[http_query(name : "noDefault", description= "Test", to_lowercase)]
     pub no_default: String,
 
     #[http_query(name = "withDefault"; description: "a", default: "MyDefault", to_lowercase)]
     pub with_default: String,
 
-    #[http_query(name : "noDefaultOpt", description=: "Test", to_lowercase)]
+    #[http_query(name : "noDefaultOpt", description: "Test", to_lowercase)]
     pub no_default_opt: Option<String>,
 
     #[http_query(name = "withDefaultOpt"; description: "a", default: "MyDefault", to_lowercase)]
@@ -41,7 +41,7 @@ pub struct DefaultQueryInputModelFromHeader {
     #[http_header(name = "withDefault"; description: "a", default: "MyDefault", to_lowercase)]
     pub with_default: String,
 
-    #[http_header(name : "noDefaultOpt", description=: "Test", to_lowercase)]
+    #[http_header(name : "noDefaultOpt", description: "Test", to_lowercase)]
     pub no_default_opt: Option<String>,
 
     #[http_header(name = "withDefaultOpt"; description: "a", default: "MyDefault", to_lowercase)]
@@ -80,7 +80,7 @@ pub struct DefaultQueryInputModelFromBody {
     #[http_body(name = "withDefault"; description: "a", default: "MyDefault", to_lowercase)]
     pub with_default: String,
 
-    #[http_body(name : "noDefaultOpt", description=: "Test", to_lowercase)]
+    #[http_body(name : "noDefaultOpt", description: "Test", to_lowercase)]
     pub no_default_opt: Option<String>,
 
     #[http_body(name = "withDefaultOpt"; description: "a", default: "MyDefault", to_lowercase)]
