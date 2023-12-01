@@ -42,3 +42,9 @@ impl WebContentType {
         }
     }
 }
+
+impl Into<WebContentType> for String {
+    fn into(self) -> WebContentType {
+        WebContentType::Raw(self)
+    }
+}

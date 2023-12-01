@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{http_headers_to_use::CONTENT_TYPE_HEADER, HttpFailResult, WebContentType};
+use crate::{HttpFailResult, WebContentType};
 use hyper::{body::Bytes, Response};
 use serde::Serialize;
 
@@ -215,26 +215,23 @@ impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkR
                 headers,
                 content_type,
                 content,
-            } => match content_type {
-                Some(content_type) => {
-                    let mut builder =
-                        Response::builder().header(CONTENT_TYPE_HEADER, content_type.as_str());
+            } => {
+                let mut builder = Response::builder();
 
-                    if let Some(headers) = headers {
-                        for (key, value) in headers {
-                            builder = builder.header(key, value);
-                        }
+                if let Some(headers) = headers {
+                    for (key, value) in headers {
+                        builder = builder.header(key, value);
                     }
-
-                    let full_body = http_body_util::Full::new(hyper::body::Bytes::from(content));
-
-                    builder.body(full_body).unwrap()
                 }
-                None => Response::builder()
-                    .status(status_code)
-                    .body(create_empty_body())
-                    .unwrap(),
-            },
+
+                if let Some(content_type) = content_type {
+                    builder = builder.header("content-type", content_type.as_str());
+                }
+
+                let full_body = http_body_util::Full::new(hyper::body::Bytes::from(content));
+                builder.body(full_body).unwrap()
+            }
+
             HttpOutput::Redirect { url, permanent: _ } => Response::builder()
                 .status(status_code)
                 .header("Location", url)
