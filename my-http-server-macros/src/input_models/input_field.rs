@@ -379,7 +379,7 @@ impl<'s> InputField<'s> {
         let result = self.attr_params.try_get_named_param("validator");
 
         match result {
-            Some(value) => Ok(Some(value.get_value()?.as_string()?.into())),
+            Some(value) => Ok(Some(value.get_value()?.get_any_value_as_str()?.into())),
             _ => Ok(None),
         }
     }
