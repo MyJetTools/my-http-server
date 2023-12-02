@@ -13,19 +13,11 @@ impl<'s> ApiData<'s> {
         controller: &'s str,
         attrs: &'s types_reader::TokensObject,
     ) -> Result<Self, syn::Error> {
-        let description = attrs
-            .get_named_param("description")?
-            .get_value()?
-            .as_string()?
-            .as_str();
-        let summary = attrs
-            .get_named_param("summary")?
-            .get_value()?
-            .as_string()?
-            .as_str();
+        let description = attrs.get_named_param("description")?.try_into()?;
+        let summary = attrs.get_named_param("summary")?.try_into()?;
 
         let deprecated = if let Some(value) = attrs.try_get_named_param("deprecated") {
-            value.get_value()?.as_bool()?.get_value()
+            value.try_into()?
         } else {
             false
         };

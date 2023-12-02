@@ -37,8 +37,8 @@ impl<'s> EnumJson<'s> {
 
     pub fn get_enum_case_str_value(&self) -> Result<String, syn::Error> {
         if let Ok(value) = self.src.attrs.get_named_param(HTTP_ENUM_ATTR_NAME, "value") {
-            let result = value.get_value()?.as_string()?;
-            return Ok(result.to_string());
+            let result = value.try_into()?;
+            return Ok(result);
         }
 
         Ok(self.src.get_name_ident().to_string())
@@ -50,6 +50,6 @@ impl<'s> EnumJson<'s> {
             .attrs
             .get_named_param(HTTP_ENUM_ATTR_NAME, "description")?;
 
-        Ok(result.get_value()?.as_string()?.as_str())
+        Ok(result.try_into()?)
     }
 }

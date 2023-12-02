@@ -14,17 +14,12 @@ impl<'s> HttpRouteModel<'s> {
     pub fn parse(attrs: &'s types_reader::TokensObject) -> Result<Self, syn::Error> {
         let method = attrs
             .get_named_param("method")?
-            .get_value()?
-            .get_any_value_as_str()?;
+            .try_into_any_value_as_str()?;
 
-        let route = attrs
-            .get_named_param("route")?
-            .get_value()?
-            .as_string()?
-            .as_str();
+        let route = attrs.get_named_param("route")?.try_into()?;
 
         let input_data = if let Some(input_data) = attrs.try_get_named_param("input_data") {
-            Some(input_data.get_value()?.get_any_value_as_str()?)
+            Some(input_data.try_into_any_value_as_str()?)
         } else {
             None
         };
@@ -32,7 +27,7 @@ impl<'s> HttpRouteModel<'s> {
         let should_be_authorized = attrs.try_get_named_param("authorized");
 
         let result = if let Some(controller) = attrs.try_get_named_param("controller") {
-            let controller = controller.get_value()?.as_string()?.as_str();
+            let controller = controller.try_into()?;
 
             Ok(Self {
                 method: HttpMethod::parse(method),
@@ -84,7 +79,7 @@ impl<'s> HttpRouteModel<'s> {
             let mut result = Vec::new();
 
             for itm in values {
-                let itm = itm.get_value()?.as_string()?.as_str();
+                let itm: &str = itm.try_into()?;
                 result.push(quote::quote!(#itm));
             }
 
