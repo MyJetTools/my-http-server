@@ -105,10 +105,10 @@ impl<'s> InputField<'s> {
 
     fn is_str(&self) -> bool {
         match &self.property.ty {
-            PropertyType::Str => true,
+            PropertyType::RefTo { ty, lifetime: _ } => ty.as_str().as_str() == "str",
             PropertyType::String => true,
             PropertyType::OptionOf(sub_ty) => match sub_ty.as_ref() {
-                PropertyType::Str => true,
+                PropertyType::RefTo { ty, lifetime: _ } => ty.as_str().as_str() == "str",
                 PropertyType::String => true,
                 _ => false,
             },
@@ -246,16 +246,13 @@ impl<'s> InputField<'s> {
                         let value = value.as_string()?.as_str();
                         return Ok(quote::quote!(Some(#value.to_string())));
                     }
-                    PropertyType::Str => {
-                        let value = value.as_string()?.as_str();
-                        return Ok(quote::quote!(Some(#value)));
-                    }
+
                     PropertyType::Bool => {
                         let value = value.as_bool()?.get_value();
                         return Ok(quote::quote!(Some(#value)));
                     }
                     PropertyType::DateTime => {
-                        let value = value.get_any_value_as_str()?;
+                        let value = value.as_string()?;
                         return Ok(quote::quote!(Some(DateTimeAsMicroseconds::from_str(#value))));
                     }
                     PropertyType::OptionOf(_) => {
@@ -269,6 +266,12 @@ impl<'s> InputField<'s> {
                     }
                     PropertyType::HashMap(_, _) => {
                         return Ok(quote::quote!(None));
+                    }
+                    PropertyType::RefTo { ty, lifetime: _ } => {
+                        if ty.as_str().as_str() == "str" {
+                            let value = value.as_string()?.as_str();
+                            return Ok(quote::quote!(Some(#value)));
+                        }
                     }
                 }
             }
@@ -339,16 +342,12 @@ impl<'s> InputField<'s> {
                     let value = value.as_string()?.as_str();
                     return Ok(quote::quote!(#value.to_string()));
                 }
-                PropertyType::Str => {
-                    let value = value.as_string()?.as_str();
-                    return Ok(quote::quote!(#value));
-                }
                 PropertyType::Bool => {
                     let value = value.as_bool()?.get_value();
                     return Ok(quote::quote!(#value));
                 }
                 PropertyType::DateTime => {
-                    let value = value.get_any_value_as_str()?;
+                    let value = value.as_string()?;
                     return Ok(quote::quote!(DateTimeAsMicroseconds::from_str(#value)));
                 }
                 PropertyType::OptionOf(_) => {
@@ -363,6 +362,20 @@ impl<'s> InputField<'s> {
                 }
                 PropertyType::HashMap(_, _) => {
                     return Err(value.throw_error("HashMap default value is not supported"));
+                }
+                PropertyType::RefTo { ty, lifetime: _ } => {
+                    if ty.as_str().as_str() == "str" {
+                        let value = value.as_string()?.as_str();
+                        return Ok(quote::quote!(#value));
+                    }
+
+                    return Err(value.throw_error(
+                        format!(
+                            "Ref of {} default value is not supported",
+                            ty.as_str().as_str(),
+                        )
+                        .as_str(),
+                    ));
                 }
             }
         }
@@ -379,7 +392,7 @@ impl<'s> InputField<'s> {
         let result = self.attr_params.try_get_named_param("validator");
 
         match result {
-            Some(value) => Ok(Some(value.get_value()?.get_any_value_as_str()?.into())),
+            Some(value) => Ok(Some(&value.get_value()?.any_value_as_str().as_str())),
             _ => Ok(None),
         }
     }
@@ -398,19 +411,11 @@ impl<'s> InputField<'s> {
 
     pub fn get_let_input_param(&self) -> proc_macro2::TokenStream {
         match &self.property.ty {
-            PropertyType::Str => {
-                let struct_name = self.property.get_field_name_ident();
-                return quote::quote! {#struct_name: String};
-            }
             PropertyType::String => {
                 let struct_name = self.property.get_field_name_ident();
                 return quote::quote! {#struct_name: String};
             }
             PropertyType::OptionOf(sub_ty) => match sub_ty.as_ref() {
-                PropertyType::Str => {
-                    let struct_name = self.property.get_field_name_ident();
-                    return quote::quote! {#struct_name: Option<String>};
-                }
                 PropertyType::String => {
                     let struct_name = self.property.get_field_name_ident();
                     return quote::quote! {#struct_name: Option<String>};

@@ -1,4 +1,10 @@
-use types_reader::TokensObject;
+use types_reader::{macros::MacrosParameters, TokensObject};
+
+#[derive(MacrosParameters)]
+pub struct MacrosParameters {
+    #[default]
+    pub action_name: String,
+}
 
 pub fn generate(
     attr: proc_macro::TokenStream,
@@ -7,12 +13,10 @@ pub fn generate(
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
 
     let attr: proc_macro2::TokenStream = attr.into();
+    let attrs = TokensObject::new(attr.into())?;
+    let parameters: MacrosParameters = (&attrs).try_into()?;
 
-    let attrs = TokensObject::new(attr.into(), &|| None)?;
-
-    let action_name = attrs.get_from_single_or_named("action_name")?;
-    let action_name = action_name.as_string()?;
-    let action_name = action_name.as_str();
+    let action_name = parameters.action_name.as_str();
 
     let struct_name = &ast.ident;
 

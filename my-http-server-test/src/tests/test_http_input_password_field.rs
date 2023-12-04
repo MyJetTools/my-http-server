@@ -4,7 +4,7 @@ use my_http_server::{
 };
 use rust_extensions::StrOrString;
 
-#[http_input_field(open_api_type:"Password")]
+#[http_input_field("Password")]
 pub struct PasswordField(String);
 
 fn process_value(src: &str) -> Result<StrOrString, HttpFailResult> {
@@ -19,4 +19,18 @@ fn process_value(src: &str) -> Result<StrOrString, HttpFailResult> {
     let src = src.trim();
     let src = src.to_lowercase();
     Ok(StrOrString::create_as_string(src))
+}
+
+#[cfg(test)]
+mod tests {
+
+    use my_http_server::controllers::documentation::DataTypeProvider;
+
+    use super::*;
+
+    #[test]
+    fn test() {
+        let data_type = PasswordField::get_data_type();
+        assert_eq!("SimpleType(Password)", format!("{:?}", data_type));
+    }
 }

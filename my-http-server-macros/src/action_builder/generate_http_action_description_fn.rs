@@ -2,18 +2,19 @@ use std::str::FromStr;
 
 use proc_macro2::TokenStream;
 
-use super::attributes::HttpRouteModel;
+use super::action_builder::ActionParameters;
 
 pub fn generate_http_action_description_fn(
-    attrs: &HttpRouteModel,
+    action_parameters: &ActionParameters,
 ) -> Result<TokenStream, syn::Error> {
-    if attrs.api_data.is_none() {
+    let api_data = action_parameters.get_api_data();
+    if api_data.is_none() {
         return Ok(quote::quote!(None));
     }
 
-    let api_data = attrs.api_data.as_ref().unwrap();
+    let api_data = api_data.unwrap();
 
-    let should_be_authorized = attrs.get_should_be_authorized()?;
+    let should_be_authorized = action_parameters.get_should_be_authorized()?;
 
     let use_documentation = crate::consts::get_use_documentation();
 
@@ -24,7 +25,7 @@ pub fn generate_http_action_description_fn(
     let description = api_data.description;
     let deprecated = api_data.deprecated;
 
-    let input_params = generate_get_input_params(attrs.input_data);
+    let input_params = generate_get_input_params(action_parameters.input_data);
 
     let results = super::result_model_generator::generate(&api_data.results);
 

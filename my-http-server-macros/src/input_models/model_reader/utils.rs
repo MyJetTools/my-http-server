@@ -44,13 +44,13 @@ pub fn verify_default_value(input_field: &InputField, ty: &PropertyType) -> Resu
         PropertyType::USize => false,
         PropertyType::ISize => false,
         PropertyType::String => false,
-        PropertyType::Str => false,
         PropertyType::Bool => false,
         PropertyType::DateTime => false,
         PropertyType::OptionOf(_) => false,
         PropertyType::VecOf(_) => false,
         PropertyType::Struct(_, _) => true,
         PropertyType::HashMap(_, _) => false,
+        PropertyType::RefTo { ty: _, lifetime: _ } => false,
     };
 
     if empty_only {

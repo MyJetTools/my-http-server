@@ -79,7 +79,7 @@ fn generate_reading(
                     return default_value.throw_error(
                         format!(
                             "Please use default without value '{}'. Struct or Enum should implement create_default and default value is going to be read from there",
-                            value.get_any_value_as_str()?
+                            value.any_value_as_str().as_str()
                         ),
                     );
                 }

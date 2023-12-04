@@ -8,10 +8,10 @@ pub struct GetChartHttpInputData {
 }
 
 #[http_route(
-    method: "GET",
+    method: GET,
     route: "/api/Dashboard/v1/Chart/{AccountId}",
     summary: "Get trader's account chart",
-    input_data: "GetChartHttpInputData",
+    input_data: GetChartHttpInputData,
     description: "Get trader's account chart",
     controller: "Dashboard",
     result:[

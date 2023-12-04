@@ -1,31 +1,197 @@
 use std::str::FromStr;
 
 use proc_macro::TokenStream;
-use types_reader::TokensObject;
+use types_reader::{macros::{MacrosParameters, MacrosEnum}, TokensObject};
 
-use super::attributes::HttpRouteModel;
+use super::attributes::{ApiData, HttpResult, HttpResultModel};
+
+
+#[derive(MacrosEnum)]
+pub enum ActionMethod{
+    #[value("GET")]
+    Get,
+    #[value("POST")]
+    Post,
+    #[value("PUT")]
+    Put,
+    #[value("DELETE")]
+    Delete
+}
+
+impl ActionMethod{
+   pub fn get_trait_name(&self) -> proc_macro2::TokenStream {
+    match self {
+        ActionMethod::Get => {
+            quote::quote!(my_http_server::controllers::actions::GetAction)
+        }
+        ActionMethod::Post => {
+            quote::quote!(my_http_server::controllers::actions::PostAction)
+        }
+        ActionMethod::Put => {
+            quote::quote!(my_http_server::controllers::actions::PutAction)
+        }
+        ActionMethod::Delete => {
+            quote::quote!(my_http_server::controllers::actions::DeleteAction)
+        }
+    }
+  }
+}
+
+#[derive(MacrosParameters)]
+pub struct Test{
+    pub status_code: u16,
+    pub description: String,
+}
+
+#[derive(MacrosParameters)]
+pub struct HttpActionResult<'s>{
+    pub status_code: u16,
+    pub description: &'s str,
+    #[allow_ident]
+    pub model: Option<&'s str>,
+}
+
+
+#[derive(MacrosEnum)]
+pub enum ShouldBeAuthorized{
+    Yes,
+    No,
+    YesWithClaims(Vec<String>),
+}
+
+#[derive(MacrosParameters)]
+pub struct ActionParameters<'s>{
+    #[allow_ident]
+    pub method: ActionMethod,
+    pub route: &'s str,
+    pub summary: Option<&'s str>,
+    pub description: Option<&'s str>,
+    pub controller: Option<&'s str>,
+    #[allow_ident]
+    pub input_data: Option<&'s str>,
+    pub should_be_authorized: Option<ShouldBeAuthorized>,
+    pub deprecated: Option<bool>,
+    pub result: Option<Vec<HttpActionResult<'s>>>,
+}
+
+
+impl<'s> ActionParameters<'s>{
+
+    pub fn get_should_be_authorized(&self) -> Result<proc_macro2::TokenStream, syn::Error> {
+        if self.should_be_authorized.is_none() {
+            return Ok(quote::quote!(ShouldBeAuthorized::UseGlobal));
+        }
+
+        let should_be_authorized = self.should_be_authorized.as_ref().unwrap();
+
+
+        match should_be_authorized{
+            ShouldBeAuthorized::Yes => {
+                 Ok(quote::quote!(ShouldBeAuthorized::Yes))
+            },
+            ShouldBeAuthorized::No => {
+                Ok(quote::quote!(ShouldBeAuthorized::No))
+            },
+            ShouldBeAuthorized::YesWithClaims(claims) => {
+                if claims.len() == 0 {
+                    return Ok(quote::quote!(ShouldBeAuthorized::Yes));
+                }
+    
+                let mut result = Vec::new();
+    
+                for itm in claims {
+                    result.push(quote::quote!(#itm));
+                }
+    
+                return Ok(quote::quote!(ShouldBeAuthorized::YesWithClaims(
+                    my_http_server::controllers::RequiredClaims::from_vec(
+                        vec![#(#result.to_string(),)*]
+                    )
+                ))
+                .into());
+            },
+        }
+
+    }
+    
+    pub fn get_api_data(&self) -> Option<ApiData<'s>>{
+        if self.controller.is_none(){
+            return None;
+        }
+
+        let controller = self.controller.unwrap();
+
+
+        if self.summary.is_none(){
+             panic!("'summary' field is required");
+        }
+        
+
+        let summary = self.summary.unwrap();
+
+
+        if self.description.is_none(){
+            panic!("'description' field is required");
+       }
+       
+
+        let description = self.description.unwrap();
+
+        let deprecated = match self.deprecated{
+            Some(deprecated) => deprecated,
+            None => false
+        };
+
+        let mut results = None;
+
+
+
+        if let Some(src_results) =  &self.result{
+            let mut out_results = Vec::with_capacity(src_results.len());
+            for item in src_results{
+                out_results.push(HttpResult{
+                    status_code: item.status_code,
+                    description: item.description.to_string(),
+                    result_type: if let Some(result_type) = item.model{
+                        Some(HttpResultModel::create(result_type))
+                    }else{
+                        None
+                    },
+                });
+            }
+
+            results = Some(out_results);
+        }
+
+
+        Some(ApiData{
+            controller,
+            summary,
+            description,
+            deprecated,
+            results 
+        })
+    }
+}
 
 
 pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream, syn::Error> {
 
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
 
-
-    let attr:proc_macro2::TokenStream = attr.into();
-    let params_list = TokensObject::new(attr.into(), &||None)?;
-
-    let action_model = HttpRouteModel::parse(&params_list)?;
-
+    let attr: proc_macro2::TokenStream = attr.into();
+    let tokens_object: TokensObject = attr.try_into()?;
+    let action_parameters:ActionParameters = (&tokens_object).try_into()?;
 
     let struct_name = &ast.ident;
 
-    let trait_name = action_model.method.get_trait_name();
+    let trait_name = action_parameters.method.get_trait_name();
 
-    let route = action_model.route;
+    let route = action_parameters.route;
 
     let http_action_description = crate::consts::get_http_action_description_with_ns();
 
-    let description = super::generate_http_action_description_fn(&action_model)?;
+    let description = super::generate_http_action_description_fn(&action_parameters)?;
 
     let http_route = crate::consts::get_http_route();
 
@@ -35,9 +201,9 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
 
     let http_fail_result = crate::consts::get_http_fail_result();
 
-    let handle_request = super::generate_handle_request_fn(action_model.input_data);
+    let handle_request = super::generate_handle_request_fn(action_parameters.input_data);
 
-    let model_routes: proc_macro2::TokenStream = if let Some(input_data) = &action_model.input_data{
+    let model_routes: proc_macro2::TokenStream = if let Some(input_data) = &action_parameters.input_data{
         let input_data = proc_macro2::TokenStream::from_str(input_data).unwrap();
         quote::quote!(#input_data::get_model_routes())    
     }else{

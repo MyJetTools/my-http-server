@@ -91,7 +91,7 @@ fn reading_query_string(
                     return default_value.throw_error(
                         format!(
                             "Please use default without value '{}'. Struct or Enum should implement create_default and default value is going to be read from there",
-                            value.get_any_value_as_str()?
+                            value.any_value_as_str().as_str()
                         ),
                     );
                 }
@@ -158,8 +158,8 @@ fn generate_reading_required(
                 return Ok(result);
             }
             crate::input_models::DefaultValue::Value(default) => {
-                let default = default.get_value()?.get_any_value_as_str()?;
-                let else_data = proc_macro2::TokenStream::from_str(default);
+                let default = default.get_value()?.any_value_as_str().as_str();
+                let else_data = proc_macro2::TokenStream::from_str(&default);
 
                 if let Err(err) = else_data {
                     return Err(syn::Error::new_spanned(

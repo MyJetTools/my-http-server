@@ -11,6 +11,8 @@ proc-macro = true
 [dependencies]
 syn = { version = "*", features = ["extra-traits"] }
 quote = "*"
-types-reader = { tag = "0.4.0", git = "https://github.com/MyJetTools/types-reader.git" }
+types-reader = { tag = "0.5.0", git = "https://github.com/MyJetTools/types-reader.git" }
+
+
 proc-macro2 = "*"
 rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }

@@ -1,7 +1,30 @@
 use std::str::FromStr;
 
 use proc_macro::TokenStream;
+use types_reader::macros::{MacrosEnum, MacrosParameters};
 use types_reader::TokensObject;
+
+#[derive(MacrosParameters)]
+pub struct MacrosParameters {
+    #[default]
+    pub open_api_type: Option<OpenApiType>,
+}
+
+#[derive(MacrosEnum)]
+pub enum OpenApiType {
+    #[default]
+    String,
+    Password,
+}
+
+impl OpenApiType {
+    pub fn get_macros_stream(&self) -> proc_macro2::TokenStream {
+        match self {
+            Self::String => proc_macro2::TokenStream::from_str("String").unwrap(),
+            Self::Password => proc_macro2::TokenStream::from_str("Password").unwrap(),
+        }
+    }
+}
 
 pub fn generate(attr: TokenStream, input: TokenStream) -> Result<TokenStream, syn::Error> {
     let input: proc_macro2::TokenStream = input.into();
@@ -11,24 +34,13 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<TokenStream, sy
 
     let attr: proc_macro2::TokenStream = attr.into();
 
-    let attr = TokensObject::new(attr.into(), &|| None)?;
+    let attr = TokensObject::new(attr.into())?;
 
-    let open_api_type = attr.try_get_value_from_single_or_named("open_api_type");
+    let attrs: MacrosParameters = (&attr).try_into()?;
 
-    let open_api_type = match open_api_type {
-        Some(swagger_type_obj) => {
-            let swagger_type = swagger_type_obj.as_string()?.as_str();
-
-            match swagger_type {
-                "String" => proc_macro2::TokenStream::from_str("String").unwrap(),
-                "Password" => proc_macro2::TokenStream::from_str("Password").unwrap(),
-                _ => {
-                    return Err(swagger_type_obj
-                        .throw_error("Unknown swagger type. String and Password are supported"))
-                }
-            }
-        }
-        None => proc_macro2::TokenStream::from_str("String").unwrap(),
+    let open_api_type = match attrs.open_api_type {
+        Some(open_api_type) => open_api_type.get_macros_stream(),
+        None => OpenApiType::default().get_macros_stream(),
     };
 
     let struct_name = &tuple_struct.name_ident;
