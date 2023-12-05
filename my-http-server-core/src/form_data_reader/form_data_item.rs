@@ -1,6 +1,6 @@
 use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
 
-use crate::form_data_reader::ContentDispositionParser;
+use crate::{form_data_reader::ContentDispositionParser, HttpFailResult};
 
 #[derive(Debug)]
 pub enum FormDataItem<'s> {
@@ -17,12 +17,20 @@ pub enum FormDataItem<'s> {
 }
 
 impl<'s> FormDataItem<'s> {
-    pub fn unwrap_as_string(&'s self) -> &'s str {
+    pub fn unwrap_as_string(&'s self) -> Result<&'s str, HttpFailResult> {
         match self {
-            FormDataItem::ValueAsString { value, .. } => value.unwrap(),
-            FormDataItem::File { .. } => {
-                panic!("Can not unwrap FormDataItem as string. It is file")
+            FormDataItem::ValueAsString { value, name } => {
+                if let Some(value) = value {
+                    Ok(value)
+                } else {
+                    Err(HttpFailResult::required_parameter_is_missing(
+                        name, "FormData",
+                    ))
+                }
             }
+            FormDataItem::File { .. } => Err(HttpFailResult::as_validation_error(
+                "Can not unwrap FormDataItem as string. It is file",
+            )),
         }
     }
 
@@ -197,6 +205,6 @@ mod tests {
         let result = super::FormDataItem::parse(&src);
 
         assert_eq!(result.get_name(), "docId");
-        assert_eq!(result.unwrap_as_string(), "0");
+        assert_eq!(result.unwrap_as_string().unwrap(), "0");
     }
 }

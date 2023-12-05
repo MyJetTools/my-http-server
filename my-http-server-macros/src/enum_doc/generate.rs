@@ -135,6 +135,23 @@ pub fn generate(ast: &syn::DeriveInput, as_integer: bool) -> Result<TokenStream,
 
         }
 
+        impl<'s> TryInto<#struct_name> for my_http_server::FormDataItem<'s> {
+            type Error = my_http_server::HttpFailResult;
+
+            fn try_into(self) -> Result<#struct_name, Self::Error> {
+                use std::str::FromStr;
+                #struct_name::from_str(self.unwrap_as_string()?)
+            }
+        }
+
+        impl<'s> TryInto<#struct_name> for &'s my_http_server::FormDataItem<'s> {
+            type Error = my_http_server::HttpFailResult;
+
+            fn try_into(self) -> Result<#struct_name, Self::Error> {
+                use std::str::FromStr;
+                #struct_name::from_str(self.unwrap_as_string()?)
+            }
+        }
 
         impl my_http_server::controllers::documentation::DataTypeProvider for #struct_name {
             fn get_data_type() -> my_http_server::controllers::documentation::data_types::HttpDataType {

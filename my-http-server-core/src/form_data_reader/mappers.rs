@@ -177,6 +177,198 @@ impl<'s> TryInto<i16> for &'s FormDataItem<'s> {
     }
 }
 
+impl<'s> TryInto<u32> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u32, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to u32",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<i32> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i32, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to i32",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<u64> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<u64, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to u64",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<i64> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<i64, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to i64",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<f32> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<f32, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to f32",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<f64> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<f64, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to i64",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<usize> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<usize, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to usize",
+                name,
+            ))),
+        }
+    }
+}
+
+impl<'s> TryInto<isize> for &'s FormDataItem<'s> {
+    type Error = HttpFailResult;
+    fn try_into(self) -> Result<isize, Self::Error> {
+        match self {
+            FormDataItem::ValueAsString { value, name } => match value {
+                Some(v) => crate::convert_from_str::to_simple_value(name, v, SRC_FORM_DATA),
+                None => Err(HttpFailResult::required_parameter_is_missing(
+                    name,
+                    SRC_FORM_DATA,
+                )),
+            },
+            FormDataItem::File {
+                name,
+                file_name: _,
+                content_type: _,
+                content: _,
+            } => Err(HttpFailResult::as_not_supported_content_type(format!(
+                "Field {} contains a File which is not possible to convert to isize",
+                name,
+            ))),
+        }
+    }
+}
+
 impl<'s> TryInto<DateTimeAsMicroseconds> for &'s FormDataItem<'s> {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<DateTimeAsMicroseconds, Self::Error> {
