@@ -54,3 +54,5 @@ pub use body_data_reader::*;
 pub use cached_headers::*;
 pub use form_data_reader::*;
 pub use input_param_value::*;
+
+pub extern crate hyper;
