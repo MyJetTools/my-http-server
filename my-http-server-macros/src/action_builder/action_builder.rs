@@ -52,6 +52,7 @@ pub struct HttpActionResult<'s>{
 }
 
 
+
 #[derive(MacrosEnum)]
 pub enum ShouldBeAuthorized{
     Yes,
@@ -69,7 +70,8 @@ pub struct ActionParameters<'s>{
     pub controller: Option<&'s str>,
     #[allow_ident]
     pub input_data: Option<&'s str>,
-    pub should_be_authorized: Option<ShouldBeAuthorized>,
+    //None = UseGlobal, Some = Yes, Some = No, Some = YesWithClaims - Claims
+    pub authorized: Option<ShouldBeAuthorized>,
     pub deprecated: Option<bool>,
     pub result: Option<Vec<HttpActionResult<'s>>>,
 }
@@ -78,11 +80,11 @@ pub struct ActionParameters<'s>{
 impl<'s> ActionParameters<'s>{
 
     pub fn get_should_be_authorized(&self) -> Result<proc_macro2::TokenStream, syn::Error> {
-        if self.should_be_authorized.is_none() {
+        if self.authorized.is_none() {
             return Ok(quote::quote!(ShouldBeAuthorized::UseGlobal));
         }
 
-        let should_be_authorized = self.should_be_authorized.as_ref().unwrap();
+        let should_be_authorized = self.authorized.as_ref().unwrap();
 
 
         match should_be_authorized{
