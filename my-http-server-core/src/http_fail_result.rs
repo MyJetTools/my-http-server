@@ -1,3 +1,5 @@
+use rust_extensions::StrOrString;
+
 use crate::{http_headers_to_use::*, WebContentType};
 
 #[derive(Debug, Clone)]
@@ -79,10 +81,11 @@ impl HttpFailResult {
         )
     }
 
-    pub fn as_validation_error(text: String) -> Self {
+    pub fn as_validation_error(text: impl Into<StrOrString<'static>>) -> Self {
+        let text: StrOrString<'static> = text.into();
         Self {
             content_type: WebContentType::Text,
-            content: format!("Validation error: {}", text).into_bytes(),
+            content: format!("Validation error: {}", text.as_str()).into_bytes(),
             status_code: 400,
             write_telemetry: true,
             write_to_log: false,
