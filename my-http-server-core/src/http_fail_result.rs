@@ -83,7 +83,7 @@ impl HttpFailResult {
         Self {
             content_type: WebContentType::Text,
             content: format!("Validation error: {}", text).into_bytes(),
-            status_code: 401,
+            status_code: 400,
             write_telemetry: true,
             write_to_log: false,
             #[cfg(feature = "with-telemetry")]
