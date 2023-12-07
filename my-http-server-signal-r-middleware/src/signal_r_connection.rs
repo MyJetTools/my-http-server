@@ -3,7 +3,6 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use hyper_tungstenite::tungstenite::Message;
 use my_http_server_web_sockets::MyWebSocket;
 use rust_extensions::{
     date_time::{AtomicDateTimeAsMicroseconds, DateTimeAsMicroseconds},
@@ -14,6 +13,7 @@ use tokio::sync::Mutex;
 
 #[cfg(feature = "with-ctx")]
 use tokio::sync::RwLock;
+use tokio_tungstenite::tungstenite::Message;
 
 use crate::SignalRParam;
 
@@ -184,7 +184,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
 
         if let Some(old_websocket) = write_access.web_socket.replace(web_socket) {
             old_websocket
-                .send_message(hyper_tungstenite::tungstenite::Message::Text(format!(
+                .send_message(Message::Text(format!(
                     "SignalR WebSocket {} has been kicked by Websocket {} ",
                     old_websocket.id, new_id
                 )))

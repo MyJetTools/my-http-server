@@ -5,8 +5,10 @@ use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use my_http_server_core::UrlEncodedData;
 use tokio::sync::Mutex;
-use tokio_tungstenite::WebSocketStream;
-use tungstenite::{Error, Message};
+use tokio_tungstenite::{
+    tungstenite::{Error, Message},
+    WebSocketStream,
+};
 
 pub struct MyWebSocket {
     pub write_stream: Mutex<Option<SplitSink<WebSocketStream<TokioIo<Upgraded>>, Message>>>,
@@ -35,7 +37,7 @@ impl MyWebSocket {
     async fn send_message_and_if_connected(&self, msg: Message) -> Result<(), Error> {
         let mut write_access = self.write_stream.lock().await;
         if let Some(stream) = &mut *write_access {
-            return stream.send(msg).await;
+            let result = stream.send(msg).await;
         }
 
         Ok(())

@@ -40,7 +40,9 @@ pub enum DefaultValue<'s> {
 impl<'s> DefaultValue<'s> {
     pub fn unwrap_value(&'s self) -> Result<&'s ObjectValue, syn::Error> {
         match self {
-            DefaultValue::Empty(value) => Err(value.throw_error("Default value is not specified")),
+            DefaultValue::Empty(value) => {
+                Err(value.throw_error_at_value_token("Default value is not specified"))
+            }
             DefaultValue::Value(value) => Ok(value.get_value()?),
         }
     }
@@ -65,8 +67,8 @@ impl<'s> DefaultValue<'s> {
     ) -> Result<TOk, syn::Error> {
         let src: StrOrString<'static> = src.into();
         match self {
-            DefaultValue::Empty(value) => Err(value.throw_error(src.as_str())),
-            DefaultValue::Value(value) => Err(value.throw_error(src.as_str())),
+            DefaultValue::Empty(value) => Err(value.throw_error_at_value_token(src.as_str())),
+            DefaultValue::Value(value) => Err(value.throw_error_at_value_token(src.as_str())),
         }
     }
 }

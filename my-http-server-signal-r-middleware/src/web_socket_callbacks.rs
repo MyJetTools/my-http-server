@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use hyper_tungstenite::tungstenite::Message;
 use my_http_server_core::HttpFailResult;
 use my_http_server_web_sockets::{MyWebSocket, WebSocketMessage};
 use my_json::json_reader::JsonFirstLineReader;
@@ -8,6 +7,7 @@ use my_json::json_reader::JsonFirstLineReader;
 use my_telemetry::MyTelemetryContext;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
+use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
     messages::SignalRMessage, MySignalRCallbacks, MySignalRConnection, SignalRConnectionsList,

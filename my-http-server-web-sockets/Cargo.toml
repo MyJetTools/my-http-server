@@ -12,7 +12,6 @@ tokio = { version = "*", features = ["full"] }
 async-trait = "*"
 hyper = { version = "*", features = ["full"] }
 futures = "*"
-tungstenite = "*"
 pin-project-lite = "*"
 tokio-tungstenite = "*"
 http-body-util = "*"

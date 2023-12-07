@@ -3,12 +3,13 @@ use std::{sync::Arc, time::Duration};
 use futures::stream::SplitStream;
 use futures::StreamExt;
 use hyper::upgrade::Upgraded;
+
 use hyper_util::rt::TokioIo;
 use my_http_server_core::HttpRequest;
 use my_http_server_core::{HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
 
+use tokio_tungstenite::tungstenite::{Error, Message};
 use tokio_tungstenite::WebSocketStream;
-use tungstenite::Message;
 
 use crate::{my_web_socket_callback::WebSocketMessage, MyWebSocket, MyWebSocketCallback};
 
@@ -89,7 +90,7 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     my_web_socket: Arc<MyWebSocket>,
     mut read_stream: SplitStream<WebSocketStream<TokioIo<Upgraded>>>,
     callback: Arc<TMyWebSocketCallback>,
-) -> Result<(), tungstenite::Error> {
+) -> Result<(), Error> {
     while let Some(message) = read_stream.next().await {
         let result = match message? {
             Message::Text(msg) => {

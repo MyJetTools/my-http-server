@@ -70,7 +70,6 @@ pub struct ActionParameters<'s>{
     pub controller: Option<&'s str>,
     #[allow_ident]
     pub input_data: Option<&'s str>,
-    //None = UseGlobal, Some = Yes, Some = No, Some = YesWithClaims - Claims
     pub authorized: Option<ShouldBeAuthorized>,
     pub deprecated: Option<bool>,
     pub result: Option<Vec<HttpActionResult<'s>>>,
