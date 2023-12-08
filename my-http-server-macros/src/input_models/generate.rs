@@ -4,26 +4,18 @@ use quote::quote;
 
 use super::http_input_props::HttpInputProperties;
 
-pub fn generate(ast: &syn::DeriveInput) -> (TokenStream, bool) {
+pub fn generate(ast: &syn::DeriveInput, debug: &mut bool) -> Result<TokenStream, syn::Error> {
     let struct_name = &ast.ident;
 
-    let mut debug = false;
-
-    let fields = match types_reader::StructProperty::read(ast) {
-        Ok(result) => result,
-        Err(err) => return (err.into_compile_error().into(), false),
-    };
+    let fields = types_reader::StructProperty::read(ast)?;
 
     for prop in &fields {
         if prop.attrs.has_attr("debug") {
-            debug = true;
+            *debug = true;
         }
     }
 
-    let input_fields = match HttpInputProperties::new(&fields) {
-        Ok(result) => result,
-        Err(err) => return (err.into_compile_error().into(), false),
-    };
+    let input_fields = HttpInputProperties::new(&fields)?;
 
     let http_input_param = crate::consts::get_http_input_parameter_with_ns();
 
@@ -52,7 +44,7 @@ pub fn generate(ast: &syn::DeriveInput) -> (TokenStream, bool) {
         Err(err) => err.to_compile_error(),
     };
 
-    (quote!{
+    let result = quote! {
         impl #struct_name{
             pub fn get_input_params()->Vec<#http_input_param>{
                 #http_input
@@ -67,7 +59,8 @@ pub fn generate(ast: &syn::DeriveInput) -> (TokenStream, bool) {
                 #http_routes
             }
         }
-    }.into(), debug)
+    };
+    Ok(result.into())
 }
 
 fn http_routes(props: &HttpInputProperties) -> Result<Vec<proc_macro2::TokenStream>, syn::Error> {

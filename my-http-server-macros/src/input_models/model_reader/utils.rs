@@ -54,11 +54,14 @@ pub fn verify_default_value(input_field: &InputField, ty: &PropertyType) -> Resu
     };
 
     if empty_only {
-        let default_value = input_field.get_default_value()?;
+        let default_value = input_field.attr.get_default();
         match default_value {
-            Some(default_value) => {
-                if !default_value.is_empty() {
-                    return default_value.throw_error("Please use default parameter with NO value");
+            Some(value) => {
+                if !value.has_empty_value() {
+                    return Err(syn::Error::new_spanned(
+                        input_field.property.get_field_name_ident(),
+                        "Please use default parameter with NO value",
+                    ));
                 }
 
                 return Ok(());
@@ -66,11 +69,14 @@ pub fn verify_default_value(input_field: &InputField, ty: &PropertyType) -> Resu
             None => return Ok(()),
         }
     } else {
-        let default_value = input_field.get_default_value()?;
+        let default_value = input_field.attr.get_default();
         match default_value {
             Some(default_value) => {
-                if default_value.is_empty() {
-                    return default_value.throw_error("Please use default parameter with value");
+                if default_value.has_empty_value() {
+                    return Err(syn::Error::new_spanned(
+                        input_field.property.get_field_name_ident(),
+                        "Please use default parameter with value",
+                    ));
                 }
 
                 return Ok(());

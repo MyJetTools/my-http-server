@@ -6,7 +6,7 @@ pub fn reading_from_header(
     let mut reading_fields = Vec::with_capacity(input_fields.len());
     let mut validations = Vec::with_capacity(input_fields.len());
     for input_field in input_fields {
-        if let Some(validation) = input_field.get_validator()? {
+        if let Some(validation) = input_field.get_validator() {
             validations.push(validation);
         }
 
@@ -29,7 +29,7 @@ fn read_header_field(input_field: &InputField) -> Result<proc_macro2::TokenStrea
     let input_field_name = input_field.get_input_field_name()?;
 
     if input_field.property.ty.is_option() {
-        let default_value = input_field.get_default_value_opt_case()?;
+        let default_value = input_field.get_default_value_non_opt_case()?;
 
         let result = quote::quote! {
             if let Some(value) = ctx.request.get_headers().try_get_case_insensitive(#input_field_name) {
@@ -42,7 +42,7 @@ fn read_header_field(input_field: &InputField) -> Result<proc_macro2::TokenStrea
         return Ok(result);
     }
 
-    if !input_field.has_default_value() {
+    if !input_field.has_default_value()? {
         let result = quote::quote!(ctx.request.get_headers().get_required_case_insensitive(#input_field_name)?.try_into()?;);
         return Ok(result);
     }

@@ -25,16 +25,18 @@ pub fn generate_http_input<'s>(
 }
 
 fn generate_http_input_parameter(input_field: &InputField) -> Result<TokenStream, syn::Error> {
+    let default_value = input_field.attr.get_default();
+
     let field = crate::types::compile_http_field(
         input_field.get_input_field_name()?,
         &input_field.property.ty,
-        input_field.has_default_value(),
+        default_value.is_some(),
     )?;
 
     let http_input_parameter_type = crate::consts::get_http_input_parameter();
-    let description = input_field.get_description()?;
+    let description = input_field.get_description();
 
-    let source = input_field.src.get_input_src_token();
+    let source = input_field.attr.to_src_token_stream();
 
     let result = quote! {
         #http_input_parameter_type{

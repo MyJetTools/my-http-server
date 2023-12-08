@@ -5,9 +5,9 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[derive(Serialize_repr, Deserialize_repr, MyHttpIntegerEnum, Debug)]
 #[repr(i16)]
 pub enum Status {
-    #[http_enum_case(id="0"; description="Operations was successful")]
+    #[http_enum_case(id: 0, description="Operations was successful")]
     Ok,
-    #[http_enum_case(id="1"; description="Operations was not successful")]
+    #[http_enum_case(id: 1, description="Operations was not successful")]
     NotOk,
 }
 

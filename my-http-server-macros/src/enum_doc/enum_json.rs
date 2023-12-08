@@ -23,8 +23,7 @@ impl<'s> EnumJson<'s> {
 
     pub fn get_id(&self) -> Result<isize, syn::Error> {
         if let Ok(value) = self.src.attrs.get_named_param(HTTP_ENUM_ATTR_NAME, "id") {
-            let value = value.get_value()?;
-            return Ok(value.parse("Value must be a number".into())?);
+            return Ok(value.unwrap_as_value()?.as_number()?.as_isize());
         }
 
         let err = syn::Error::new_spanned(self.src.get_name_ident(), "[id] is not found");

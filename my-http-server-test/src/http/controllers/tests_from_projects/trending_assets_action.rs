@@ -8,7 +8,7 @@ pub struct GetTrendingAssetsApiRequest {
     #[http_query(name: "limitOpt"; description: "Limit for records count. Default is 5", default:5)]
     pub limit_op: Option<i32>,
 
-    #[http_query(name: "limit"; description: "Limit for records count. Default is 5", default:5)]
+    #[http_query(name: "limit"; description: "Limit for records count", default)]
     pub limit: i32,
 }
 

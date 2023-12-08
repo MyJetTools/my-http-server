@@ -4,14 +4,15 @@ use proc_macro::TokenStream;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use syn;
 
-mod action_builder;
 mod as_token_stream;
+mod attributes;
 mod consts;
 mod enum_doc;
 mod generic_utils;
 mod http_input_field;
 mod http_input_object_structure;
 mod http_object_structure;
+mod http_route;
 mod input_models;
 mod property_type_ext;
 mod types;
@@ -30,7 +31,11 @@ mod types;
 )]
 pub fn my_http_input_doc_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
-    let (result, debug) = crate::input_models::generate(&ast);
+    let mut debug = false;
+    let result = match crate::input_models::generate(&ast, &mut debug) {
+        Ok(result) => result,
+        Err(err) => err.to_compile_error().into(),
+    };
 
     if debug {
         println!("{}", result);
@@ -82,7 +87,7 @@ pub fn my_http_integer_enum_derive(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn http_route(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match crate::action_builder::build_action(attr, item) {
+    match crate::http_route::build_action(attr, item) {
         Ok(result) => result,
         Err(err) => err.to_compile_error().into(),
     }

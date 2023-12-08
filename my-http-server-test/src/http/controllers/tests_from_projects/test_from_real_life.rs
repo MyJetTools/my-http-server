@@ -2,7 +2,7 @@ use my_http_server::macros::{MyHttpInput, MyHttpIntegerEnum};
 
 #[derive(MyHttpInput)]
 pub struct OpenPositionHttpRequest {
-    #[http_form_data(name = "processId"; description = "Process id")]
+    #[http_form_data(name: "processId"; description: "Process id")]
     pub process_id: String,
     #[http_form_data(name = "accountId"; description = "Account id")]
     pub account_id: String,
@@ -27,19 +27,19 @@ pub struct OpenPositionHttpRequest {
 #[derive(Clone, Copy, Debug, MyHttpIntegerEnum)]
 #[repr(u8)]
 pub enum SlTpType {
-    #[http_enum_case(id="0"; value="i"; description="")]
+    #[http_enum_case(id=0; value="i"; description="")]
     Currency,
-    #[http_enum_case(id="1"; value="1"; description="")]
+    #[http_enum_case(id=1; value="1"; description="")]
     Price,
-    #[http_enum_case(id="2"; value="2"; description="")]
+    #[http_enum_case(id=2; value="2"; description="")]
     Percent,
 }
 
 #[derive(Clone, Copy, Debug, MyHttpIntegerEnum)]
 #[repr(u8)]
 pub enum PositionSide {
-    #[http_enum_case(id="0"; value="0"; description="")]
+    #[http_enum_case(id=0; value="0"; description="")]
     Buy,
-    #[http_enum_case(id="1"; value="1"; description="")]
+    #[http_enum_case(id=1; value="1"; description="")]
     Sell,
 }

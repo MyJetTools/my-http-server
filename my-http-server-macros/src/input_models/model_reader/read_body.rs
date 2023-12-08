@@ -14,12 +14,12 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
     let mut is_form_data = false;
 
     for input_field in input_fields {
-        if input_field.src.is_form_data() {
+        if input_field.attr.is_form_data() {
             is_form_data = true;
         }
 
         reading_fields.push(generate_reading(input_field, &data_src)?);
-        if let Some(validator) = input_field.get_validator()? {
+        if let Some(validator) = input_field.get_validator() {
             validations.push(validator);
         }
     }
@@ -73,15 +73,9 @@ fn generate_reading(
             return Ok(line);
         }
         PropertyType::Struct(..) => {
-            if let Some(default_value) = input_field.get_default_value()? {
-                if default_value.has_value() {
-                    let value = default_value.unwrap_value()?;
-                    return default_value.throw_error(
-                        format!(
-                            "Please use default without value '{}'. Struct or Enum should implement create_default and default value is going to be read from there",
-                            value.any_value_as_str().as_str()
-                        ),
-                    );
+            if let Some(default_value) = input_field.attr.get_default() {
+                if !default_value.has_empty_value() {
+                    panic!("Please use default without value. Struct or Enum should implement create_default and default value is going to be read from there",);
                 }
 
                 let default_value = input_field.get_default_value_opt_case()?;
@@ -109,7 +103,7 @@ fn generate_reading(
         _ => {
             super::utils::verify_default_value(input_field, &input_field.property.ty)?;
 
-            if input_field.has_default_value() {
+            if input_field.attr.get_default().is_some() {
                 let default_value = input_field.get_default_value_non_opt_case()?;
 
                 let let_field_name = input_field.get_let_input_param();

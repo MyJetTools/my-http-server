@@ -11,7 +11,10 @@ impl HttpResultModel {
     pub fn new(param_list: &TokensObject) -> Result<Option<Self>, syn::Error> {
         match param_list.try_get_named_param("model") {
             Some(result) => Ok(Some(Self::create(
-                result.get_value()?.any_value_as_str().as_str(),
+                result
+                    .unwrap_as_value()?
+                    .unwrap_any_value_as_str()?
+                    .as_str(),
             ))),
             None => Ok(None),
         }

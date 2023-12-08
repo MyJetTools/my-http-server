@@ -21,7 +21,7 @@ pub fn generate_reading_query_fields(
     for input_field in input_fields {
         let token_stream = reading_query_string(input_field, &data_src)?;
 
-        if let Some(validation) = input_field.get_validator()? {
+        if let Some(validation) = input_field.get_validator() {
             validations.push(validation);
         }
 
@@ -85,15 +85,9 @@ fn reading_query_string(
             return Ok(item);
         }
         PropertyType::Struct(..) => {
-            if let Some(default_value) = input_field.get_default_value()? {
-                if default_value.has_value() {
-                    let value = default_value.unwrap_value()?;
-                    return default_value.throw_error(
-                        format!(
-                            "Please use default without value '{}'. Struct or Enum should implement create_default and default value is going to be read from there",
-                            value.any_value_as_str().as_str()
-                        ),
-                    );
+            if let Some(default_value) = input_field.attr.get_default() {
+                if !default_value.has_empty_value() {
+                    return Err(syn::Error::new_spanned(input_field.property.get_field_name_ident(), "Please use default without value . Struct or Enum should implement create_default and default value is going to be read from there",));
                 }
 
                 let default_value = input_field.get_default_value_opt_case()?;
@@ -122,7 +116,7 @@ fn reading_query_string(
 
             let let_input_param = input_field.get_let_input_param();
 
-            if input_field.has_default_value() {
+            if input_field.has_default_value()? {
                 let default_value = input_field.get_default_value_non_opt_case()?;
 
                 let result = quote::quote! {
@@ -149,40 +143,36 @@ fn generate_reading_required(
 ) -> Result<TokenStream, syn::Error> {
     let struct_field_name = input_field.property.get_field_name_ident();
     let input_field_name = input_field.get_input_field_name()?;
-    if let Some(default_value) = input_field.get_default_value()? {
-        match default_value {
-            crate::input_models::DefaultValue::Empty(_) => {
-                let prop_type = input_field.property.get_syn_type();
-                let result = quote::quote!(#prop_type::create_default()?);
-
-                return Ok(result);
-            }
-            crate::input_models::DefaultValue::Value(default) => {
-                let default = default.get_value()?.any_value_as_str().as_str();
-                let else_data = proc_macro2::TokenStream::from_str(&default);
-
-                if let Err(err) = else_data {
-                    return Err(syn::Error::new_spanned(
-                        input_field.property.field,
-                        format!("Invalid default value: {}", err),
-                    ));
-                }
-
-                let else_data = else_data.unwrap();
-
-                let let_input_param = input_field.get_let_input_param();
-
-                let result = quote::quote! {
-                    let #let_input_param = if let Some(value) = #data_src.get_optional(#input_field_name){
-                        value.try_into()?
-                    }else{
-                        #else_data
-                    };
-                };
-
-                return Ok(result);
-            }
+    if let Some(default_value) = input_field.attr.get_default() {
+        if default_value.has_empty_value() {
+            let prop_type = input_field.property.get_syn_type();
+            let result = quote::quote!(#prop_type::create_default()?);
+            return Ok(result);
         }
+
+        let default = default_value.get_str();
+        let else_data = proc_macro2::TokenStream::from_str(default);
+
+        if let Err(err) = else_data {
+            return Err(syn::Error::new_spanned(
+                input_field.property.field,
+                format!("Invalid default value: {}", err),
+            ));
+        }
+
+        let else_data = else_data.unwrap();
+
+        let let_input_param = input_field.get_let_input_param();
+
+        let result = quote::quote! {
+            let #let_input_param = if let Some(value) = #data_src.get_optional(#input_field_name){
+                value.try_into()?
+            }else{
+                #else_data
+            };
+        };
+
+        return Ok(result);
     } else {
         let ty = input_field.property.ty.get_token_stream();
         return Ok(

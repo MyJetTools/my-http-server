@@ -14,7 +14,7 @@ pub enum TestEnum {
 
 #[derive(MyHttpInput, Debug)]
 pub struct PostBodyModel {
-    #[http_query(name = "dd"; description = "First param", to_lower_string)]
+    #[http_query(name = "dd"; description = "First param", to_lowercase)]
     pub dd: String,
 
     #[http_query(description = "Second Param")]

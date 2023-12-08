@@ -6,7 +6,7 @@ pub fn reading_from_path(
     let mut reading_fields = Vec::with_capacity(input_fields.len());
     let mut validations = Vec::with_capacity(input_fields.len());
     for input_field in input_fields {
-        if let Some(validation) = input_field.get_validator()? {
+        if let Some(validation) = input_field.get_validator() {
             validations.push(validation);
         }
 

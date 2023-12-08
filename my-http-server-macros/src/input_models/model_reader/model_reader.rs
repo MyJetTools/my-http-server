@@ -2,10 +2,7 @@ use proc_macro2::{Ident, TokenStream};
 
 use quote::quote;
 
-use crate::input_models::{
-    http_input_props::HttpInputProperties,
-    input_model_struct_property_ext::InputModelStructPropertyExt, InputField,
-};
+use crate::input_models::{http_input_props::HttpInputProperties, InputField};
 
 pub fn generate(name: &Ident, properties: &HttpInputProperties) -> Result<TokenStream, syn::Error> {
     let mut fields_to_return = Vec::new();
@@ -39,9 +36,7 @@ pub fn generate(name: &Ident, properties: &HttpInputProperties) -> Result<TokenS
     };
 
     if let Some(body_raw_field) = &properties.body_raw_field {
-        let struct_field_name = body_raw_field
-            .property
-            .get_struct_field_name_as_token_stream();
+        let struct_field_name = body_raw_field.property.get_field_name_ident();
         let read_value = read_from_body_raw(&body_raw_field)?;
         fields_to_return.push(quote!(#struct_field_name: #read_value));
     };
@@ -51,19 +46,6 @@ pub fn generate(name: &Ident, properties: &HttpInputProperties) -> Result<TokenS
             fields_to_return.push(body_field.read_value_with_transformation()?);
         }
         super::read_body::generate_read_body(body_fields)?
-
-        /*
-        if body_fields.len() > 1 {
-            for input_field in body_fields {
-                let struct_field_name = input_field.property.get_field_name_ident();
-                fields_to_return.push(quote!(#struct_field_name));
-            }
-
-            super::read_body::generate_read_body(body_fields)?
-        } else {
-            fields_to_return.push(read_body_single_field(body_fields.get(0).unwrap())?);
-            quote!()
-        } */
     } else {
         quote!()
     };

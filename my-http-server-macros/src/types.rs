@@ -7,12 +7,12 @@ use crate::property_type_ext::PropertyTypeExt;
 pub fn compile_http_field(
     name: &str,
     pt: &PropertyType,
-    has_default_value: bool,
+    has_defaults_value: bool,
 ) -> Result<TokenStream, syn::Error> {
     let data_type = compile_data_type(pt);
     let mut required = pt.required();
 
-    if has_default_value {
+    if has_defaults_value {
         required = false;
     }
 

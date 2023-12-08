@@ -1,9 +1,8 @@
 use rust_extensions::lazy::LazyVec;
-use types_reader::StructProperty;
+use types_reader::{MacrosAttribute, StructProperty};
 
-use super::{
-    input_model_struct_property_ext::InputModelStructPropertyExt, HttpInputSource, InputField,
-};
+use super::InputField;
+use crate::attributes::*;
 
 pub struct HttpInputProperties<'s> {
     pub header_fields: Option<Vec<InputField<'s>>>,
@@ -27,40 +26,72 @@ impl<'s> HttpInputProperties<'s> {
         let mut body_raw_field = None;
 
         for struct_property in props {
-            let input_field = struct_property.try_into_input_field()?;
-
-            if input_field.is_none() {
+            if struct_property.attrs.has_attr(IgnoreAttribute::NAME) {
                 continue;
             }
 
-            let input_field = input_field.unwrap();
+            let attr: Option<HttpQueryAttribute> = struct_property.try_get_attribute()?;
 
-            match input_field.src {
-                HttpInputSource::Query => {
-                    query_string_fields.add(input_field);
+            if let Some(attr) = attr {
+                query_string_fields.add(InputField::new(struct_property, attr));
+                continue;
+            }
+
+            let attr: Option<HttpPathAttribute> = struct_property.try_get_attribute()?;
+
+            if let Some(attr) = attr {
+                path_fields.add(InputField::new(struct_property, attr));
+                continue;
+            }
+
+            let attr: Option<HttpFormDataAttribute> = struct_property.try_get_attribute()?;
+
+            if let Some(attr) = attr {
+                if !body_fields.is_empty() {
+                    struct_property.throw_error("http_body attribute already exists.")?;
                 }
-                HttpInputSource::Header => {
-                    header_fields.add(input_field);
+
+                if body_raw_field.is_some() {
+                    struct_property.throw_error("body_raw attribute already exists.")?;
                 }
-                HttpInputSource::FormData => {
-                    form_data_fields.add(input_field);
+
+                form_data_fields.add(InputField::new(struct_property, attr));
+                continue;
+            }
+
+            let attr: Option<HttpBodyAttribute> = struct_property.try_get_attribute()?;
+
+            if let Some(attr) = attr {
+                if !form_data_fields.is_empty() {
+                    struct_property.throw_error("form_data attribute already exists.")?;
                 }
-                HttpInputSource::Body => {
-                    body_fields.add(input_field);
+
+                if body_raw_field.is_some() {
+                    struct_property.throw_error("body_raw attribute already exists.")?;
                 }
-                HttpInputSource::BodyRaw => {
-                    if body_raw_field.is_some() {
-                        let err = syn::Error::new_spanned(
-                            struct_property.get_field_name_ident(),
-                            "Body raw data can be only once",
-                        );
-                        return Err(err);
-                    }
-                    body_raw_field = Some(input_field);
+
+                body_fields.add(InputField::new(struct_property, attr));
+                continue;
+            }
+
+            let attr: Option<HttpBodyRawAttribute> = struct_property.try_get_attribute()?;
+
+            if let Some(attr) = attr {
+                if !form_data_fields.is_empty() {
+                    struct_property.throw_error("form_data attribute already exists.")?;
                 }
-                HttpInputSource::Path => {
-                    path_fields.add(input_field);
+
+                if body_raw_field.is_some() {
+                    struct_property.throw_error("body_raw attribute can be used once.")?;
                 }
+
+                if !body_fields.is_empty() {
+                    struct_property.throw_error("http_body attribute already exists.")?;
+                }
+
+                body_raw_field = Some(InputField::new(struct_property, attr));
+
+                continue;
             }
         }
 
