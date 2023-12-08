@@ -44,6 +44,13 @@ impl<'s> HttpInputProperties<'s> {
                 continue;
             }
 
+            let attr: Option<HttpHeaderAttribute> = struct_property.try_get_attribute()?;
+
+            if let Some(attr) = attr {
+                header_fields.add(InputField::new(struct_property, attr));
+                continue;
+            }
+
             let attr: Option<HttpFormDataAttribute> = struct_property.try_get_attribute()?;
 
             if let Some(attr) = attr {
