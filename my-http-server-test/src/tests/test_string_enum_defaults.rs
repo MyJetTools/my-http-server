@@ -3,7 +3,7 @@ use my_http_server::*;
 
 #[derive(MyHttpStringEnum)]
 pub enum MyEnumModel {
-    #[http_enum_case(id: 0, value:"myCase1", description = "My Case 1 Description", default)]
+    #[http_enum_case(id: "0", value:"myCase1", description = "My Case 1 Description", default)]
     Case1,
     #[http_enum_case(id: 1, description = "My Case 1 Description")]
     Case2,

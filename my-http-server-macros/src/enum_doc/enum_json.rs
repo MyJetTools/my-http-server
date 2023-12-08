@@ -1,31 +1,41 @@
 use types_reader::EnumCase;
 
+use crate::attributes::EnumCaseAttribute;
+
 pub struct EnumJson<'s> {
     pub src: EnumCase<'s>,
-    pub is_default_value: bool,
+    pub attr: EnumCaseAttribute,
 }
 
-pub const HTTP_ENUM_ATTR_NAME: &str = "http_enum_case";
+//pub const HTTP_ENUM_ATTR_NAME: &str = "http_enum_case";
 
 impl<'s> EnumJson<'s> {
-    pub fn new(src: EnumCase<'s>) -> Option<Self> {
-        if let Ok(value) = src.attrs.get_attr(HTTP_ENUM_ATTR_NAME) {
-            let is_default_value = value.has_param("default");
-            return Self {
-                src,
-                is_default_value,
-            }
-            .into();
+    pub fn new(src: EnumCase<'s>) -> Result<Self, syn::Error> {
+        let attr: Option<EnumCaseAttribute> = src.try_get_attribute()?;
+
+        if attr.is_none() {
+            return Err(syn::Error::new_spanned(
+                src.get_name_ident(),
+                "Enum case does not have #[http_enum_case] attribute",
+            ));
         }
 
-        return None;
+        return Ok(Self {
+            src,
+            attr: attr.unwrap(),
+        });
     }
 
     pub fn get_id(&self) -> Result<isize, syn::Error> {
-        if let Ok(value) = self.src.attrs.get_named_param(HTTP_ENUM_ATTR_NAME, "id") {
-            return Ok(value.unwrap_as_value()?.as_number()?.as_isize());
+        if let Some(id) = self.attr.id.as_ref() {
+            match id.parse() {
+                Ok(id) => return Ok(id),
+                Err(_) => {
+                    let err = syn::Error::new_spanned(id, "Id must be a number");
+                    return Err(err);
+                }
+            };
         }
-
         let err = syn::Error::new_spanned(self.src.get_name_ident(), "[id] is not found");
         Err(err)
     }
@@ -35,20 +45,14 @@ impl<'s> EnumJson<'s> {
     }
 
     pub fn get_enum_case_str_value(&self) -> Result<String, syn::Error> {
-        if let Ok(value) = self.src.attrs.get_named_param(HTTP_ENUM_ATTR_NAME, "value") {
-            let result = value.try_into()?;
-            return Ok(result);
+        if let Some(value) = self.attr.value.as_ref() {
+            return Ok(value.to_string());
         }
 
         Ok(self.src.get_name_ident().to_string())
     }
 
-    pub fn description(&self) -> Result<&str, syn::Error> {
-        let result = self
-            .src
-            .attrs
-            .get_named_param(HTTP_ENUM_ATTR_NAME, "description")?;
-
-        Ok(result.try_into()?)
+    pub fn description(&self) -> &str {
+        self.attr.description.as_str()
     }
 }

@@ -7,7 +7,7 @@ pub fn generate(name: &str, enum_cases: &[EnumJson]) -> Result<Vec<TokenStream>,
 
     let mut default_value = false;
     for enum_case in enum_cases {
-        if enum_case.is_default_value {
+        if enum_case.attr.default {
             default_value = true;
             continue;
         }

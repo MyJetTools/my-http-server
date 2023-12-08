@@ -3,7 +3,7 @@ use std::str::FromStr;
 use proc_macro::TokenStream;
 use types_reader::EnumCase;
 
-use crate::enum_doc::enum_json::{EnumJson, HTTP_ENUM_ATTR_NAME};
+use crate::enum_doc::enum_json::EnumJson;
 
 use super::generate_default::generate_default_as_str_fn;
 
@@ -19,20 +19,13 @@ pub fn generate(ast: &syn::DeriveInput, as_integer: bool) -> Result<TokenStream,
     let mut default_case_value = None;
 
     for src_field in src_fields {
-        let name = src_field.get_name_ident().to_string();
-        if let Some(enum_json) = EnumJson::new(src_field) {
-            if enum_json.is_default_value {
-                default_str_value = Some(enum_json.get_enum_case_str_value()?);
-                default_case_value = Some(enum_json.get_enum_case_value());
-            }
-
-            fields.push(enum_json);
-        } else {
-            panic!(
-                "Enum case {} does not have #[{}] attribute",
-                name, HTTP_ENUM_ATTR_NAME
-            )
+        let enum_json = EnumJson::new(src_field)?;
+        if enum_json.attr.default {
+            default_str_value = Some(enum_json.get_enum_case_str_value()?);
+            default_case_value = Some(enum_json.get_enum_case_value());
         }
+
+        fields.push(enum_json);
     }
 
     //Default Trait
@@ -185,7 +178,7 @@ fn generate_enum_cases(cases: &[EnumJson]) -> Result<Vec<proc_macro2::TokenStrea
     for case in cases {
         let id = proc_macro2::Literal::isize_unsuffixed(case.get_id()?);
         let value = case.get_enum_case_value();
-        let description = case.description()?;
+        let description = case.description();
 
         result.push(quote::quote! {
             __es.cases.push(data_types::HttpEnumCase{
