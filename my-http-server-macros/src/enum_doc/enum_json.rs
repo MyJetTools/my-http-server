@@ -31,7 +31,8 @@ impl<'s> EnumJson<'s> {
             match id.parse() {
                 Ok(id) => return Ok(id),
                 Err(_) => {
-                    let err = syn::Error::new_spanned(id, "Id must be a number");
+                    let err =
+                        syn::Error::new_spanned(self.src.get_name_ident(), "Id must be a number");
                     return Err(err);
                 }
             };

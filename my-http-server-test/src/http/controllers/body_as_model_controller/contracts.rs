@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(MyHttpIntegerEnum, Debug)]
 pub enum TestEnum {
-    #[http_enum_case(id: 0, description: "Case 1")]
+    #[http_enum_case(id: "1", description: "Case 1")]
     Case1,
     #[http_enum_case(id: 1; description: "Case 2")]
     Case2,
