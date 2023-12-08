@@ -1,5 +1,3 @@
-use types_reader::TokensObject;
-
 pub enum HttpResultModel {
     Object(String),
     Array(String),
@@ -8,18 +6,6 @@ pub enum HttpResultModel {
 }
 
 impl HttpResultModel {
-    pub fn new(param_list: &TokensObject) -> Result<Option<Self>, syn::Error> {
-        match param_list.try_get_named_param("model") {
-            Some(result) => Ok(Some(Self::create(
-                result
-                    .unwrap_as_value()?
-                    .unwrap_any_value_as_str()?
-                    .as_str(),
-            ))),
-            None => Ok(None),
-        }
-    }
-
     pub fn create(model: &str) -> Self {
         if let Some(vec_model) = is_model_vec(model) {
             if is_simple_type(vec_model) {

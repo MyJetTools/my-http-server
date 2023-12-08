@@ -7,7 +7,5 @@ pub use generate::generate;
 pub use input_field::*;
 mod http_field_attr;
 pub use http_field_attr::*;
-mod default_value;
-pub use default_value::*;
 mod http_input_default_value;
 pub use http_input_default_value::*;

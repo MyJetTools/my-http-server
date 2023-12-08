@@ -1,4 +1,4 @@
-use types_reader::{macros::*, OptionalObjectValue};
+use types_reader::macros::*;
 
 #[attribute_name("http_path")]
 #[derive(MacrosParameters, Clone)]
