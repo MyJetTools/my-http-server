@@ -1,6 +1,7 @@
 use my_http_server::macros::MyHttpInput;
 
 mod test_http_input_password_field;
+mod test_trim;
 
 mod test_defaults;
 mod test_http_input_email_field;

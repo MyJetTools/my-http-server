@@ -59,7 +59,11 @@ pub fn my_http_input_object_derive(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(MyHttpObjectStructure, attributes(debug))]
 pub fn my_http_output_object_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
-    let (result, debug) = crate::http_object_structure::generate(&ast);
+    let mut debug = false;
+    let result = match crate::http_object_structure::generate(&ast, &mut debug) {
+        Ok(result) => result,
+        Err(err) => err.to_compile_error().into(),
+    };
 
     if debug {
         println!("{}", result);

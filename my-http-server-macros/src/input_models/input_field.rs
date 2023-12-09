@@ -69,61 +69,48 @@ impl<'s> InputField<'s> {
         Ok(result)
     }
 
-    /*
-       pub fn has_trim_attr(&self) -> Result<bool, syn::Error> {
-           let result = self.attr.has_trim_attribute();
-
-           if result && !self.is_str() {
-               return self
-                   .property
-                   .throw_error("trim attribute can be only with String property");
-           }
-
-           Ok(result)
-       }
-    */
     pub fn read_value_with_transformation(&self) -> Result<TokenStream, syn::Error> {
         let ident = self.property.get_field_name_ident();
+
+        let trim = if self.attr.has_trim_attribute() {
+            quote::quote!(.trim())
+        } else {
+            quote::quote!()
+        };
+
         if self.to_upper_case_string()? {
             if self.property.ty.is_option() {
                 return Ok(
-                    quote::quote!(#ident: if let Some(value) = #ident {value.to_uppercase().into()}else{None}),
+                    quote::quote!(#ident: if let Some(value) = #ident {value #trim .to_uppercase().into()}else{None}),
                 );
             } else {
-                return Ok(quote::quote!(#ident: #ident.to_uppercase()));
+                return Ok(quote::quote!(#ident: #ident #trim .to_uppercase()));
             }
         }
 
         if self.to_lower_case_string()? {
             if self.property.ty.is_option() {
                 return Ok(
-                    quote::quote!(#ident: if let Some(value) = #ident {value.to_lowercase().into()}else{None}),
+                    quote::quote!(#ident: if let Some(value) = #ident {value #trim .to_lowercase().into()}else{None}),
                 );
             } else {
-                return Ok(quote::quote!(#ident: #ident.to_lowercase()));
+                return Ok(quote::quote!(#ident: #ident #trim .to_lowercase()));
             }
         }
 
-        Ok(quote::quote!(#ident))
+        if self.attr.has_trim_attribute() {
+            if self.property.ty.is_option() {
+                Ok(
+                    quote::quote!(#ident: if let Some(value) = #ident {value.trim().to_string().into()}else{None}),
+                )
+            } else {
+                Ok(quote::quote!(#ident: #ident.trim().to_string()))
+            }
+        } else {
+            Ok(quote::quote!(#ident))
+        }
     }
 
-    /*
-       pub fn get_default_value<T: FromStr>(&self) -> Result<T, syn::Error> {
-           match self.attr.get_default_value()? {
-               Some(value) => match value.parse::<T>() {
-                   Ok(value) => Ok(value),
-                   Err(_) => Err(syn::Error::new_spanned(
-                       self.property.get_field_name_ident(),
-                       "Can not parse default value",
-                   )),
-               },
-               None => Err(syn::Error::new_spanned(
-                   self.property.get_field_name_ident(),
-                   "Can not parse default value",
-               )),
-           }
-       }
-    */
     pub fn get_default_value_opt_case(&'s self) -> Result<TokenStream, syn::Error> {
         let default_value = self.attr.get_default();
 

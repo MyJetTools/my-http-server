@@ -44,7 +44,7 @@ pub struct DefaultQueryInputModelFromHeader {
     #[http_header(name : "noDefaultOpt", description: "Test", to_lowercase)]
     pub no_default_opt: Option<String>,
 
-    #[http_header(name = "withDefaultOpt"; description: "a", default: "MyDefault", to_lowercase)]
+    #[http_header(name = "withDefaultOpt"; description: "a", default: "MyDefault", to_lowercase, trim)]
     pub with_default_opt: Option<String>,
 }
 

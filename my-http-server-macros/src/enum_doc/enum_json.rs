@@ -1,4 +1,4 @@
-use types_reader::EnumCase;
+use types_reader::{EnumCase, MacrosAttribute};
 
 use crate::attributes::EnumCaseAttribute;
 
@@ -7,8 +7,6 @@ pub struct EnumJson<'s> {
     pub attr: EnumCaseAttribute,
 }
 
-//pub const HTTP_ENUM_ATTR_NAME: &str = "http_enum_case";
-
 impl<'s> EnumJson<'s> {
     pub fn new(src: EnumCase<'s>) -> Result<Self, syn::Error> {
         let attr: Option<EnumCaseAttribute> = src.try_get_attribute()?;
@@ -16,7 +14,11 @@ impl<'s> EnumJson<'s> {
         if attr.is_none() {
             return Err(syn::Error::new_spanned(
                 src.get_name_ident(),
-                "Enum case does not have #[http_enum_case] attribute",
+                format!(
+                    "Enum case does not have #[{}] attribute",
+                    EnumCaseAttribute::NAME
+                )
+                .as_str(),
             ));
         }
 

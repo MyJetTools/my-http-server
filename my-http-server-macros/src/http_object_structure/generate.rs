@@ -3,19 +3,17 @@ use types_reader::StructProperty;
 
 use crate::generic_utils::GenericData;
 
-pub fn generate(ast: &syn::DeriveInput) -> (proc_macro::TokenStream, bool) {
+pub fn generate(
+    ast: &syn::DeriveInput,
+    debug: &mut bool,
+) -> Result<proc_macro::TokenStream, syn::Error> {
     let struct_name = &ast.ident;
 
-    let mut debug = false;
-
-    let fields = match StructProperty::read(ast) {
-        Ok(result) => result,
-        Err(err) => return (err.into_compile_error().into(), debug),
-    };
+    let fields = StructProperty::read(ast)?;
 
     for prop in &fields {
         if prop.attrs.has_attr("debug") {
-            debug = true;
+            *debug = true;
         }
     }
 
@@ -30,22 +28,11 @@ pub fn generate(ast: &syn::DeriveInput) -> (proc_macro::TokenStream, bool) {
         (quote::quote! {}, quote::quote! {})
     };
 
-    let get_http_data_structure = match super::generate_get_http_data_structure(
-        struct_name,
-        generic_data.as_ref(),
-        &fields,
-    ) {
-        Ok(result) => result,
-        Err(err) => return (err.into_compile_error().into(), debug),
-    };
+    let get_http_data_structure =
+        super::generate_get_http_data_structure(struct_name, generic_data.as_ref(), &fields)?;
 
-    let data_structure_provider = match crate::http_object_structure::generate_data_provider(
-        struct_name,
-        generic_data.as_ref(),
-    ) {
-        Ok(result) => result,
-        Err(err) => return (err.into_compile_error().into(), debug),
-    };
+    let data_structure_provider =
+        crate::http_object_structure::generate_data_provider(struct_name, generic_data.as_ref())?;
 
     let result = quote! {
 
@@ -58,5 +45,5 @@ pub fn generate(ast: &syn::DeriveInput) -> (proc_macro::TokenStream, bool) {
     }
     .into();
 
-    (result, debug)
+    Ok(result)
 }

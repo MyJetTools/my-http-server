@@ -99,14 +99,16 @@ impl<'s> HttpFieldAttribute<'s> {
     }
 
     pub fn has_trim_attribute(&self) -> bool {
-        match self {
-            Self::HttpHeader(http_header) => http_header.to_uppercase,
-            Self::HttpQuery(http_query) => http_query.to_uppercase,
-            Self::HttpBody(http_body) => http_body.to_uppercase,
-            Self::HttpFormData(http_form_data) => http_form_data.to_uppercase,
-            Self::HttpBodyRaw(http_body_raw) => http_body_raw.to_uppercase,
-            Self::HttpPath(http_path) => http_path.to_uppercase,
-        }
+        let result = match self {
+            Self::HttpHeader(http_header) => http_header.trim,
+            Self::HttpQuery(http_query) => http_query.trim,
+            Self::HttpBody(http_body) => http_body.trim,
+            Self::HttpFormData(http_form_data) => http_form_data.trim,
+            Self::HttpBodyRaw(http_body_raw) => http_body_raw.trim,
+            Self::HttpPath(http_path) => http_path.trim,
+        };
+
+        result
     }
 
     pub fn is_form_data(&self) -> bool {
