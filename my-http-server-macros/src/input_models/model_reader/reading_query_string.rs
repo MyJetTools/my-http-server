@@ -56,7 +56,6 @@ fn reading_query_string(
 
             let result = quote::quote! {
                 let #let_input_param = if let Some(value) = #data_src.get_optional(#input_field_name) {
-
                     Some(value.try_into()?)
                 } else {
                     #default_value
@@ -150,7 +149,7 @@ fn generate_reading_required(
             return Ok(result);
         }
 
-        let default = default_value.get_str();
+        let default = default_value.get_value().unwrap_any_value_as_string()?;
         let else_data = proc_macro2::TokenStream::from_str(default);
 
         if let Err(err) = else_data {

@@ -15,12 +15,12 @@ pub enum HttpFieldAttribute<'s> {
 impl<'s> HttpFieldAttribute<'s> {
     pub fn get_default(&self) -> Option<HttpInputDefaultValue> {
         let default_attr = match self {
-            Self::HttpHeader(http_header) => http_header.default,
-            Self::HttpQuery(http_query) => http_query.default,
-            Self::HttpBody(http_body) => http_body.default,
-            Self::HttpFormData(http_form_data) => http_form_data.default,
-            Self::HttpBodyRaw(http_body_raw) => http_body_raw.default,
-            Self::HttpPath(http_path) => http_path.default,
+            Self::HttpHeader(http_header) => http_header.default.clone(),
+            Self::HttpQuery(http_query) => http_query.default.clone(),
+            Self::HttpBody(http_body) => http_body.default.clone(),
+            Self::HttpFormData(http_form_data) => http_form_data.default.clone(),
+            Self::HttpBodyRaw(http_body_raw) => http_body_raw.default.clone(),
+            Self::HttpPath(http_path) => http_path.default.clone(),
         };
 
         if default_attr.is_none() {

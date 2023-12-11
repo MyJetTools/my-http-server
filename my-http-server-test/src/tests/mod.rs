@@ -9,6 +9,7 @@ mod test_http_input_email_field;
 mod test_string_enum_defaults;
 #[cfg(test)]
 mod test_to_lower_case;
+mod test_with_enum_default;
 
 #[derive(MyHttpInput)]
 pub struct SetBalanceLockApiRequest {

@@ -1,8 +1,8 @@
-use types_reader::{macros::*, OptionalObjectValue};
+use types_reader::macros::*;
 
 #[attribute_name("default")]
 #[derive(MacrosParameters, Clone)]
 pub struct DefaultAttribute<'s> {
     #[default]
-    pub value: &'s OptionalObjectValue,
+    pub value: types_reader::AnyValue<'s>,
 }

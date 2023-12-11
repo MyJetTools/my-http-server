@@ -18,6 +18,5 @@ pub struct HttpBodyAttribute<'s> {
     #[has_attribute]
     pub trim: bool,
 
-    #[any_value_as_string]
-    pub default: Option<&'s str>,
+    pub default: Option<types_reader::AnyValue<'s>>,
 }
