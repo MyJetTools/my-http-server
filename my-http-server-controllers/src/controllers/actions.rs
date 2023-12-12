@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use hyper::Method;
 use my_http_server_core::{HttpContext, HttpFailResult, HttpOkResult};
 
 use super::{
@@ -8,22 +9,26 @@ use super::{
 };
 
 pub trait GetAction {
-    fn get_route(&self) -> &str;
+    fn get_route(&self) -> &'static str;
+    fn get_deprecated_routes(&self) -> Option<Vec<&'static str>>;
     fn get_model_routes(&self) -> Option<Vec<&'static str>>;
 }
 
 pub trait PostAction {
-    fn get_route(&self) -> &str;
+    fn get_route(&self) -> &'static str;
+    fn get_deprecated_routes(&self) -> Option<Vec<&'static str>>;
     fn get_model_routes(&self) -> Option<Vec<&'static str>>;
 }
 
 pub trait PutAction {
-    fn get_route(&self) -> &str;
+    fn get_route(&self) -> &'static str;
+    fn get_deprecated_routes(&self) -> Option<Vec<&'static str>>;
     fn get_model_routes(&self) -> Option<Vec<&'static str>>;
 }
 
 pub trait DeleteAction {
-    fn get_route(&self) -> &str;
+    fn get_route(&self) -> &'static str;
+    fn get_deprecated_routes(&self) -> Option<Vec<&'static str>>;
     fn get_model_routes(&self) -> Option<Vec<&'static str>>;
 }
 
@@ -49,6 +54,7 @@ pub struct HttpAction {
     pub http_route: HttpRoute,
     pub description: Arc<dyn GetDescription + Send + Sync + 'static>,
     pub should_be_authorized: ShouldBeAuthorized,
+    pub deprecated: bool,
 }
 
 impl GetShouldBeAuthorized for HttpAction {
@@ -59,16 +65,55 @@ impl GetShouldBeAuthorized for HttpAction {
 
 pub struct HttpActions {
     actions: Vec<HttpAction>,
+    pub action_verb: Method,
 }
 
 impl HttpActions {
-    pub fn new() -> Self {
+    pub fn new(action_verb: Method) -> Self {
         Self {
             actions: Vec::new(),
+            action_verb,
         }
     }
 
-    pub fn register(&mut self, action: HttpAction) -> Result<(), String> {
+    pub fn register_action<
+        TGetAction: HandleHttpRequest + GetDescription + Send + Sync + 'static,
+    >(
+        &mut self,
+        action: Arc<TGetAction>,
+        action_route: &str,
+        model_routes: Option<Vec<&'static str>>,
+        deprecated: bool,
+    ) {
+        let http_route = HttpRoute::new(action_route);
+
+        if let Some(route_keys) = model_routes {
+            if let Err(err) = http_route.check_route_keys(&route_keys) {
+                panic!("[{}]: {}", self.action_verb, err)
+            }
+        }
+
+        let result = self.register(HttpAction {
+            handler: action.clone(),
+
+            should_be_authorized: if let Some(desc) = action.get_description() {
+                desc.input_params
+                    .check_parameters(&self.action_verb, http_route.route.as_str());
+                desc.should_be_authorized
+            } else {
+                ShouldBeAuthorized::UseGlobal
+            },
+            http_route,
+            description: action,
+            deprecated,
+        });
+
+        if let Err(err) = result {
+            panic!("Failed to register [{}] action: {}", self.action_verb, err);
+        }
+    }
+
+    fn register(&mut self, action: HttpAction) -> Result<(), String> {
         for registered_action in &self.actions {
             if registered_action.http_route.route.to_lowercase()
                 == action.http_route.route.to_lowercase()

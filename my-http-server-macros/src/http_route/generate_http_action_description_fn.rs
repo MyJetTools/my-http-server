@@ -23,7 +23,6 @@ pub fn generate_http_action_description_fn(
     let controller_name = api_data.controller;
     let summary = api_data.summary;
     let description = api_data.description;
-    let deprecated = api_data.deprecated;
 
     let input_params = generate_get_input_params(action_parameters.input_data);
 
@@ -39,7 +38,6 @@ pub fn generate_http_action_description_fn(
             should_be_authorized: #should_be_authorized,
             input_params: #input_params,
             results: #results,
-            deprecated: #deprecated
         }.into()
 
     })

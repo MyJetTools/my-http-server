@@ -17,7 +17,6 @@ pub struct HttpActionDescription<'s> {
     pub input_params: HttpParameters,
     pub results: Vec<HttpResult>,
     pub should_be_authorized: ShouldBeAuthorized,
-    pub deprecated: bool,
 }
 
 pub trait HttpActionDescriptionProvider {

@@ -1,15 +1,14 @@
 use std::collections::BTreeMap;
 
-use crate::controllers::documentation::HttpActionDescription;
-
 use crate::controllers::ControllersMiddleware;
 
+use super::builder::SwaggerActionDescription;
 use super::yaml_writer::YamlWriter;
 
 pub fn build(
     yaml_writer: &mut YamlWriter,
 
-    actions: &BTreeMap<String, BTreeMap<String, HttpActionDescription>>,
+    actions: &BTreeMap<String, BTreeMap<String, SwaggerActionDescription>>,
     controllers: &ControllersMiddleware,
 ) {
     yaml_writer.write_upper_level("paths", |yaml_writer| {
@@ -19,8 +18,9 @@ pub fn build(
                     super::verb_description::build(
                         yaml_writer,
                         verb,
-                        action_description,
+                        &action_description.description,
                         controllers,
+                        action_description.deprecated,
                     )
                 }
             });

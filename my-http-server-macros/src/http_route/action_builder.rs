@@ -65,13 +65,13 @@ pub struct ActionParameters<'s>{
     #[allow_ident]
     pub method: ActionMethod,
     pub route: &'s str,
+    pub deprecated_routes: Option<Vec<&'s str>>,
     pub summary: Option<&'s str>,
     pub description: Option<&'s str>,
     pub controller: Option<&'s str>,
     #[allow_ident]
     pub input_data: Option<&'s str>,
     pub authorized: Option<ShouldBeAuthorized>,
-    pub deprecated: Option<bool>,
     pub result: Option<Vec<HttpActionResult<'s>>>,
 }
 
@@ -139,10 +139,7 @@ impl<'s> ActionParameters<'s>{
 
         let description = self.description.unwrap();
 
-        let deprecated = match self.deprecated{
-            Some(deprecated) => deprecated,
-            None => false
-        };
+
 
         let mut results = None;
 
@@ -170,7 +167,6 @@ impl<'s> ActionParameters<'s>{
             controller,
             summary,
             description,
-            deprecated,
             results 
         })
     }
@@ -212,12 +208,31 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
         quote::quote!(None)
     };
 
+
+    let deprecated_routes = if let Some(deprecated_routes) = action_parameters.deprecated_routes{
+
+        if deprecated_routes.is_empty(){
+            panic!("'deprecated_routes' must have at least one route");
+        }
+
+        quote::quote!(Some(vec![#(#deprecated_routes,)*]))
+
+    }else{
+        quote::quote!(None)
+    };
+
+    //todo!("Render Deprecated rotes")
     let result = quote::quote! {
+        #[derive(Clone)]
         #ast
 
         impl #trait_name for #struct_name{
-            fn get_route(&self) -> &str {
-                #route
+            fn get_route(&self) -> &'static str {
+                #route               
+            }
+
+            fn get_deprecated_routes(&self) -> Option<Vec<&'static str>>{
+                #deprecated_routes
             }
 
             fn get_model_routes(&self) -> Option<Vec<&'static str>>{

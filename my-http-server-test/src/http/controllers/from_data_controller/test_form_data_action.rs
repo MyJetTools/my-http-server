@@ -6,15 +6,16 @@ use super::contracts::*;
 #[http_route(
     method: "POST",
     route: "/api/formdata/v1",
+    deprecated_routes: ["/api/formdata/v1/deprecated"],
     summary: "Test of body as model",
     description: "Test of body as model",
     controller: "FormDataTest",
     input_data: "FromDataInputModel",
-    deprecated: true,
     result:[
         {status_code: 202, description: "Ok response"},
     ]
 )]
+
 pub struct TestFormDataAction {}
 
 impl TestFormDataAction {

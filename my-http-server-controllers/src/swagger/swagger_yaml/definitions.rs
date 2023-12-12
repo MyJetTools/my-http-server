@@ -8,12 +8,12 @@ use crate::controllers::{
     ControllersMiddleware,
 };
 
-use super::yaml_writer::YamlWriter;
+use super::{builder::SwaggerActionDescription, yaml_writer::YamlWriter};
 
 pub fn build_and_write(
     yaml_writer: &mut YamlWriter,
     controllers: &ControllersMiddleware,
-    path_descriptions: &BTreeMap<String, BTreeMap<String, HttpActionDescription>>,
+    path_descriptions: &BTreeMap<String, BTreeMap<String, SwaggerActionDescription>>,
 ) {
     yaml_writer.write_upper_level("schemas", |yaml_writer| {
         let mut definitions = HashMap::new();
@@ -24,22 +24,14 @@ pub fn build_and_write(
 
         for (_, action_descriptions) in path_descriptions {
             for (_, action_description) in action_descriptions {
-                for result in &action_description.results {
+                for result in &action_description.description.results {
                     populate_object_type(yaml_writer, &mut definitions, &result.data_type);
                 }
 
-                if let Some(input_parameters) = action_description.input_params.get_body_params() {
-                    for in_param in input_parameters {
-                        populate_object_type(
-                            yaml_writer,
-                            &mut definitions,
-                            &in_param.field.data_type,
-                        );
-                    }
-                }
-
-                if let Some(input_parameters) =
-                    action_description.input_params.get_non_body_params()
+                if let Some(input_parameters) = action_description
+                    .description
+                    .input_params
+                    .get_body_params()
                 {
                     for in_param in input_parameters {
                         populate_object_type(
@@ -50,8 +42,24 @@ pub fn build_and_write(
                     }
                 }
 
-                if let Some(input_parameters) =
-                    action_description.input_params.get_form_data_params()
+                if let Some(input_parameters) = action_description
+                    .description
+                    .input_params
+                    .get_non_body_params()
+                {
+                    for in_param in input_parameters {
+                        populate_object_type(
+                            yaml_writer,
+                            &mut definitions,
+                            &in_param.field.data_type,
+                        );
+                    }
+                }
+
+                if let Some(input_parameters) = action_description
+                    .description
+                    .input_params
+                    .get_form_data_params()
                 {
                     for in_param in input_parameters {
                         populate_object_type(

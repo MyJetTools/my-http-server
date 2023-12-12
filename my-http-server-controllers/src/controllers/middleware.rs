@@ -11,8 +11,8 @@ use super::{
         DeleteAction, GetAction, GetDescription, HandleHttpRequest, HttpAction, HttpActions,
         PostAction, PutAction,
     },
-    documentation::{data_types::HttpObjectStructure, ShouldBeAuthorized},
-    AuthErrorFactory, AuthorizationMap, HttpRoute,
+    documentation::data_types::HttpObjectStructure,
+    AuthErrorFactory, AuthorizationMap,
 };
 
 use super::ControllersAuthorization;
@@ -33,10 +33,10 @@ impl ControllersMiddleware {
         auth_error_factory: Option<Arc<dyn AuthErrorFactory + Send + Sync + 'static>>,
     ) -> Self {
         Self {
-            get: HttpActions::new(),
-            post: HttpActions::new(),
-            put: HttpActions::new(),
-            delete: HttpActions::new(),
+            get: HttpActions::new(Method::GET),
+            post: HttpActions::new(Method::POST),
+            put: HttpActions::new(Method::PUT),
+            delete: HttpActions::new(Method::DELETE),
             http_objects: Vec::new(),
             authorization_map: AuthorizationMap::new(authorization),
             auth_error_factory,
@@ -55,13 +55,30 @@ impl ControllersMiddleware {
     }
 
     pub fn register_get_action<
-        TGetAction: GetAction + HandleHttpRequest + GetDescription + Send + Sync + 'static,
+        TGetAction: GetAction + HandleHttpRequest + GetDescription + Clone + Send + Sync + 'static,
     >(
         &mut self,
         action: Arc<TGetAction>,
     ) {
-        let http_route = HttpRoute::new(action.get_route());
+        let route = action.get_route();
 
+        let model_routes = action.get_model_routes();
+
+        self.get
+            .register_action(action.clone(), route, model_routes.clone(), false);
+
+        if let Some(deprecated_rotes) = action.get_deprecated_routes() {
+            for deprecated_route in deprecated_rotes {
+                self.get.register_action(
+                    action.clone(),
+                    deprecated_route,
+                    model_routes.clone(),
+                    true,
+                );
+            }
+        }
+
+        /*
         if let Some(route_keys) = action.get_model_routes() {
             if let Err(err) = http_route.check_route_keys(&route_keys) {
                 panic!("[GET]: {}", err)
@@ -85,15 +102,34 @@ impl ControllersMiddleware {
         if let Err(err) = result {
             panic!("Failed to register GET action: {}", err);
         }
+         */
     }
 
     pub fn register_post_action<
-        TPostAction: PostAction + HandleHttpRequest + GetDescription + Send + Sync + 'static,
+        TPostAction: PostAction + HandleHttpRequest + GetDescription + Clone + Send + Sync + 'static,
     >(
         &mut self,
         action: Arc<TPostAction>,
     ) {
-        let http_route = HttpRoute::new(action.get_route());
+        let route = action.get_route();
+
+        let model_routes = action.get_model_routes();
+
+        self.post
+            .register_action(action.clone(), route, model_routes.clone(), false);
+
+        if let Some(deprecated_rotes) = action.get_deprecated_routes() {
+            for deprecated_route in deprecated_rotes {
+                self.post.register_action(
+                    action.clone(),
+                    deprecated_route,
+                    model_routes.clone(),
+                    true,
+                );
+            }
+        }
+
+        /*
         if let Some(route_keys) = action.get_model_routes() {
             if let Err(err) = http_route.check_route_keys(&route_keys) {
                 panic!("[POST]: {}", err)
@@ -117,6 +153,7 @@ impl ControllersMiddleware {
         if let Err(err) = result {
             panic!("Failed to register POST action: {}", err);
         }
+         */
     }
 
     pub fn register_put_action<
@@ -125,7 +162,25 @@ impl ControllersMiddleware {
         &mut self,
         action: Arc<TPutAction>,
     ) {
-        let http_route = HttpRoute::new(action.get_route());
+        let route = action.get_route();
+
+        let model_routes = action.get_model_routes();
+
+        self.put
+            .register_action(action.clone(), route, model_routes.clone(), false);
+
+        if let Some(deprecated_rotes) = action.get_deprecated_routes() {
+            for deprecated_route in deprecated_rotes {
+                self.put.register_action(
+                    action.clone(),
+                    deprecated_route,
+                    model_routes.clone(),
+                    true,
+                );
+            }
+        }
+
+        /*
         if let Some(route_keys) = action.get_model_routes() {
             if let Err(err) = http_route.check_route_keys(&route_keys) {
                 panic!("[PUT]: {}", err)
@@ -149,6 +204,7 @@ impl ControllersMiddleware {
         if let Err(err) = result {
             panic!("Failed to register PUT action: {}", err);
         }
+         */
     }
 
     pub fn register_delete_action<
@@ -157,8 +213,25 @@ impl ControllersMiddleware {
         &mut self,
         action: Arc<TDeleteAction>,
     ) {
-        let http_route = HttpRoute::new(action.get_route());
+        let route = action.get_route();
 
+        let model_routes = action.get_model_routes();
+
+        self.delete
+            .register_action(action.clone(), route, model_routes.clone(), false);
+
+        if let Some(deprecated_rotes) = action.get_deprecated_routes() {
+            for deprecated_route in deprecated_rotes {
+                self.delete.register_action(
+                    action.clone(),
+                    deprecated_route,
+                    model_routes.clone(),
+                    true,
+                );
+            }
+        }
+
+        /*
         if let Some(route_keys) = action.get_model_routes() {
             if let Err(err) = http_route.check_route_keys(&route_keys) {
                 panic!("[DELETE]: {}", err)
@@ -182,6 +255,7 @@ impl ControllersMiddleware {
         if let Err(err) = result {
             panic!("Failed to register DELETE action: {}", err);
         }
+         */
     }
 
     pub fn list_of_get_route_actions(&self) -> &Vec<HttpAction> {

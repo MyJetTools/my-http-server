@@ -13,6 +13,7 @@ pub fn build(
     verb: &str,
     action_description: &HttpActionDescription,
     controllers: &ControllersMiddleware,
+    deprecated: bool,
 ) {
     yaml_writer.write_upper_level(verb, |yaml_writer| {
         if let Some(authorization) = &controllers.authorization_map.global_authorization {
@@ -52,7 +53,7 @@ pub fn build(
 
         yaml_writer.write("description", action_description.description);
 
-        if action_description.deprecated {
+        if deprecated {
             yaml_writer.write_bool("deprecated", true);
         }
 

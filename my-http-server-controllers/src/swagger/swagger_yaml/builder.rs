@@ -44,35 +44,52 @@ pub fn build(
     yaml_writer.build()
 }
 
+pub struct SwaggerActionDescription<'s> {
+    pub deprecated: bool,
+    pub description: HttpActionDescription<'s>,
+}
+
 fn build_paths_descriptions(
     controllers: &ControllersMiddleware,
     global_fail_results: Option<Vec<HttpResult>>,
-) -> BTreeMap<String, BTreeMap<String, HttpActionDescription>> {
+) -> BTreeMap<String, BTreeMap<String, SwaggerActionDescription>> {
     let mut result = BTreeMap::new();
 
-    for route_action in controllers.list_of_get_route_actions() {
-        if let Some(description) = route_action.description.get_description() {
-            if !result.contains_key(route_action.http_route.route.as_str()) {
-                result.insert(route_action.http_route.route.to_string(), BTreeMap::new());
+    for http_action in controllers.list_of_get_route_actions() {
+        if let Some(description) = http_action.description.get_description() {
+            if !result.contains_key(http_action.http_route.route.as_str()) {
+                result.insert(http_action.http_route.route.to_string(), BTreeMap::new());
             }
 
             result
-                .get_mut(route_action.http_route.route.as_str())
+                .get_mut(http_action.http_route.route.as_str())
                 .unwrap()
-                .insert("get".to_string(), description);
+                .insert(
+                    "get".to_string(),
+                    SwaggerActionDescription {
+                        deprecated: http_action.deprecated,
+                        description: description,
+                    },
+                );
         }
     }
 
-    for route_action in controllers.list_of_post_route_actions() {
-        if let Some(description) = route_action.description.get_description() {
-            if !result.contains_key(route_action.http_route.route.as_str()) {
-                result.insert(route_action.http_route.route.to_string(), BTreeMap::new());
+    for http_action in controllers.list_of_post_route_actions() {
+        if let Some(description) = http_action.description.get_description() {
+            if !result.contains_key(http_action.http_route.route.as_str()) {
+                result.insert(http_action.http_route.route.to_string(), BTreeMap::new());
             }
 
             result
-                .get_mut(route_action.http_route.route.as_str())
+                .get_mut(http_action.http_route.route.as_str())
                 .unwrap()
-                .insert("post".to_string(), description);
+                .insert(
+                    "post".to_string(),
+                    SwaggerActionDescription {
+                        deprecated: http_action.deprecated,
+                        description: description,
+                    },
+                );
         }
     }
 
@@ -85,7 +102,13 @@ fn build_paths_descriptions(
             result
                 .get_mut(route_action.http_route.route.as_str())
                 .unwrap()
-                .insert("put".to_string(), description);
+                .insert(
+                    "put".to_string(),
+                    SwaggerActionDescription {
+                        deprecated: route_action.deprecated,
+                        description: description,
+                    },
+                );
         }
     }
 
@@ -98,7 +121,13 @@ fn build_paths_descriptions(
             result
                 .get_mut(route_action.http_route.route.as_str())
                 .unwrap()
-                .insert("delete".to_string(), description);
+                .insert(
+                    "delete".to_string(),
+                    SwaggerActionDescription {
+                        deprecated: route_action.deprecated,
+                        description: description,
+                    },
+                );
         }
     }
 
@@ -106,7 +135,7 @@ fn build_paths_descriptions(
         for verbs in result.values_mut() {
             for action in verbs.values_mut() {
                 for global_fail_result in &global_path_description {
-                    action.results.push(global_fail_result.clone());
+                    action.description.results.push(global_fail_result.clone());
                 }
             }
         }
