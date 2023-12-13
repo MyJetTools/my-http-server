@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use hyper::HeaderMap;
 
 use crate::{data_src::SRC_HEADER, HeaderValue, HttpFailResult};
@@ -32,6 +34,8 @@ pub trait HttpRequestHeaders {
             )),
         }
     }
+
+    fn to_hash_map(&self) -> HashMap<String, String>;
 }
 
 impl HttpRequestHeaders for HeaderMap {
@@ -56,5 +60,18 @@ impl HttpRequestHeaders for HeaderMap {
         }
 
         None
+    }
+
+    fn to_hash_map(&self) -> HashMap<String, String> {
+        let mut result = HashMap::new();
+
+        for (key, value) in self {
+            let key = key.as_str().to_string();
+            let value = value.to_str().unwrap().to_string();
+
+            result.insert(key, value);
+        }
+
+        result
     }
 }
