@@ -93,6 +93,14 @@ impl<'s> UrlEncodedData<'s> {
             UrlEncodedData::QueryStringEmpty => "query string",
         }
     }
+
+    pub fn get_raw(&self) -> &str {
+        match self {
+            UrlEncodedData::Body(src) => src.get_raw(),
+            UrlEncodedData::QueryString(src) => src.get_raw(),
+            UrlEncodedData::QueryStringEmpty => "",
+        }
+    }
 }
 
 impl From<UrlDecodeError> for HttpFailResult {

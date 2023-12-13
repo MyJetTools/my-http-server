@@ -221,7 +221,6 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
         quote::quote!(None)
     };
 
-    //todo!("Render Deprecated rotes")
     let result = quote::quote! {
         #[derive(Clone)]
         #ast
@@ -255,6 +254,7 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
         #[async_trait::async_trait]
         impl my_http_server::controllers::actions::HandleHttpRequest for #struct_name{
             async fn handle_request(&self, http_route: &#http_route, ctx: &mut #http_context) -> Result<#http_ok_result, #http_fail_result> {
+                
                 #handle_request
             }
         }

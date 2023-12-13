@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::controllers::{
     documentation::{
         data_types::{ArrayElement, HttpDataType, HttpObjectStructure},
-        HttpActionDescription, InputStructure,
+        InputStructure,
     },
     ControllersMiddleware,
 };

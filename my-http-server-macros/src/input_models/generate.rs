@@ -17,6 +17,25 @@ pub fn generate(ast: &syn::DeriveInput, debug: &mut bool) -> Result<TokenStream,
 
     let input_fields = HttpInputProperties::new(&fields)?;
 
+    let print_request_to_console = if input_fields.print_request_to_console {
+        quote::quote! {
+            {
+                let query = ctx.request.get_query_string()?;
+                println!("QueryString: '{}'", query.get_raw());
+                for (name, value) in ctx.request.get_headers().to_hash_map() {
+                    println!("Header: ['{}']: '{}'", name, value);
+                }
+
+                let body = ctx.request.get_body().await?;
+                println!("===Body Start===");
+                print!("{}", body.as_str()?);
+                println!("===Body End===");
+            }
+        }
+    } else {
+        quote::quote!()
+    };
+
     let http_input_param = crate::consts::get_http_input_parameter_with_ns();
 
     let http_ctx = crate::consts::get_http_context();
@@ -52,6 +71,7 @@ pub fn generate(ast: &syn::DeriveInput, debug: &mut bool) -> Result<TokenStream,
 
             pub async fn parse_http_input(http_route: &my_http_server::controllers::HttpRoute, ctx: &mut #http_ctx)->Result<Self,#http_fail_result>{
                 use my_http_server::*;
+                #print_request_to_console
                 #parse_http_input
             }
 

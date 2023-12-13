@@ -19,4 +19,7 @@ pub struct HttpBodyAttribute<'s> {
     pub trim: bool,
 
     pub default: Option<types_reader::AnyValue<'s>>,
+
+    #[has_attribute]
+    pub print_request_to_console: bool,
 }

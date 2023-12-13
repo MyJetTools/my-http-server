@@ -11,10 +11,13 @@ pub struct HttpInputProperties<'s> {
     pub form_data_fields: Option<Vec<InputField<'s>>>,
     pub body_raw_field: Option<InputField<'s>>,
     pub path_fields: Option<Vec<InputField<'s>>>,
+
+    pub print_request_to_console: bool,
 }
 
 impl<'s> HttpInputProperties<'s> {
     pub fn new(props: &'s [StructProperty]) -> Result<Self, syn::Error> {
+        let mut print_request_to_console = false;
         let mut body_fields = LazyVec::with_capacity(props.len());
         let mut query_string_fields = LazyVec::with_capacity(props.len());
         let mut header_fields = LazyVec::with_capacity(props.len());
@@ -33,6 +36,9 @@ impl<'s> HttpInputProperties<'s> {
             let attr: Option<HttpQueryAttribute> = struct_property.try_get_attribute()?;
 
             if let Some(attr) = attr {
+                if attr.print_request_to_console {
+                    print_request_to_console = true;
+                }
                 query_string_fields.add(InputField::new(struct_property, attr));
                 continue;
             }
@@ -40,6 +46,9 @@ impl<'s> HttpInputProperties<'s> {
             let attr: Option<HttpPathAttribute> = struct_property.try_get_attribute()?;
 
             if let Some(attr) = attr {
+                if attr.print_request_to_console {
+                    print_request_to_console = true;
+                }
                 path_fields.add(InputField::new(struct_property, attr));
                 continue;
             }
@@ -47,6 +56,9 @@ impl<'s> HttpInputProperties<'s> {
             let attr: Option<HttpHeaderAttribute> = struct_property.try_get_attribute()?;
 
             if let Some(attr) = attr {
+                if attr.print_request_to_console {
+                    print_request_to_console = true;
+                }
                 header_fields.add(InputField::new(struct_property, attr));
                 continue;
             }
@@ -60,6 +72,10 @@ impl<'s> HttpInputProperties<'s> {
 
                 if body_raw_field.is_some() {
                     struct_property.throw_error("body_raw attribute already exists.")?;
+                }
+
+                if attr.print_request_to_console {
+                    print_request_to_console = true;
                 }
 
                 form_data_fields.add(InputField::new(struct_property, attr));
@@ -77,6 +93,9 @@ impl<'s> HttpInputProperties<'s> {
                     struct_property.throw_error("body_raw attribute already exists.")?;
                 }
 
+                if attr.print_request_to_console {
+                    print_request_to_console = true;
+                }
                 body_fields.add(InputField::new(struct_property, attr));
                 continue;
             }
@@ -96,6 +115,10 @@ impl<'s> HttpInputProperties<'s> {
                     struct_property.throw_error("http_body attribute already exists.")?;
                 }
 
+                if attr.print_request_to_console {
+                    print_request_to_console = true;
+                }
+
                 body_raw_field = Some(InputField::new(struct_property, attr));
 
                 continue;
@@ -109,6 +132,7 @@ impl<'s> HttpInputProperties<'s> {
             path_fields: path_fields.get_result(),
             body_raw_field,
             form_data_fields: form_data_fields.get_result(),
+            print_request_to_console,
         };
 
         result.self_check()?;
