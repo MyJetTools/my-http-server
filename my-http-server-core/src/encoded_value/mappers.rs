@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    data_src::SRC_FORM_DATA,
     types::{RawData, RawDataTyped},
     EncodedParamValue, HttpFailResult,
 };
@@ -20,6 +21,10 @@ impl TryInto<DateTimeAsMicroseconds> for EncodedParamValue<'_> {
             }
             Self::JsonEncodedData { value, .. } => {
                 return value.as_date_time();
+            }
+            Self::FormData { name, value } => {
+                let value = value.unwrap_as_string()?;
+                crate::convert_from_str::to_date_time(name, value, SRC_FORM_DATA)
             }
         }
     }
@@ -153,6 +158,10 @@ where
             Self::JsonEncodedData { name, value, src } => {
                 crate::convert_from_str::to_json(name, &Some(value.as_bytes()?), src)
             }
+            Self::FormData { name, value } => {
+                let value = value.unwrap_as_string()?;
+                crate::convert_from_str::to_json(name, &Some(value.as_bytes()), SRC_FORM_DATA)
+            }
         }
     }
 }
@@ -169,6 +178,10 @@ impl<'s, T: DeserializeOwned> TryInto<RawDataTyped<T>> for EncodedParamValue<'s>
                 value,
                 src,
             } => Ok(RawDataTyped::from_slice(value.as_bytes()?, src)),
+            Self::FormData { name: _, value } => {
+                let value = value.unwrap_as_string()?;
+                Ok(RawDataTyped::from_slice(value.as_bytes(), SRC_FORM_DATA))
+            }
         }
     }
 }
@@ -179,6 +192,10 @@ impl TryInto<RawData> for EncodedParamValue<'_> {
         match self {
             Self::UrlEncodedValue { value, .. } => Ok(RawData::from_slice(value.value.as_bytes())),
             Self::JsonEncodedData { value, .. } => Ok(RawData::from_slice(value.as_bytes()?)),
+            Self::FormData { name: _, value } => {
+                let value = value.unwrap_as_string()?;
+                Ok(RawData::from_slice(value.as_bytes()))
+            }
         }
     }
 }

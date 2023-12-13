@@ -1,34 +1,40 @@
 use crate::{url_encoded_data::UrlEncodedData, EncodedParamValue, HttpFailResult, JsonEncodedData};
 
-use crate::data_src::*;
+use crate::{data_src::*, FormDataReader};
+
+/*
 pub enum BodyDataReaderInner<'s> {
     UrlEncoded(UrlEncodedData<'s>),
     JsonEncoded(JsonEncodedData<'s>),
+    FormData(FormDataReader<'s>),
 }
-pub struct BodyDataReader<'s> {
-    inner: BodyDataReaderInner<'s>,
+ */
+pub enum BodyDataReader<'s> {
+    UrlEncoded(UrlEncodedData<'s>),
+    JsonEncoded(JsonEncodedData<'s>),
+    FormData(FormDataReader<'s>),
 }
 
 impl<'s> BodyDataReader<'s> {
     pub fn crate_as_url_encoded_data(src: UrlEncodedData<'s>) -> Self {
-        Self {
-            inner: BodyDataReaderInner::UrlEncoded(src),
-        }
+        Self::UrlEncoded(src)
     }
 
     pub fn create_as_json_encoded_data(src: JsonEncodedData<'s>) -> Self {
-        Self {
-            inner: BodyDataReaderInner::JsonEncoded(src),
-        }
+        Self::JsonEncoded(src)
+    }
+
+    pub fn create_as_form_data_reader(src: FormDataReader<'s>) -> Self {
+        Self::FormData(src)
     }
 
     pub fn get_required(
         &'s self,
         name: &'static str,
     ) -> Result<EncodedParamValue<'s>, HttpFailResult> {
-        match &self.inner {
-            BodyDataReaderInner::UrlEncoded(src) => src.get_required(name),
-            BodyDataReaderInner::JsonEncoded(src) => {
+        match self {
+            Self::UrlEncoded(src) => src.get_required(name),
+            Self::JsonEncoded(src) => {
                 let value = src.get_required(name)?;
                 Ok(EncodedParamValue::JsonEncodedData {
                     name: name,
@@ -36,19 +42,31 @@ impl<'s> BodyDataReader<'s> {
                     src: SRC_BODY_JSON,
                 })
             }
+            Self::FormData(src) => {
+                let result = src.get_required(name)?;
+                Ok(EncodedParamValue::FormData {
+                    name,
+                    value: result,
+                })
+            }
         }
     }
 
     pub fn get_optional(&'s self, name: &'static str) -> Option<EncodedParamValue<'s>> {
-        match &self.inner {
-            BodyDataReaderInner::UrlEncoded(result) => result.get_optional(name),
-            BodyDataReaderInner::JsonEncoded(result) => {
+        match self {
+            Self::UrlEncoded(result) => result.get_optional(name),
+            Self::JsonEncoded(result) => {
                 let value = result.get_optional(name)?;
                 Some(EncodedParamValue::JsonEncodedData {
                     name: name.into(),
                     value,
                     src: SRC_BODY_JSON,
                 })
+            }
+
+            Self::FormData(src) => {
+                let value = src.get_optional(name)?;
+                Some(EncodedParamValue::FormData { name, value })
             }
         }
     }

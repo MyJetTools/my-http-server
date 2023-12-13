@@ -110,13 +110,6 @@ impl<'s> HttpFieldAttribute<'s> {
 
         result
     }
-
-    pub fn is_form_data(&self) -> bool {
-        match self {
-            Self::HttpFormData(_) => true,
-            _ => false,
-        }
-    }
 }
 
 impl<'s> Into<HttpFieldAttribute<'s>> for HttpHeaderAttribute<'s> {

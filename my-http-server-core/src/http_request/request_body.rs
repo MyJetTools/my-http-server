@@ -77,7 +77,7 @@ impl HttpRequestBody {
         }
     }
 
-    pub fn get_form_data_reader(&self) -> Result<FormDataReader, HttpFailResult> {
+    fn get_form_data_reader(&self) -> Result<FormDataReader, HttpFailResult> {
         if let Some(content_type) = self.content_type.as_ref() {
             if extract_boundary(content_type.as_bytes()).is_some() {
                 let reader = FormDataReader::new(&self.raw_body);
@@ -98,9 +98,8 @@ impl HttpRequestBody {
                 get_body_data_reader_as_url_encoded(body_as_str)
             }
             BodyModelFormat::Unknown => {
-                return Err(HttpFailResult::as_not_supported_content_type(
-                    "Unknown body content type".to_string(),
-                ))
+                let form_data_reader = self.get_form_data_reader()?;
+                Ok(BodyDataReader::create_as_form_data_reader(form_data_reader))
             }
         }
     }

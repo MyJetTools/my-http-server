@@ -3,7 +3,10 @@ use std::str::FromStr;
 use rust_extensions::StrOrString;
 use serde::de::DeserializeOwned;
 
-use crate::{json_encoded_data::JsonEncodedValueAsString, HttpFailResult};
+use crate::{
+    data_src::SRC_FORM_DATA, json_encoded_data::JsonEncodedValueAsString, FormDataItem,
+    HttpFailResult,
+};
 
 use url_utils::url_encoded_data_reader::UrlEncodedValue;
 
@@ -17,6 +20,11 @@ pub enum EncodedParamValue<'s> {
         value: &'s JsonEncodedValueAsString<'s>,
         src: &'static str,
     },
+
+    FormData {
+        name: &'static str,
+        value: &'s FormDataItem<'s>,
+    },
 }
 
 impl<'s> EncodedParamValue<'s> {
@@ -27,6 +35,7 @@ impl<'s> EncodedParamValue<'s> {
         match self {
             Self::UrlEncodedValue { value, .. } => value.get_name(),
             Self::JsonEncodedData { name, .. } => &name,
+            Self::FormData { name, .. } => name,
         }
     }
     pub fn as_string(&self) -> Result<String, HttpFailResult> {
@@ -41,6 +50,10 @@ impl<'s> EncodedParamValue<'s> {
                 value,
                 src: _,
             } => value.as_string(),
+            EncodedParamValue::FormData { name: _, value } => {
+                let value = value.unwrap_as_string()?;
+                Ok(value.to_string())
+            }
         }
     }
 
@@ -55,6 +68,11 @@ impl<'s> EncodedParamValue<'s> {
                 value,
                 src: _,
             } => value.parse(),
+
+            EncodedParamValue::FormData { name, value } => {
+                let value = value.unwrap_as_string()?;
+                crate::convert_from_str::to_simple_value(name, value, SRC_FORM_DATA)
+            }
         }
     }
 
@@ -66,6 +84,11 @@ impl<'s> EncodedParamValue<'s> {
                 value,
                 src: _,
             } => value.as_raw_str(),
+
+            EncodedParamValue::FormData { name: _, value } => {
+                let value = value.unwrap_as_string()?;
+                Ok(value)
+            }
         }
     }
 
@@ -79,6 +102,10 @@ impl<'s> EncodedParamValue<'s> {
             Self::JsonEncodedData { name, value, src } => {
                 crate::convert_from_str::to_json(name, &Some(value.as_bytes()?), src)
             }
+            Self::FormData { name, value } => {
+                let value = value.unwrap_as_string()?;
+                crate::convert_from_str::to_json(name, &Some(value.as_bytes()), SRC_FORM_DATA)
+            }
         }
     }
 
@@ -86,6 +113,7 @@ impl<'s> EncodedParamValue<'s> {
         match self {
             Self::UrlEncodedValue { src, .. } => src,
             Self::JsonEncodedData { src, .. } => src,
+            Self::FormData { .. } => SRC_FORM_DATA,
         }
     }
 
@@ -99,6 +127,10 @@ impl<'s> EncodedParamValue<'s> {
                 value,
                 src: _,
             } => Ok(StrOrString::create_as_str(value.as_raw_str()?)),
+            Self::FormData { value, .. } => {
+                let value = value.unwrap_as_string()?;
+                Ok(StrOrString::create_as_str(value))
+            }
         }
     }
 }

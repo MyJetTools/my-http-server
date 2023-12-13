@@ -11,13 +11,7 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
 
     let mut reading_fields = Vec::with_capacity(input_fields.len());
 
-    let mut is_form_data = false;
-
     for input_field in input_fields {
-        if input_field.attr.is_form_data() {
-            is_form_data = true;
-        }
-
         reading_fields.push(generate_reading(input_field, &data_src)?);
         if let Some(validator) = input_field.get_validator() {
             validations.push(validator);
@@ -26,16 +20,10 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
 
     let init_fields = super::utils::get_fields_to_read(input_fields)?;
 
-    let body_data_reader = if is_form_data {
-        quote::quote!(get_form_data_reader)
-    } else {
-        quote::quote!(get_body_data_reader)
-    };
-
     let result = quote! {
         let #init_fields ={
             let __body = ctx.request.get_body().await?;
-            let __reader = __body.#body_data_reader()?;
+            let __reader = __body.get_body_data_reader()?;
             #(#reading_fields)*
             #init_fields
         };
