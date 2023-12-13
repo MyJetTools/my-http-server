@@ -1,4 +1,5 @@
 //pub mod bulk_controller;
+pub mod authorized_attr;
 pub mod body_as_model_controller;
 pub mod body_test_controller;
 pub mod from_data_controller;
