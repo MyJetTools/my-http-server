@@ -226,6 +226,12 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
         #[derive(Clone)]
         #ast
 
+        impl #struct_name{
+            fn get_description() -> Option<#http_action_description>{
+                #description
+            }
+        }
+
         impl #trait_name for #struct_name{
             fn get_route(&self) -> &'static str {
                 #route               
@@ -242,7 +248,7 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
 
         impl my_http_server::controllers::actions::GetDescription for #struct_name{
             fn get_description(&self) -> Option<#http_action_description>{
-                #description
+                Self::get_description()
             }
         }
 

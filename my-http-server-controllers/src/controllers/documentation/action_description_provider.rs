@@ -10,10 +10,10 @@ pub enum ShouldBeAuthorized {
     UseGlobal,
 }
 
-pub struct HttpActionDescription<'s> {
-    pub controller_name: &'s str,
-    pub summary: &'s str,
-    pub description: &'s str,
+pub struct HttpActionDescription {
+    pub controller_name: &'static str,
+    pub summary: &'static str,
+    pub description: &'static str,
     pub input_params: HttpParameters,
     pub results: Vec<HttpResult>,
     pub should_be_authorized: ShouldBeAuthorized,

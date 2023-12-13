@@ -2,7 +2,7 @@ use my_http_server_core::RequestClaim;
 
 #[derive(Debug, Clone)]
 pub struct RequiredClaims {
-    required_claims: Vec<String>,
+    pub required_claims: Vec<String>,
 }
 
 impl RequiredClaims {

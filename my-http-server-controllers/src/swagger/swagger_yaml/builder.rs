@@ -44,9 +44,9 @@ pub fn build(
     yaml_writer.build()
 }
 
-pub struct SwaggerActionDescription<'s> {
+pub struct SwaggerActionDescription {
     pub deprecated: bool,
-    pub description: HttpActionDescription<'s>,
+    pub description: HttpActionDescription,
 }
 
 fn build_paths_descriptions(
