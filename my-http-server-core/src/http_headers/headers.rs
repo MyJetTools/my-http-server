@@ -51,10 +51,11 @@ impl HttpRequestHeaders for HeaderMap {
     }
 
     fn try_get_case_insensitive(&self, header_name: &'static str) -> Option<HeaderValue> {
-        let header_name_lk = header_name.to_lowercase();
-
         for (key, value) in self {
-            if key.as_str().to_lowercase() == header_name_lk {
+            if rust_extensions::str_utils::compare_strings_case_insensitive(
+                key.as_str(),
+                header_name,
+            ) {
                 return Some(HeaderValue::from_header_value(header_name, value));
             }
         }

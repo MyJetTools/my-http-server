@@ -1,50 +1,24 @@
 use std::collections::HashMap;
 
-use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    data_src::*, form_data_reader::FormDataReader, BodyDataReader, HttpFailResult, JsonEncodedData,
-    UrlEncodedData, WebContentType,
+    data_src::*, form_data_reader::FormDataReader, BodyContentType, BodyDataReader, HttpFailResult,
+    JsonEncodedData, UrlEncodedData, WebContentType,
 };
 
-pub enum BodyModelFormat {
-    Json,
-    UrlEncoded,
-    Unknown,
-}
-
-impl BodyModelFormat {
-    pub fn detect(raw_body: &[u8]) -> Self {
-        for b in raw_body {
-            if *b <= 32 {
-                continue;
-            }
-
-            if *b == '{' as u8 || *b == '[' as u8 {
-                return BodyModelFormat::Json;
-            } else {
-                return BodyModelFormat::UrlEncoded;
-            }
-        }
-        Self::Unknown
-    }
-}
-
 pub struct HttpRequestBody {
-    pub content_type: Option<String>,
     raw_body: Vec<u8>,
-    body_content_type: BodyModelFormat,
+    body_content_type: BodyContentType,
 }
 
 impl HttpRequestBody {
-    pub fn new(body: Vec<u8>, content_type: Option<String>) -> Self {
-        let body_content_type = BodyModelFormat::detect(body.as_slice());
-        Self {
+    pub fn new(body: Vec<u8>, content_type: Option<String>) -> Result<Self, HttpFailResult> {
+        let body_content_type = BodyContentType::detect(body.as_slice(), content_type.as_ref())?;
+        Ok(Self {
             raw_body: body,
             body_content_type,
-            content_type,
-        }
+        })
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -77,28 +51,16 @@ impl HttpRequestBody {
         }
     }
 
-    fn get_form_data_reader(&self) -> Result<FormDataReader, HttpFailResult> {
-        if let Some(content_type) = self.content_type.as_ref() {
-            if extract_boundary(content_type.as_bytes()).is_some() {
-                let reader = FormDataReader::new(&self.raw_body);
-                return Ok(reader);
-            }
-        }
-
-        return Err(HttpFailResult::as_not_supported_content_type(
-            "Expected form data body content".to_string(),
-        ));
-    }
-
     pub fn get_body_data_reader(&self) -> Result<BodyDataReader, HttpFailResult> {
-        match self.body_content_type {
-            BodyModelFormat::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
-            BodyModelFormat::UrlEncoded => {
+        match &self.body_content_type {
+            BodyContentType::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
+            BodyContentType::UrlEncoded => {
                 let body_as_str = self.as_str()?;
                 get_body_data_reader_as_url_encoded(body_as_str)
             }
-            BodyModelFormat::Unknown => {
-                let form_data_reader = self.get_form_data_reader()?;
+
+            BodyContentType::FormData(boundary) => {
+                let form_data_reader = FormDataReader::new(&self.raw_body, boundary.as_str());
                 Ok(BodyDataReader::create_as_form_data_reader(form_data_reader))
             }
         }
@@ -158,19 +120,6 @@ fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, H
 
             return Err(result);
         }
-    }
-}
-
-fn extract_boundary(src: &[u8]) -> Option<&[u8]> {
-    let pos = src.find_sequence_pos("boundary".as_bytes(), 0)?;
-
-    let pos = src.find_byte_pos('=' as u8, pos)?;
-
-    let end_pos = src.find_byte_pos(';' as u8, pos);
-
-    match end_pos {
-        Some(end_pos) => Some(&src[pos + 1..end_pos]),
-        None => Some(&src[pos + 1..]),
     }
 }
 
@@ -287,13 +236,14 @@ impl TryInto<String> for HttpRequestBody {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
 
     #[test]
     fn test() {
         let body = r#"{"processId":"8269e2ac-fa3b-419a-8e65-1a606ba07942","sellAmount":0.4,"buyAmount":null,"sellAsset":"ETH","buyAsset":"USDT"}"#;
 
-        let body = HttpRequestBody::new(body.as_bytes().to_vec(), None);
+        let body = HttpRequestBody::new(body.as_bytes().to_vec(), None).unwrap();
 
         let form_data = body.get_body_data_reader().unwrap();
 
@@ -317,18 +267,5 @@ mod test {
 
         let result = form_data.get_optional("buyAmount");
         assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_boundary_extractor() {
-        let content_type_header =
-            "multipart/form-data; boundary=----WebKitFormBoundaryXayIfSQWkEtJ6k10";
-
-        let boundary = extract_boundary(content_type_header.as_bytes()).unwrap();
-
-        assert_eq!(
-            "----WebKitFormBoundaryXayIfSQWkEtJ6k10",
-            std::str::from_utf8(boundary).unwrap()
-        );
     }
 }

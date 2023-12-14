@@ -1,4 +1,4 @@
-use crate::{form_data_reader::FormDataItem, HttpFailResult};
+use crate::{data_src::SRC_FORM_DATA, form_data_reader::FormDataItem, HttpFailResult};
 
 use super::content_iterator::ContentIterator;
 
@@ -7,10 +7,10 @@ pub struct FormDataReader<'s> {
 }
 
 impl<'s> FormDataReader<'s> {
-    pub fn new(content: &'s [u8]) -> Self {
+    pub fn new(content: &'s [u8], boundary: &'s str) -> Self {
         let mut data = Vec::new();
 
-        for chunk in ContentIterator::new(content) {
+        for chunk in ContentIterator::new(content, boundary) {
             let item = FormDataItem::parse(chunk);
             data.push(item);
         }
@@ -24,7 +24,7 @@ impl<'s> FormDataReader<'s> {
             }
         }
 
-        HttpFailResult::required_parameter_is_missing(name, "form data").into_err()
+        HttpFailResult::required_parameter_is_missing(name, SRC_FORM_DATA).into_err()
     }
 
     pub fn get_optional(&'s self, name: &str) -> Option<&'s FormDataItem> {

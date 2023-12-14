@@ -23,10 +23,11 @@ impl RequestData {
 
                 let headers = parts.headers;
 
-                let content_type = if let Some(content_type) = headers.get("content-type") {
-                    Some(content_type.to_str().unwrap().to_string())
-                } else {
-                    None
+                let content_type = headers.try_get_case_insensitive("content-type");
+
+                let content_type = match content_type {
+                    Some(content_type) => Some(content_type.as_str()?.to_string()),
+                    None => None,
                 };
                 (
                     parts.uri,
@@ -48,7 +49,7 @@ impl RequestData {
             }
         };
 
-        let body = HttpRequestBody::new(bytes, content_type);
+        let body = HttpRequestBody::new(bytes, content_type)?;
         *self = Self::AsBody {
             body: Some(body),
             uri,
@@ -62,7 +63,7 @@ impl RequestData {
             Self::Incoming(incoming) => {
                 let incoming = incoming.take().unwrap();
                 let bytes = read_bytes(incoming).await?;
-                let body = HttpRequestBody::new(bytes, None);
+                let body = HttpRequestBody::new(bytes, None)?;
                 return Ok(body);
             }
             Self::AsBody { body, .. } => match body.take() {

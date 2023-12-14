@@ -1,4 +1,4 @@
-use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
+use rust_extensions::{slice_of_u8_utils::SliceOfU8Ext, StrOrString};
 
 use crate::{form_data_reader::ContentDispositionParser, HttpFailResult};
 
@@ -75,16 +75,19 @@ impl<'s> FormDataItem<'s> {
 
             let double_quote_pos = double_quote_pos.unwrap();
 
-            let header_name = std::str::from_utf8(&src[pos..double_quote_pos]).unwrap();
+            let header_name = StrOrString::from_str_convert_to_lower_case(
+                std::str::from_utf8(&src[pos..double_quote_pos]).unwrap(),
+            );
+
+            let header_name = header_name.as_str();
 
             match header_name {
-                "Content-Disposition" => {
+                "content-disposition" => {
                     let content_disposition_data = &src[double_quote_pos + 1..];
 
-                    let end = content_disposition_data
-                        .iter()
-                        .position(|p| *p == 13)
-                        .unwrap();
+                    let end = content_disposition_data.iter().position(|p| *p == 13);
+
+                    let end = end.unwrap();
 
                     let content_disposition_data = &content_disposition_data[..end];
 
@@ -98,7 +101,7 @@ impl<'s> FormDataItem<'s> {
 
                     pos = src.find_byte_pos(13, double_quote_pos).unwrap();
                 }
-                "Content-Type" => {
+                "content-type" => {
                     let start = src
                         .find_pos_by_condition(double_quote_pos + 1, |p| p > 32)
                         .unwrap();

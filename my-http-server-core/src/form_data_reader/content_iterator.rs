@@ -1,17 +1,19 @@
-use rust_extensions::slice_of_u8_utils::SliceOfU8Ext;
+use rust_extensions::{slice_of_u8_utils::SliceOfU8Ext, ShortString};
 
 pub struct ContentIterator<'s> {
-    boundary_data: &'s [u8],
+    boundary_data: ShortString,
     payload: &'s [u8],
     pos: usize,
 }
 
 impl<'s> ContentIterator<'s> {
-    pub fn new(payload: &'s [u8]) -> Self {
-        let boundary_pos = payload.iter().position(|p| p == &13u8).unwrap();
+    pub fn new(payload: &'s [u8], boundary: &str) -> Self {
+        let mut boundary_data = ShortString::new_empty();
+        boundary_data.push_str("--");
+        boundary_data.push_str(boundary);
 
         let result = Self {
-            boundary_data: &payload[..boundary_pos],
+            boundary_data,
             payload,
             pos: 0,
         };
@@ -29,7 +31,7 @@ impl<'s> Iterator for ContentIterator<'s> {
 
         let next_pos = self
             .payload
-            .find_sequence_pos(self.boundary_data, self.pos)?;
+            .find_sequence_pos(self.boundary_data.as_bytes(), self.pos)?;
 
         let result = &self.payload[self.pos..next_pos];
 
@@ -52,11 +54,14 @@ fn find_non_space(payload: &[u8], pos_from: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
 
+    use crate::FormDataItem;
+
     use super::ContentIterator;
 
     #[test]
     fn test_splitting() {
-        //let boundary = "----WebKitFormBoundaryu7oxE5T3UC2xY2Q9";
+        let boundary = "----WebKitFormBoundaryu7oxE5T3UC2xY2Q9";
+
         let payload: Vec<u8> = vec![
             45, 45, 45, 45, 45, 45, 87, 101, 98, 75, 105, 116, 70, 111, 114, 109, 66, 111, 117,
             110, 100, 97, 114, 121, 117, 55, 111, 120, 69, 53, 84, 51, 85, 67, 50, 120, 89, 50, 81,
@@ -89,7 +94,7 @@ mod tests {
             45, 45, 13, 10,
         ];
 
-        let result: Vec<&[u8]> = ContentIterator::new(payload.as_slice()).collect();
+        let result: Vec<&[u8]> = ContentIterator::new(payload.as_slice(), boundary).collect();
 
         let expected_payload_0: Vec<u8> = vec![
             67, 111, 110, 116, 101, 110, 116, 45, 68, 105, 115, 112, 111, 115, 105, 116, 105, 111,
@@ -115,5 +120,28 @@ mod tests {
         assert_eq!(result.get(0).unwrap(), &expected_payload_0);
         assert_eq!(result.get(1).unwrap(), &expected_payload_1);
         assert_eq!(result.get(2).unwrap(), &expected_payload_2);
+    }
+
+    #[test]
+    fn test_from_real_example() {
+        let src =  "----dio-boundary-0620928629content-disposition: form-data; name=\"IsLocked\"\r\n\r\ntrue\r\n----dio-boundary-0620928629\r\ncontent-disposition: form-data; name=\"BalanceId\"\r\n\r\nSP-0256e9b5829a4a60b6626d527ef3d795ETH\r\n----dio-boundary-0620928629--\r\n";
+
+        let boundary = "--dio-boundary-0620928629";
+
+        let result: Vec<&[u8]> = ContentIterator::new(src.as_bytes(), boundary).collect();
+
+        assert_eq!(result.len(), 2);
+
+        let item: FormDataItem<'_> = FormDataItem::parse(result.get(0).unwrap());
+
+        assert_eq!(item.get_name(), "IsLocked");
+        assert_eq!(item.unwrap_as_string().unwrap(), "true");
+
+        let item: FormDataItem<'_> = FormDataItem::parse(result.get(1).unwrap());
+        assert_eq!(item.get_name(), "BalanceId");
+        assert_eq!(
+            item.unwrap_as_string().unwrap(),
+            "SP-0256e9b5829a4a60b6626d527ef3d795ETH"
+        );
     }
 }

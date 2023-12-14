@@ -2,13 +2,6 @@ use crate::{url_encoded_data::UrlEncodedData, EncodedParamValue, HttpFailResult,
 
 use crate::{data_src::*, FormDataReader};
 
-/*
-pub enum BodyDataReaderInner<'s> {
-    UrlEncoded(UrlEncodedData<'s>),
-    JsonEncoded(JsonEncodedData<'s>),
-    FormData(FormDataReader<'s>),
-}
- */
 pub enum BodyDataReader<'s> {
     UrlEncoded(UrlEncodedData<'s>),
     JsonEncoded(JsonEncodedData<'s>),
