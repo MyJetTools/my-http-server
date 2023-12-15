@@ -71,6 +71,6 @@ pub struct GetKeyValueResponse {
 #[derive(Serialize, Debug, MyHttpObjectStructure)]
 pub struct DoneResult {
     #[serde(rename = "doneResult")]
-    //#[debug]
+    //  #[debug]
     result: u8,
 }

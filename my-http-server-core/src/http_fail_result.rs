@@ -1,6 +1,6 @@
 use rust_extensions::StrOrString;
 
-use crate::{http_headers_to_use::*, WebContentType};
+use crate::{http_headers_to_use::*, HttpOkResult, WebContentType};
 
 #[derive(Debug, Clone)]
 pub struct HttpFailResult {
@@ -22,6 +22,12 @@ impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpF
             true,
             false,
         )
+    }
+}
+
+impl Into<Result<HttpOkResult, HttpFailResult>> for HttpFailResult {
+    fn into(self) -> Result<HttpOkResult, HttpFailResult> {
+        Result::Err(self)
     }
 }
 
