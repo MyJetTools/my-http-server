@@ -34,3 +34,39 @@ pub use signal_r_param::*;
 mod signal_r_telemetry;
 #[cfg(feature = "with-telemetry")]
 pub use signal_r_telemetry::*;
+
+pub struct SignalRConnectionId(String);
+
+impl SignalRConnectionId {
+    pub fn generate() -> Self {
+        let mut connection_id = uuid::Uuid::new_v4().to_string();
+        connection_id = connection_id.replace("-", "");
+
+        Self(connection_id)
+    }
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    pub fn as_ref_of_string(&self) -> &String {
+        &self.0
+    }
+}
+
+pub struct SignalRConnectionToken(String);
+impl SignalRConnectionToken {
+    pub fn generate() -> Self {
+        let mut connection_token = uuid::Uuid::new_v4().to_string();
+        connection_token = connection_token.replace("-", "");
+
+        Self(connection_token)
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
+    pub fn as_ref_of_string(&self) -> &String {
+        &self.0
+    }
+}

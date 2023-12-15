@@ -75,7 +75,7 @@ impl<TCtx: Send + Sync + Default + 'static> SignalRConnectionsList<TCtx> {
         };
 
         if let Some(found) = found {
-            found.add_web_socket(web_socket).await;
+            found.assign_web_socket(web_socket).await;
             Some(found)
         } else {
             None
@@ -157,7 +157,9 @@ impl<TCtx: Send + Sync + Default + 'static> SignalRConnectionsList<TCtx> {
                 .remove(connection_token);
 
             if let Some(removed) = &removed {
-                write_access.tags.remove_connection(&removed.connection_id);
+                write_access
+                    .tags
+                    .remove_connection(removed.connection_id.as_ref_of_string());
             }
 
             removed

@@ -1,26 +1,115 @@
+use std::sync::Arc;
+use std::{net::SocketAddr, time::Duration};
+
+use futures::StreamExt;
+use futures_util::stream::SplitStream;
 use hyper::body::Bytes;
 
 use http_body_util::Full;
-use hyper::header::{HeaderValue, UPGRADE};
-use hyper::upgrade::Upgraded;
-use hyper::{Request, Response, Result, StatusCode};
+use hyper::{Request, Response};
+use hyper_tungstenite::tungstenite::Message;
+use hyper_tungstenite::HyperWebsocketStream;
 
-pub async fn upgrade(
+use crate::{MyWebSocket, MyWebSocketCallback, WebSocketMessage};
+
+type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
+    id: i64,
+    addr: SocketAddr,
+    query_string: Option<String>,
     req: Request<hyper::body::Incoming>,
-) -> Result<(Option<Upgraded>, Response<Full<Bytes>>)> {
-    let full_body = http_body_util::Full::new(hyper::body::Bytes::from(vec![]));
+    callback: Arc<TMyWebSocketCallback>,
+    disconnect_timeout: Duration,
+) -> Result<Response<Full<Bytes>>, Error> {
+    let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
 
-    let mut res = Response::new(full_body);
+    tokio::spawn(async move {
+        let ws_stream = websocket.await;
 
-    if !req.headers().contains_key(UPGRADE) {
-        *res.status_mut() = StatusCode::BAD_REQUEST;
-        return Ok((None, res));
+        match ws_stream {
+            Ok(ws_stream) => {
+                let (ws_sender, ws_receiver) = ws_stream.split();
+
+                let my_web_socket =
+                    MyWebSocket::new(id, addr, ws_sender, query_string, callback.clone());
+
+                let my_web_socket = Arc::new(my_web_socket);
+
+                callback
+                    .connected(my_web_socket.clone(), disconnect_timeout)
+                    .await
+                    .unwrap();
+
+                let my_web_socket_cloned = my_web_socket.clone();
+
+                if let Err(e) = serve_websocket(my_web_socket_cloned, ws_receiver, callback).await {
+                    eprintln!("Error in websocket connection: {e}");
+                }
+            }
+            Err(err) => {
+                println!("Error in websocket connection: {}", err);
+            }
+        }
+    });
+
+    Ok(response)
+}
+
+/// Handle a websocket connection.
+async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
+    my_web_socket: Arc<MyWebSocket>,
+    mut websocket: SplitStream<HyperWebsocketStream>,
+    callback: Arc<TMyWebSocketCallback>,
+) -> Result<(), Error> {
+    while let Some(message) = websocket.next().await {
+        let result = match message? {
+            Message::Text(msg) => {
+                send_message(
+                    my_web_socket.clone(),
+                    WebSocketMessage::String(msg),
+                    callback.clone(),
+                )
+                .await
+            }
+            Message::Binary(msg) => {
+                send_message(
+                    my_web_socket.clone(),
+                    WebSocketMessage::Binary(msg),
+                    callback.clone(),
+                )
+                .await
+            }
+            Message::Ping(_) => Ok(()),
+            Message::Pong(_) => Ok(()),
+            Message::Close(_) => Ok(()),
+            Message::Frame(_) => Ok(()),
+        };
+
+        if let Err(err) = result {
+            eprintln!("Error in websocket connection: {}", err);
+            break;
+        }
     }
 
-    let upgraded = hyper::upgrade::on(req).await?;
+    my_web_socket.disconnect().await;
 
-    *res.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
-    res.headers_mut()
-        .insert(UPGRADE, HeaderValue::from_static("foobar"));
-    Ok((Some(upgraded), res))
+    Ok(())
+}
+
+async fn send_message<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
+    web_socket: Arc<MyWebSocket>,
+    message: WebSocketMessage,
+    callback: Arc<TMyWebSocketCallback>,
+) -> Result<(), String> {
+    let result = tokio::spawn(async move {
+        callback.on_message(web_socket, message).await;
+    })
+    .await;
+
+    if let Err(err) = result {
+        return Err(format!("Error in on_message: {}", err));
+    }
+
+    Ok(())
 }

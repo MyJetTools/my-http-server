@@ -32,5 +32,5 @@ pub async fn start<TCtx: Send + Sync + Default + 'static>(
         }
     }
 
-    crate::process_disconnect(&sockets_list, &my_socket_io_connection, &connect_events).await;
+    crate::process_disconnect(&sockets_list, &my_socket_io_connection, connect_events).await;
 }

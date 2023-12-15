@@ -16,6 +16,10 @@ impl HttpPath {
         Self::from_vec(path.into_bytes())
     }
 
+    pub fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.path).unwrap()
+    }
+
     pub fn from_vec(path_as_vec: Vec<u8>) -> Self {
         let mut segments = Vec::new();
 
@@ -55,7 +59,7 @@ impl HttpPath {
         for i in 0..segments_amount {
             let src = self.get_segment_value_as_str(i).unwrap();
             let dest = http_path.get_segment_value_as_str(i).unwrap();
-            if !equal_strings_case_insensitive(src, dest) {
+            if !rust_extensions::str_utils::compare_strings_case_insensitive(src, dest) {
                 return false;
             }
         }
@@ -95,7 +99,7 @@ impl HttpPath {
         for index in 0..http_path.segments_amount() {
             let one_side = http_path.get_segment_value_as_str(index).unwrap();
             let other_side = self.get_segment_value_as_str(index).unwrap();
-            if !equal_strings_case_insensitive(one_side, other_side) {
+            if !rust_extensions::str_utils::compare_strings_case_insensitive(one_side, other_side) {
                 return false;
             }
         }
@@ -111,7 +115,10 @@ impl HttpPath {
 
     pub fn has_value_at_index_case_insensitive(&self, index: usize, value: &str) -> bool {
         if let Some(segment_value) = self.get_segment_value_as_str(index) {
-            return equal_strings_case_insensitive(segment_value, value);
+            return rust_extensions::str_utils::compare_strings_case_insensitive(
+                segment_value,
+                value,
+            );
         }
 
         false
@@ -121,7 +128,10 @@ impl HttpPath {
         for offset in 0..values.len() {
             let value = values.get(offset).unwrap();
             if let Some(segment_value) = self.get_segment_value_as_str(index_from + offset) {
-                if !equal_strings_case_insensitive(segment_value, value) {
+                if !rust_extensions::str_utils::compare_strings_case_insensitive(
+                    segment_value,
+                    value,
+                ) {
                     return false;
                 }
             } else {
@@ -131,20 +141,6 @@ impl HttpPath {
 
         true
     }
-}
-
-fn equal_strings_case_insensitive(src: &str, dest: &str) -> bool {
-    if src.len() != dest.len() {
-        return false;
-    }
-
-    for (src_char, dest_char) in src.chars().zip(dest.chars()) {
-        if src_char.to_ascii_lowercase() != dest_char.to_ascii_lowercase() {
-            return false;
-        }
-    }
-
-    true
 }
 
 #[cfg(test)]

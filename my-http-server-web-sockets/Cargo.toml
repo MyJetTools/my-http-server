@@ -7,15 +7,15 @@ edition = "2021"
 
 
 [dependencies]
+
 my-http-server-core = { path = "../my-http-server-core" }
 tokio = { version = "*", features = ["full"] }
 async-trait = "*"
 hyper = { version = "*", features = ["full"] }
 futures = "*"
 pin-project-lite = "*"
-tokio-tungstenite = "*"
+hyper-tungstenite = "*"
 http-body-util = "*"
-hyper-util = { git = "https://github.com/hyperium/hyper-util.git", features = [
-    "tokio",
-] }
+hyper-util = { version = "*", features = ["tokio"] }
 tokio-util = { version = "*", features = ["compat"] }
+futures-util = "*"

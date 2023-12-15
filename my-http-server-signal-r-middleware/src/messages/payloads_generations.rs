@@ -1,7 +1,9 @@
+use crate::{SignalRConnectionId, SignalRConnectionToken};
+
 pub fn generate_negotiate_response(
     negotiate_version: usize,
-    connection_id: &str,
-    connection_token: &Option<String>,
+    connection_id: &SignalRConnectionId,
+    connection_token: &Option<SignalRConnectionToken>,
 ) -> String {
     let mut result = String::new();
 
@@ -11,7 +13,7 @@ pub fn generate_negotiate_response(
 
     result.push_str(",\"connectionId\":\"");
 
-    result.push_str(connection_id);
+    result.push_str(connection_id.as_str());
     result.push_str("\"");
 
     if let Some(connection_token) = connection_token {

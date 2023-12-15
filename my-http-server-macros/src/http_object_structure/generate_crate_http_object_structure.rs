@@ -41,7 +41,7 @@ fn render_obj_fields(
     let mut result = Vec::with_capacity(fields.len());
     for field in fields {
         let line =
-            crate::types::compile_http_field(field.get_name()?, &field.ty, field.ty.is_option())?; //todo!("Plug has default value from Type")
+            crate::types::compile_http_field(field.get_name()?, &field.ty, field.ty.is_option())?;
 
         result.push(quote::quote!(__hos.main.fields.push(#line);));
     }

@@ -15,7 +15,7 @@ use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio_tungstenite::tungstenite::Message;
 
-use crate::SignalRParam;
+use crate::{SignalRConnectionId, SignalRConnectionToken, SignalRParam};
 
 pub struct MySignalRConnectionSingleThreaded {
     web_socket: Option<Arc<MyWebSocket>>,
@@ -24,12 +24,11 @@ pub struct MySignalRConnectionSingleThreaded {
 
 pub struct MySignalRConnection<TCtx: Send + Sync + 'static> {
     single_threaded: Mutex<MySignalRConnectionSingleThreaded>,
-    pub connection_id: String,
-    pub connection_token: Option<String>,
+    pub connection_id: SignalRConnectionId,
+    pub connection_token: Option<SignalRConnectionToken>,
     pub created: DateTimeAsMicroseconds,
     pub last_incoming_moment: AtomicDateTimeAsMicroseconds,
     connected: AtomicBool,
-    has_web_socket: AtomicBool,
     has_greeting: AtomicBool,
     pub negotiation_version: usize,
     pub ctx: TCtx,
@@ -37,12 +36,11 @@ pub struct MySignalRConnection<TCtx: Send + Sync + 'static> {
 
 impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
     pub fn new(
-        connection_id: String,
-        connection_token: Option<String>,
+        connection_id: SignalRConnectionId,
+        connection_token: Option<SignalRConnectionToken>,
         negotiation_version: usize,
         web_socket: Option<Arc<MyWebSocket>>,
     ) -> Self {
-        let has_web_socket = web_socket.is_some();
         Self {
             single_threaded: Mutex::new(MySignalRConnectionSingleThreaded {
                 web_socket,
@@ -54,7 +52,6 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
             created: DateTimeAsMicroseconds::now(),
             last_incoming_moment: AtomicDateTimeAsMicroseconds::now(),
             connected: AtomicBool::new(true),
-            has_web_socket: AtomicBool::new(has_web_socket),
             has_greeting: AtomicBool::new(false),
             ctx: TCtx::default(),
         }
@@ -62,9 +59,9 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
 
     pub fn get_list_index(&self) -> &String {
         if let Some(token) = self.connection_token.as_ref() {
-            token
+            token.as_ref_of_string()
         } else {
-            &self.connection_id
+            self.connection_id.as_ref_of_string()
         }
     }
 
@@ -75,11 +72,6 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
     pub fn set_has_greeting(&self) {
         self.has_greeting
             .store(true, std::sync::atomic::Ordering::SeqCst)
-    }
-
-    pub fn in_web_socket_model(&self) -> bool {
-        self.has_web_socket
-            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     pub async fn has_web_socket(&self, web_socket_id: i64) -> bool {
@@ -178,7 +170,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
         }
     }
 
-    pub async fn add_web_socket(&self, web_socket: Arc<MyWebSocket>) {
+    pub async fn assign_web_socket(&self, web_socket: Arc<MyWebSocket>) {
         let new_id = web_socket.id;
         let mut write_access = self.single_threaded.lock().await;
 

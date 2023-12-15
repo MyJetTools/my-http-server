@@ -79,7 +79,8 @@ pub async fn start(
     logger: Arc<dyn Logger + Send + Sync + 'static>,
 ) {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-
+    let mut http1 = http1::Builder::new();
+    http1.keep_alive(true);
     loop {
         if app_states.is_shutting_down() {
             break;
@@ -91,31 +92,32 @@ pub async fn start(
         let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
         let app_states = app_states.clone();
 
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger = logger.clone();
+        let socket_addr = socket_addr.clone();
+        let app_states = app_states.clone();
+
+        let connection = http1
+            .serve_connection(
+                io,
+                service_fn(move |req| {
+                    if app_states.is_shutting_down() {
+                        panic!("Application is shutting down");
+                    }
+
+                    let resp = handle_requests(
+                        req,
+                        http_server_middlewares.clone(),
+                        socket_addr.clone(),
+                        logger.clone(),
+                    );
+                    resp
+                }),
+            )
+            .with_upgrades();
+
         tokio::task::spawn(async move {
-            let http_server_middlewares = http_server_middlewares.clone();
-            let logger = logger.clone();
-            let socket_addr = socket_addr.clone();
-            let app_states = app_states.clone();
-
-            if let Err(err) = http1::Builder::new()
-                .serve_connection(
-                    io,
-                    service_fn(move |req| {
-                        if app_states.is_shutting_down() {
-                            panic!("Application is shutting down");
-                        }
-
-                        let resp = handle_requests(
-                            req,
-                            http_server_middlewares.clone(),
-                            socket_addr.clone(),
-                            logger.clone(),
-                        );
-                        resp
-                    }),
-                )
-                .await
-            {
+            if let Err(err) = connection.await {
                 println!("Error serving connection: {:?}", err);
             }
         });

@@ -17,6 +17,6 @@ pub trait MyWebSocketCallback {
         my_web_socket: Arc<MyWebSocket>,
         disconnect_timeout: Duration,
     ) -> Result<(), HttpFailResult>;
-    async fn disconnected(&self, my_web_socket: Arc<MyWebSocket>);
+    async fn disconnected(&self, my_web_socket: &MyWebSocket);
     async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: WebSocketMessage);
 }

@@ -1,19 +1,24 @@
-use std::{net::SocketAddr, sync::atomic::AtomicBool};
-
-use futures::{stream::SplitSink, SinkExt};
-use hyper::upgrade::Upgraded;
-use hyper_util::rt::TokioIo;
-use my_http_server_core::UrlEncodedData;
-use tokio::sync::Mutex;
-use tokio_tungstenite::{
-    tungstenite::{Error, Message},
-    WebSocketStream,
+use std::{
+    net::SocketAddr,
+    sync::{atomic::AtomicBool, Arc},
 };
 
+use futures::SinkExt;
+use futures_util::stream::SplitSink;
+use hyper_tungstenite::{
+    tungstenite::{Error, Message},
+    HyperWebsocketStream,
+};
+use my_http_server_core::UrlEncodedData;
+use tokio::sync::Mutex;
+
+use crate::MyWebSocketCallback;
+
 pub struct MyWebSocket {
-    pub write_stream: Mutex<Option<SplitSink<WebSocketStream<TokioIo<Upgraded>>, Message>>>,
+    pub write_stream: Mutex<Option<SplitSink<HyperWebsocketStream, Message>>>,
     pub addr: SocketAddr,
     pub id: i64,
+    callbacks: Arc<dyn MyWebSocketCallback + Send + Sync + 'static>,
     query_string: Option<String>,
     connected: AtomicBool,
 }
@@ -22,8 +27,9 @@ impl MyWebSocket {
     pub fn new(
         id: i64,
         addr: SocketAddr,
-        write_stream: SplitSink<WebSocketStream<TokioIo<Upgraded>>, Message>,
+        write_stream: SplitSink<HyperWebsocketStream, Message>,
         query_string: Option<String>,
+        callbacks: Arc<dyn MyWebSocketCallback + Send + Sync + 'static>,
     ) -> Self {
         Self {
             write_stream: Mutex::new(write_stream.into()),
@@ -31,20 +37,21 @@ impl MyWebSocket {
             id,
             query_string,
             connected: AtomicBool::new(true),
+            callbacks,
         }
     }
 
-    async fn send_message_and_if_connected(&self, msg: Message) -> Result<(), Error> {
+    async fn send_message_if_connected(&self, msg: Message) -> Result<(), Error> {
         let mut write_access = self.write_stream.lock().await;
         if let Some(stream) = &mut *write_access {
-            let result = stream.send(msg).await;
+            return stream.send(msg).await;
         }
 
         Ok(())
     }
 
     pub async fn send_message(&self, msg: Message) {
-        let result = self.send_message_and_if_connected(msg).await;
+        let result = self.send_message_if_connected(msg).await;
 
         if let Err(err) = result {
             println!("Error sending message to websocket {}: {:?}", self.id, err);
@@ -64,24 +71,29 @@ impl MyWebSocket {
         }
     }
 
-    pub async fn disconnect(&self) {
+    pub async fn disconnect(&self) -> bool {
         self.connected
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        todo!("Restore");
-        /*
-        let mut write_access = self.write_stream.lock().await;
-        if let Some(mut item) = write_access.take() {
 
+        let just_disconnected = {
+            let mut write_access = self.write_stream.lock().await;
+            if let Some(mut item) = write_access.take() {
+                let result = item.close().await;
 
-
-             let result = item.close().await;
-
-            if let Err(err) = result {
-                println!("Can not close websocket {}. Reason: {:?}", self.id, err);
+                if let Err(err) = result {
+                    println!("Can not close websocket {}. Reason: {:?}", self.id, err);
+                }
+                true
+            } else {
+                false
             }
+        };
 
+        if just_disconnected {
+            self.callbacks.disconnected(self).await;
         }
-              */
+
+        just_disconnected
     }
 
     pub fn is_connected(&self) -> bool {

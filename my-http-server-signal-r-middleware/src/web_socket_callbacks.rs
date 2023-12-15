@@ -74,7 +74,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
         Ok(())
     }
 
-    async fn disconnected(&self, my_web_socket: Arc<MyWebSocket>) {
+    async fn disconnected(&self, my_web_socket: &MyWebSocket) {
         #[cfg(feature = "debug_ws")]
         println!("disconnected web_socket:{}", my_web_socket.id);
         let find_result = self
@@ -86,7 +86,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
             crate::process_disconnect(
                 &self.signal_r_list,
                 &signal_r_connection,
-                &self.my_signal_r_callbacks,
+                self.my_signal_r_callbacks.clone(),
             )
             .await;
         }

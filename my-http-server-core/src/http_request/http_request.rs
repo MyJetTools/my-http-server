@@ -6,6 +6,7 @@ use crate::{
 };
 
 use hyper::{Method, Uri};
+use url_utils::url_decoder::UrlDecodeError;
 
 pub struct HttpRequest {
     pub data: RequestData,
@@ -32,7 +33,7 @@ impl HttpRequest {
         }
     }
 
-    pub fn get_query_string(&self) -> Result<UrlEncodedData, HttpFailResult> {
+    pub fn get_query_string(&self) -> Result<UrlEncodedData, UrlDecodeError> {
         if let Some(query) = self.data.uri().query() {
             let result = UrlEncodedData::from_query_string(query)?;
             Ok(result)

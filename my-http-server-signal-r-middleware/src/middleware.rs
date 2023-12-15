@@ -6,8 +6,8 @@ use rust_extensions::Logger;
 use tokio::sync::Mutex;
 
 use crate::{
-    my_signal_r_actions::MySignalRActions, MiddlewareBuilder, SignalRConnectionsList,
-    WebSocketCallbacks,
+    my_signal_r_actions::MySignalRActions, process_disconnect::process_disconnect,
+    MiddlewareBuilder, SignalRConnectionsList, WebSocketCallbacks,
 };
 
 pub struct MySignalRMiddleware<TCtx: Send + Sync + Default + 'static> {
@@ -65,19 +65,15 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
     ) -> Result<HttpOkResult, HttpFailResult> {
         #[cfg(feature = "debug_ws")]
         println!("handle_negotiate_request");
-        let query_string_result = ctx.request.get_query_string();
+        let query_string = ctx.request.get_query_string()?;
 
-        let negotiation_version = match query_string_result {
-            Ok(value) => {
-                if let Some(result) = value.get_optional("negotiateVersion") {
-                    let value = result.as_str()?;
-                    value.as_str().parse::<usize>().unwrap()
-                } else {
-                    0
-                }
-            }
-            Err(_) => 0,
-        };
+        let negotiation_version =
+            if let Some(result) = query_string.get_optional("negotiateVersion") {
+                let value = result.as_str()?;
+                value.as_str().parse::<usize>().unwrap()
+            } else {
+                0
+            };
 
         let (_, response) = crate::process_connect(
             &self.actions,
@@ -93,6 +89,53 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
         }
         .into_ok_result(true)
         .into()
+    }
+
+    async fn handle_websocket_upgrade(
+        &self,
+        ctx: &mut HttpContext,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let query_string = ctx.request.get_query_string()?;
+        let connection_id_or_token = query_string.get_required("id")?;
+        let connection_id_or_token = connection_id_or_token.as_str()?;
+
+        let signal_r_connection = self
+            .signal_r_list
+            .get_by_connection_token(connection_id_or_token.as_str())
+            .await;
+
+        if signal_r_connection.is_none() {
+            return HttpOutput::Content {
+                headers: None,
+                content_type: Some(WebContentType::Text),
+                content: format!("Connection '{}' not found", connection_id_or_token.as_str())
+                    .into_bytes(),
+            }
+            .into_ok_result(true)
+            .into();
+        }
+
+        let signal_r_connection = signal_r_connection.unwrap();
+
+        let id = self.get_socket_id().await;
+        let result = my_http_server_web_sockets::handle_web_socket_upgrade(
+            &mut ctx.request,
+            self.web_socket_callback.clone(),
+            id,
+            self.disconnect_timeout,
+        )
+        .await;
+
+        if result.is_err() {
+            process_disconnect(
+                &self.signal_r_list,
+                &signal_r_connection,
+                self.actions.clone(),
+            )
+            .await;
+        }
+
+        return result;
     }
 }
 
@@ -117,14 +160,7 @@ impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalRMi
             .try_get_case_insensitive("sec-websocket-key")
             .is_some()
         {
-            let id = self.get_socket_id().await;
-            return my_http_server_web_sockets::handle_web_socket_upgrade(
-                &mut ctx.request,
-                self.web_socket_callback.clone(),
-                id,
-                self.disconnect_timeout,
-            )
-            .await;
+            return self.handle_websocket_upgrade(ctx).await;
         }
 
         if ctx.request.method == Method::POST {

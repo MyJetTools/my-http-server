@@ -5,7 +5,7 @@ use crate::{MySignalRCallbacks, MySignalRConnection, SignalRConnectionsList};
 pub async fn process_disconnect<TCtx: Send + Sync + Default + 'static>(
     sockets_list: &Arc<SignalRConnectionsList<TCtx>>,
     signal_r_connection: &Arc<MySignalRConnection<TCtx>>,
-    connect_events: &Arc<dyn MySignalRCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
+    connect_events: Arc<dyn MySignalRCallbacks<TCtx = TCtx> + Send + Sync + 'static>,
 ) {
     let removed_connection = sockets_list
         .remove(signal_r_connection.get_list_index())
