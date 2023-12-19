@@ -56,8 +56,8 @@ impl MyHttpServer {
         }
     }
 
-    pub fn get_http_connections_counter(&self) -> HttpConnectionCounter {
-        HttpConnectionCounter {
+    pub fn get_http_connections_counter(&self) -> HttpConnectionsCounter {
+        HttpConnectionsCounter {
             connections: self.connections.clone(),
         }
     }
