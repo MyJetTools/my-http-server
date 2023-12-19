@@ -18,11 +18,12 @@ use crate::{
     HttpServerMiddleware, HttpServerMiddlewares,
 };
 
-pub struct HttpConnectionCounter {
+#[derive(Clone)]
+pub struct HttpConnectionsCounter {
     connections: Arc<AtomicI64>,
 }
 
-impl HttpConnectionCounter {
+impl HttpConnectionsCounter {
     pub fn get_connections_amount(&self) -> i64 {
         self.connections.load(std::sync::atomic::Ordering::SeqCst)
     }
