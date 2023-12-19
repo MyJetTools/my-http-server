@@ -18,6 +18,16 @@ use crate::{
     HttpServerMiddleware, HttpServerMiddlewares,
 };
 
+pub struct HttpConnectionCounter {
+    connections: Arc<AtomicI64>,
+}
+
+impl HttpConnectionCounter {
+    pub fn get_connections_amount(&self) -> i64 {
+        self.connections.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
 pub struct MyHttpServer {
     pub addr: SocketAddr,
     middlewares: Option<Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
@@ -42,6 +52,12 @@ impl MyHttpServer {
             None => {
                 panic!("Cannot add middleware after server is started");
             }
+        }
+    }
+
+    pub fn get_http_connections_counter(&self) -> HttpConnectionCounter {
+        HttpConnectionCounter {
+            connections: self.connections.clone(),
         }
     }
 
