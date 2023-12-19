@@ -8,6 +8,7 @@ use my_telemetry::TelemetryEventTagsBuilder;
 #[cfg(feature = "with-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use rust_extensions::{ApplicationStates, Logger, StrOrString};
+use std::sync::atomic::AtomicI64;
 use std::{collections::HashMap, net::SocketAddr};
 
 use std::sync::Arc;
@@ -20,6 +21,7 @@ use crate::{
 pub struct MyHttpServer {
     pub addr: SocketAddr,
     middlewares: Option<Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
+    connections: Arc<AtomicI64>,
 }
 
 impl MyHttpServer {
@@ -27,6 +29,7 @@ impl MyHttpServer {
         Self {
             addr,
             middlewares: Some(Vec::new()),
+            connections: Arc::new(AtomicI64::new(0)),
         }
     }
 
@@ -63,11 +66,13 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
         };
 
+        let connections = self.connections.clone();
         tokio::spawn(start(
             self.addr.clone(),
             Arc::new(http_server_middlewares),
             app_states,
             logger,
+            connections,
         ));
     }
 }
@@ -77,6 +82,7 @@ pub async fn start(
     http_server_middlewares: Arc<HttpServerMiddlewares>,
     app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
+    connections: Arc<AtomicI64>,
 ) {
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     let mut http1 = http1::Builder::new();
@@ -87,6 +93,9 @@ pub async fn start(
         }
 
         let (stream, socket_addr) = listener.accept().await.unwrap();
+
+        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
         let io = TokioIo::new(stream);
         let http_server_middlewares = http_server_middlewares.clone();
         let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
@@ -116,10 +125,13 @@ pub async fn start(
             )
             .with_upgrades();
 
+        let connections_clone = connections.clone();
         tokio::task::spawn(async move {
             if let Err(err) = connection.await {
                 println!("Error serving connection: {:?}", err);
             }
+
+            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         });
     }
 }

@@ -18,17 +18,14 @@ pub fn build_controllers() -> ControllersMiddleware {
         super::controllers::from_data_controller::TestFormDataAction::new(),
     ));
 
+    result.register_post_action(Arc::new(
+        super::controllers::body_as_model_controller::PostAction,
+    ));
+
+    result.register_post_action(Arc::new(
+        super::controllers::body_test_controller::PostBodyModelAction::new(),
+    ));
     /*
-           result.register_post_action(Arc::new(
-               super::controllers::body_as_model_controller::PostAction,
-           ));
-
-
-
-           result.register_post_action(Arc::new(
-               super::controllers::body_test_controller::PostBodyModelAction::new(),
-           ));
-
            result.register_post_action(Arc::new(
                super::controllers::body_test_controller::PostBodyStringRawModelAction::new(),
            ));

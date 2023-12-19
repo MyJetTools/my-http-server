@@ -15,11 +15,11 @@ use super::contracts::*;
         {status_code: 200, description: "Ok response", model: DoneResult},
     ]
 )]
-pub struct PostAction {}
+pub struct PostAction;
 
 impl PostAction {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
