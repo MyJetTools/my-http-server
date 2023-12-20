@@ -13,7 +13,7 @@ pub fn generate_read_body(input_fields: &[InputField]) -> Result<TokenStream, sy
 
     for input_field in input_fields {
         reading_fields.push(generate_reading(input_field, &data_src)?);
-        if let Some(validator) = input_field.get_validator() {
+        if let Some(validator) = input_field.get_validator_as_token_stream() {
             validations.push(validator);
         }
     }

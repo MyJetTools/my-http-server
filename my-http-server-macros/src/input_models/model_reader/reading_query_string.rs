@@ -21,7 +21,7 @@ pub fn generate_reading_query_fields(
     for input_field in input_fields {
         let token_stream = reading_query_string(input_field, &data_src)?;
 
-        if let Some(validation) = input_field.get_validator() {
+        if let Some(validation) = input_field.get_validator_as_token_stream() {
             validations.push(validation);
         }
 

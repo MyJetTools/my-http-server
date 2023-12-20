@@ -319,17 +319,16 @@ impl<'s> InputField<'s> {
         self.attr.validator()
     }
 
-    /*
-       pub fn get_validator_as_token_stream(&self) -> Option<proc_macro2::TokenStream> {
-           if let Some(validator) = self.get_validator() {
-               let validation_fn_name = proc_macro2::TokenStream::from_str(validator).unwrap();
-               let struct_field_name = self.property.get_field_name_ident();
-               return Some(quote::quote!(#validation_fn_name(ctx, &#struct_field_name)?;));
-           }
+    pub fn get_validator_as_token_stream(&self) -> Option<proc_macro2::TokenStream> {
+        if let Some(validator) = self.get_validator() {
+            let validation_fn_name = proc_macro2::TokenStream::from_str(validator).unwrap();
+            let struct_field_name = self.property.get_field_name_ident();
+            return Some(quote::quote!(#validation_fn_name(ctx, &#struct_field_name)?;));
+        }
 
-           None
-       }
-    */
+        None
+    }
+
     pub fn get_let_input_param(&self) -> proc_macro2::TokenStream {
         match &self.property.ty {
             PropertyType::String => {
