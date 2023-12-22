@@ -6,6 +6,7 @@ pub enum BodyDataReader<'s> {
     UrlEncoded(UrlEncodedData<'s>),
     JsonEncoded(JsonEncodedData<'s>),
     FormData(FormDataReader<'s>),
+    Unknown(&'s [u8]),
 }
 
 impl<'s> BodyDataReader<'s> {
@@ -42,6 +43,10 @@ impl<'s> BodyDataReader<'s> {
                     value: result,
                 })
             }
+
+            Self::Unknown(_) => Err(HttpFailResult::as_validation_error(
+                "Body is empty. Can not read data from it".to_string(),
+            )),
         }
     }
 
@@ -61,6 +66,8 @@ impl<'s> BodyDataReader<'s> {
                 let value = src.get_optional(name)?;
                 Some(EncodedParamValue::FormData { name, value })
             }
+
+            BodyDataReader::Unknown(_) => None,
         }
     }
 }

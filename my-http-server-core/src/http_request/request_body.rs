@@ -63,6 +63,8 @@ impl HttpRequestBody {
                 let form_data_reader = FormDataReader::new(&self.raw_body, boundary.as_str());
                 Ok(BodyDataReader::create_as_form_data_reader(form_data_reader))
             }
+
+            BodyContentType::Unknown => Ok(BodyDataReader::Unknown(self.raw_body.as_slice())),
         }
     }
 }

@@ -6,6 +6,7 @@ pub enum BodyContentType {
     Json,
     UrlEncoded,
     FormData(StrOrString<'static>),
+    Unknown,
 }
 
 impl BodyContentType {
@@ -62,9 +63,7 @@ impl BodyContentType {
             }
         }
 
-        return Err(HttpFailResult::as_fatal_error(format!(
-            "There is no content type header and can not detect content type from body"
-        )));
+        return Ok(Self::Unknown);
     }
 }
 
