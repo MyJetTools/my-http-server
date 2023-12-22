@@ -7,10 +7,15 @@ pub enum BodyContentType {
     UrlEncoded,
     FormData(StrOrString<'static>),
     Unknown,
+    Empty,
 }
 
 impl BodyContentType {
     pub fn detect(raw_body: &[u8], content_type: Option<&String>) -> Result<Self, HttpFailResult> {
+        if raw_body.is_empty() {
+            return Ok(Self::Empty);
+        }
+
         if let Some(content_type) = content_type {
             let lower_case = StrOrString::create_as_short_string_or_string(content_type);
             let lower_case = lower_case.as_str();

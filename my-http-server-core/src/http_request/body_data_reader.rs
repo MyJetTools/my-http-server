@@ -7,6 +7,7 @@ pub enum BodyDataReader<'s> {
     JsonEncoded(JsonEncodedData<'s>),
     FormData(FormDataReader<'s>),
     Unknown(&'s [u8]),
+    Empty,
 }
 
 impl<'s> BodyDataReader<'s> {
@@ -45,6 +46,10 @@ impl<'s> BodyDataReader<'s> {
             }
 
             Self::Unknown(_) => Err(HttpFailResult::as_validation_error(
+                "Body has unknown format. Can not read data from it".to_string(),
+            )),
+
+            Self::Empty => Err(HttpFailResult::as_validation_error(
                 "Body is empty. Can not read data from it".to_string(),
             )),
         }
@@ -68,6 +73,8 @@ impl<'s> BodyDataReader<'s> {
             }
 
             BodyDataReader::Unknown(_) => None,
+
+            BodyDataReader::Empty => None,
         }
     }
 }

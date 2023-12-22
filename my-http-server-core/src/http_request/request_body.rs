@@ -65,6 +65,7 @@ impl HttpRequestBody {
             }
 
             BodyContentType::Unknown => Ok(BodyDataReader::Unknown(self.raw_body.as_slice())),
+            BodyContentType::Empty => Ok(BodyDataReader::Empty),
         }
     }
 }
