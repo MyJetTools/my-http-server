@@ -49,9 +49,9 @@ pub fn build(
                 .map(|itm| itm.into()),
         );
 
-        yaml_writer.write("summary", action_description.summary);
+        yaml_writer.write_as_str("summary", action_description.summary);
 
-        yaml_writer.write("description", action_description.description);
+        yaml_writer.write_as_str("description", action_description.description);
 
         if deprecated {
             yaml_writer.write_bool("deprecated", true);
@@ -103,7 +103,7 @@ fn compile_responses(yaml_writer: &mut YamlWriter, results: &[HttpResult]) {
 }
 
 fn compile_response(yaml_writer: &mut YamlWriter, src: &HttpResult) {
-    yaml_writer.write("description", src.description.as_str());
+    yaml_writer.write_as_str("description", src.description.as_str());
 
     if src.data_type.is_none() {
         return;

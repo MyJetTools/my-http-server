@@ -32,6 +32,28 @@ impl YamlWriter {
         self.content.push(10);
     }
 
+    pub fn write_as_str(&mut self, field: &str, value: &str) {
+        self.fill_spaces(0);
+
+        self.content.extend_from_slice(field.as_bytes());
+        self.content.extend_from_slice(": '".as_bytes());
+
+        for c in value.as_bytes() {
+            match c {
+                b'\'' => {
+                    self.content.push(b'\\');
+                }
+                _ => {}
+            }
+
+            self.content.push(*c as u8);
+        }
+
+        self.content.extend_from_slice("'".as_bytes());
+        self.content.push(13);
+        self.content.push(10);
+    }
+
     pub fn write_empty(&mut self, field: &str) {
         self.fill_spaces(0);
 

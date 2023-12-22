@@ -19,7 +19,7 @@ pub fn build(yaml_writer: &mut YamlWriter, action_description: &HttpActionDescri
 
     if let Some(body_param) = action_description.input_params.is_single_body_parameter() {
         yaml_writer.write_upper_level("requestBody", |yaml_writer| {
-            yaml_writer.write("description", body_param.description.as_str());
+            yaml_writer.write_as_str("description", body_param.description.as_str());
             yaml_writer.write_bool("required", true);
             yaml_writer.write_upper_level("content", |yaml_writer| {
                 yaml_writer.write_upper_level("application/json", |yaml_writer| {
