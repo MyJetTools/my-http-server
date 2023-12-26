@@ -8,7 +8,7 @@ use super::contracts::*;
     route: "/api/formdata/v1",
     deprecated_routes: ["/api/formdata/v1/deprecated"],
     summary: "Test of body as model",
-    description: "Test of body as model",
+    description: "Test of body as model's description",
     controller: "FormDataTest",
     input_data: "FromDataInputModel",
     result:[

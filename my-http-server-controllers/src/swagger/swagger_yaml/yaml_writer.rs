@@ -41,7 +41,7 @@ impl YamlWriter {
         for c in value.as_bytes() {
             match c {
                 b'\'' => {
-                    self.content.push(b'\\');
+                    self.content.push(b'\'');
                 }
                 _ => {}
             }
