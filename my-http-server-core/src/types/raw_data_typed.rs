@@ -34,6 +34,16 @@ impl<T: DeserializeOwned> RawDataTyped<T> {
     pub fn deserialize_json(&self) -> Result<T, HttpFailResult> {
         crate::convert_from_str::to_json("RawDataType", &Some(&self.data), self.src)
     }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.data
+    }
+}
+
+impl<T: DeserializeOwned> Into<Vec<u8>> for RawDataTyped<T> {
+    fn into(self) -> Vec<u8> {
+        self.data
+    }
 }
 
 impl<T: DeserializeOwned> AsRef<[u8]> for RawDataTyped<T> {
