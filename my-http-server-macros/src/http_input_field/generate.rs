@@ -68,6 +68,10 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<TokenStream, sy
                 pub fn as_str(&self) -> &str {
                     self.0.as_str()
                 }
+
+                pub fn validate(src: &str)-> Result<rust_extensions::StrOrString, my_http_server::HttpFailResult>{
+                    process_value(src)
+                }
             }
 
             impl Into<#tp> for #struct_name {
