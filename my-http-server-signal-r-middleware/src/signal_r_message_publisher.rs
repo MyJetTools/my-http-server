@@ -22,7 +22,7 @@ impl<
         }
     }
 
-    pub async fn broadcast_to_all(&self, contract: TContract) {
+    pub async fn broadcast_to_all(&self, contract: &TContract) {
         if let Some(connections) = self.signal_r_list.get_all().await {
             let payload = contract.serialize();
 
@@ -37,7 +37,7 @@ impl<
     pub async fn send_to_connection(
         &self,
         connection: &MySignalRConnection<TCtx>,
-        contract: TContract,
+        contract: &TContract,
     ) {
         let payload = contract.serialize();
 
@@ -45,7 +45,7 @@ impl<
         connection.send(TContract::ACTION_NAME, &params).await;
     }
 
-    pub async fn send_to_tagged_connections(&self, key: &str, contract: TContract) {
+    pub async fn send_to_tagged_connections(&self, key: &str, contract: &TContract) {
         if let Some(connections) = self.signal_r_list.get_tagged_connections(key).await {
             let payload = contract.serialize();
 
@@ -60,7 +60,7 @@ impl<
         &self,
         key: &str,
         value: &str,
-        contract: TContract,
+        contract: &TContract,
     ) {
         if let Some(connections) = self
             .signal_r_list
