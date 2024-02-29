@@ -26,7 +26,7 @@ pub use signal_r_message_publisher::*;
 pub use signal_r_publishers_builder::*;
 pub use signal_r_serializer::*;
 pub use tags::Tags;
-pub use tags::*;
+
 pub use web_socket_callbacks::WebSocketCallbacks;
 mod signal_r_param;
 pub use signal_r_param::*;

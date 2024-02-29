@@ -48,7 +48,7 @@ pub fn generate(attr: TokenStream, input: TokenStream) -> Result<TokenStream, sy
     let tp = &tuple_struct.type_ident;
 
     let result = quote::quote! {
-
+        #[derive(Debug)]
         #src
 
         impl  my_http_server::controllers::documentation::DataTypeProvider for #struct_name {
