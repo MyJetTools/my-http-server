@@ -8,5 +8,5 @@ members = [
     "my-http-server-signal-r-middleware",
     "static-files-middleware",
     "signal-r-macros",
-    "my-http-server-test",
+    "my-http-server-test", "my-http-metrics",
 ]

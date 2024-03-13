@@ -66,7 +66,7 @@ impl HttpFailResult {
     pub fn as_not_found(text: String, write_telemetry: bool) -> Self {
         Self::new(
             WebContentType::Text,
-            400,
+            404,
             text.into_bytes(),
             write_telemetry,
             false,
