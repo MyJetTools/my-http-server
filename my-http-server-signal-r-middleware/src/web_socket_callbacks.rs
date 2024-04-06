@@ -7,6 +7,7 @@ use my_json::json_reader::JsonFirstLineReader;
 use my_telemetry::MyTelemetryContext;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
+use rust_extensions::array_of_bytes_iterator::SliceIterator;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
@@ -105,7 +106,9 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
 
             if let WebSocketMessage::String(value) = &message {
                 if signal_r_connection.get_has_greeting() {
-                    let packet_type = get_payload_type(value);
+                    let mut json_first_line_iterator: JsonFirstLineReader<SliceIterator> =
+                        value.as_bytes().into();
+                    let packet_type = get_payload_type(&mut json_first_line_iterator);
 
                     if packet_type == "1" {
                         #[cfg(feature = "with-telemetry")]
@@ -114,7 +117,9 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                         #[cfg(feature = "with-telemetry")]
                         let started = rust_extensions::date_time::DateTimeAsMicroseconds::now();
 
-                        let message = SignalRMessage::parse(value);
+                        let mut json_first_line_iterator: JsonFirstLineReader<SliceIterator> =
+                            value.as_bytes().into();
+                        let message = SignalRMessage::parse(&mut json_first_line_iterator);
 
                         #[cfg(feature = "with-telemetry")]
                         let ctx_spawned = ctx.clone();
@@ -191,13 +196,12 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
     }
 }
 
-fn get_payload_type(payload: &str) -> &str {
-    let json_reader = JsonFirstLineReader::new(payload.as_bytes());
-    for line in json_reader {
+fn get_payload_type<'s>(first_line_reader: &'s mut JsonFirstLineReader<SliceIterator>) -> &'s str {
+    while let Some(line) = first_line_reader.get_next() {
         let line = line.unwrap();
-        if line.get_name().unwrap() == "type" {
-            let result = line.get_value().unwrap();
-            return result.as_str().unwrap();
+        if line.name.as_unescaped_name(first_line_reader).unwrap() == "type" {
+            let result = line.value.as_unescaped_str(first_line_reader).unwrap();
+            return result;
         }
     }
 
@@ -208,18 +212,17 @@ async fn read_first_payload<TCtx: Send + Sync + Default + 'static>(
     signal_r_connection: &Arc<MySignalRConnection<TCtx>>,
     payload: &str,
 ) {
-    let json_reader = JsonFirstLineReader::new(payload.as_bytes());
+    let mut json_reader: JsonFirstLineReader<SliceIterator> = payload.as_bytes().into();
 
     let mut protocol = false;
     let mut version = false;
-
-    for line in json_reader {
+    while let Some(line) = json_reader.get_next() {
         let line = line.unwrap();
 
-        if line.get_name().unwrap() == "protocol" {
+        if line.name.as_unescaped_name(&json_reader).unwrap() == "protocol" {
             protocol = true;
         }
-        if line.get_name().unwrap() == "version" {
+        if line.name.as_unescaped_name(&json_reader).unwrap() == "version" {
             version = true;
         }
     }

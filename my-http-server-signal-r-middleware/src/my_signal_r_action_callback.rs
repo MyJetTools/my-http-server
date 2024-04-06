@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use rust_extensions::Logger;
+use my_json::json_reader::array_iterator::JsonArrayIterator;
+use rust_extensions::{array_of_bytes_iterator::SliceIterator, Logger};
 
 use crate::{MySignalRConnection, MySignalRPayloadCallbacks, SignalRContractSerializer};
 
@@ -44,8 +45,11 @@ impl<
         #[cfg(feature = "with-telemetry")] ctx: &mut crate::SignalRTelemetry,
     ) {
         let mut params = Vec::new();
-        for item in my_json::json_reader::array_parser::JsonArrayIterator::new(data) {
-            match item {
+
+        let mut json_array_iterator: JsonArrayIterator<SliceIterator> = data.into();
+
+        while let Some(line) = json_array_iterator.get_next() {
+            match line {
                 Ok(itm) => params.push(itm),
                 Err(err) => {
                     let mut ctx = HashMap::new();
@@ -63,7 +67,7 @@ impl<
             }
         }
 
-        match TContract::deserialize(&params) {
+        match TContract::deserialize(params.iter().map(|x| x.as_bytes(&json_array_iterator))) {
             Ok(contract) => {
                 self.callback
                     .on(

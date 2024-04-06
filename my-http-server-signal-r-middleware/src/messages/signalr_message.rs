@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use my_json::json_reader::JsonFirstLineReader;
+use rust_extensions::array_of_bytes_iterator::SliceIterator;
 
 pub struct SignalRMessage<'s> {
     pub headers: Option<HashMap<String, String>>,
@@ -10,28 +11,22 @@ pub struct SignalRMessage<'s> {
 }
 
 impl<'s> SignalRMessage<'s> {
-    pub fn parse(payload: &'s str) -> Self {
+    pub fn parse(json_first_line_reader: &'s mut JsonFirstLineReader<SliceIterator>) -> Self {
         let mut invocation_id = None;
         let mut target = None;
         let mut arguments = None;
 
-        let json_reader = JsonFirstLineReader::new(payload.as_bytes());
-        for line in json_reader {
+        while let Some(line) = json_first_line_reader.get_next() {
             let line = line.unwrap();
 
-            match line.get_name().unwrap() {
+            match line.name.as_unescaped_name(json_first_line_reader).unwrap() {
                 "invocationId" => {
-                    let result = line.get_value().unwrap();
-                    invocation_id = result.as_str();
+                    invocation_id = Some(line.value);
                 }
                 "arguments" => {
-                    let result = line.get_value().unwrap();
-                    arguments = result.as_bytes();
+                    arguments = Some(line.value);
                 }
-                "target" => {
-                    let result = line.get_value().unwrap();
-                    target = result.as_str();
-                }
+                "target" => target = Some(line.value),
                 _ => {}
             }
         }
@@ -43,11 +38,25 @@ impl<'s> SignalRMessage<'s> {
         if arguments.is_none() {
             panic!("Arguments is not found");
         }
+
         Self {
             headers: None,
-            invocation_id: invocation_id,
-            target: target.unwrap(),
-            arguments: arguments.unwrap(),
+            invocation_id: if let Some(invocation_id) = invocation_id.take() {
+                Some(
+                    invocation_id
+                        .as_unescaped_str(json_first_line_reader)
+                        .unwrap(),
+                )
+            } else {
+                None
+            },
+            target: target
+                .take()
+                .unwrap()
+                .as_unescaped_str(json_first_line_reader)
+                .unwrap()
+                .into(),
+            arguments: arguments.take().unwrap().as_bytes(json_first_line_reader),
         }
     }
 }

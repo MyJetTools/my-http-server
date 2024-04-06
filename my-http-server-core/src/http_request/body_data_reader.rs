@@ -121,7 +121,7 @@ mod test {
     fn test_boolean() {
         use crate::{BodyDataReader, JsonEncodedData};
 
-        let src_data = r#"{"name":"John","age":30,"cars":["Ford","BMW","Fiat"],"is_admin":true, ,"is_user":false}"#;
+        let src_data = r#"{"name":"John","age":30,"cars":["Ford","BMW","Fiat"],"is_admin":true, "is_user":false}"#;
 
         let json_encoded_data = JsonEncodedData::new(src_data.as_bytes()).unwrap();
         let body_data_reader = BodyDataReader::create_as_json_encoded_data(json_encoded_data);
