@@ -15,7 +15,7 @@ with-telemetry = ["dep:my-telemetry"]
 my-http-server-core = { path = "../my-http-server-core" }
 my-http-server-web-sockets = { path = "../my-http-server-web-sockets" }
 rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
-my-json = { tag = "0.2.2", git = "https://github.com/MyJetTools/my-json.git" }
+my-json = { tag = "0.2.3", git = "https://github.com/MyJetTools/my-json.git" }
 
 
 my-telemetry = { tag = "1.1.0", git = "https://github.com/MyJetTools/my-telemetry.git", optional = true }
