@@ -104,48 +104,52 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
         };
 
         if let Some(web_socket) = web_socket {
-            let mut result = String::new();
+            let mut result = Vec::new();
 
-            result.push_str("{\"type\":1,\"target\":\"");
-            result.push_str(action_name);
-            result.push_str("\",\"arguments\":[");
+            result.extend_from_slice("{\"type\":1,\"target\":\"".as_bytes());
+            result.extend_from_slice(action_name.as_bytes());
+            result.extend_from_slice("\",\"arguments\":[".as_bytes());
             match parameter {
                 SignalRParam::JsonObject(json_writer) => {
                     json_writer.build_into(&mut result);
                 }
                 SignalRParam::String(value) => {
-                    result.push('"');
+                    result.push(b'"');
                     my_json::json_string_value::write_escaped_json_string_value(value, &mut result);
-                    result.push('"');
+                    result.push(b'"');
                 }
                 SignalRParam::Number(number) => {
-                    result.push_str(number.to_string().as_str());
+                    result.extend_from_slice(number.to_string().as_bytes());
                 }
                 SignalRParam::Float(value) => {
-                    result.push_str(value.to_string().as_str());
+                    result.extend_from_slice(value.to_string().as_bytes());
                 }
                 SignalRParam::Boolean(value) => {
                     if *value {
-                        result.push_str("true");
+                        result.extend_from_slice("true".as_bytes());
                     } else {
-                        result.push_str("false");
+                        result.extend_from_slice("false".as_bytes());
                     }
                 }
                 SignalRParam::Raw(value) => {
                     for (index, item) in value.iter().enumerate() {
                         if index > 0 {
-                            result.push(',');
+                            result.push(b',');
                         }
-                        result.push_str(std::str::from_utf8(item).unwrap());
+                        result.extend_from_slice(item);
                     }
                 }
                 SignalRParam::None => {}
             }
 
-            result.push_str("]}");
-            result.push(30 as char);
+            result.extend_from_slice("]}".as_bytes());
+            result.push(30);
 
-            web_socket.send_message(Message::Text(result)).await;
+            unsafe {
+                web_socket
+                    .send_message(Message::Text(String::from_utf8_unchecked(result)))
+                    .await;
+            }
         }
     }
 
