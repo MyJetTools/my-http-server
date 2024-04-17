@@ -126,7 +126,7 @@ impl<'s> EncodedParamValue<'s> {
                 name: _,
                 value,
                 src: _,
-            } => Ok(StrOrString::create_as_str(value.as_raw_str()?)),
+            } => Ok(StrOrString::create_as_string(value.as_string()?)),
             Self::FormData { value, .. } => {
                 let value = value.unwrap_as_string()?;
                 Ok(StrOrString::create_as_str(value))
