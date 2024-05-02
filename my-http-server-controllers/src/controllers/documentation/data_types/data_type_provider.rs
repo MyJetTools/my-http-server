@@ -8,7 +8,7 @@ use super::{ArrayElement, HttpDataType, HttpSimpleType};
 
 pub trait DataTypeProvider {
     fn get_data_type() -> HttpDataType;
-    fn get_generic_type() -> Option<&'static str> {
+    fn get_generic_type() -> Option<rust_extensions::StrOrString<'static>> {
         None
     }
 }
@@ -120,8 +120,11 @@ impl<T: DataTypeProvider> DataTypeProvider for Vec<T> {
         }
     }
 
-    fn get_generic_type() -> Option<&'static str> {
-        T::get_generic_type()
+    fn get_generic_type() -> Option<rust_extensions::StrOrString<'static>> {
+        match T::get_generic_type() {
+            Some(generic_type) => Some(format!("array_of_{}", generic_type.as_str()).into()),
+            None => None,
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use rust_extensions::StrOrString;
 use super::{ArrayElement, HttpDataType, HttpField};
 #[derive(Clone, Debug)]
 pub struct HttpObjectFields {
-    pub struct_id: &'static str,
+    pub struct_id: StrOrString<'static>,
     pub fields: Vec<HttpField>,
 }
 
@@ -16,10 +16,13 @@ pub struct HttpObjectStructure {
 impl super::InputStructure for HttpObjectStructure {
     fn get_struct_id(&self) -> StrOrString<'static> {
         match &self.generic {
-            Some(generic_data) => {
-                format!("{}_{}", self.main.struct_id, generic_data.struct_id).into()
-            }
-            None => self.main.struct_id.into(),
+            Some(generic_data) => format!(
+                "{}_{}",
+                self.main.struct_id.as_str(),
+                generic_data.struct_id.as_str()
+            )
+            .into(),
+            None => self.main.struct_id.clone(),
         }
     }
 }
@@ -33,7 +36,7 @@ impl HttpObjectStructure {
         HttpDataType::ArrayOf(ArrayElement::Object(self))
     }
 
-    pub fn new(struct_id: &'static str, generic_struct_id: Option<&'static str>) -> Self {
+    pub fn new(struct_id: &'static str, generic_struct_id: Option<StrOrString<'static>>) -> Self {
         let generic = if let Some(generic_struct_id) = generic_struct_id {
             Some(HttpObjectFields {
                 struct_id: generic_struct_id,
@@ -45,7 +48,7 @@ impl HttpObjectStructure {
 
         Self {
             main: HttpObjectFields {
-                struct_id,
+                struct_id: struct_id.into(),
                 fields: vec![],
             },
             generic,

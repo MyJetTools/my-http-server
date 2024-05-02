@@ -161,7 +161,7 @@ pub fn generate(ast: &syn::DeriveInput, as_integer: bool) -> Result<TokenStream,
                 __es.into_http_data_type_object()
             }
 
-            fn get_generic_type() -> Option<&'static str> {
+            fn get_generic_type() -> Option<rust_extensions::StrOrString<'static>> {
                 None
              }
         }

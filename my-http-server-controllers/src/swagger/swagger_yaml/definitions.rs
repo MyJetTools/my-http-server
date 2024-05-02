@@ -138,15 +138,15 @@ fn write_object_type(
     }
 
     if let Some(generic_data) = &object_type.generic {
-        if !definitions.contains_key(generic_data.struct_id) {
-            yaml_writer.write_upper_level(generic_data.struct_id, |yaml_writer| {
+        if !definitions.contains_key(generic_data.struct_id.as_str()) {
+            yaml_writer.write_upper_level(generic_data.struct_id.as_str(), |yaml_writer| {
                 super::http_object_type::build(yaml_writer, generic_data);
             });
             for field in &generic_data.fields {
                 populate_object_type(yaml_writer, definitions, &field.data_type);
             }
 
-            definitions.insert(generic_data.struct_id.to_string(), ());
+            definitions.insert(generic_data.struct_id.as_str().to_string(), ());
         }
     }
 }

@@ -30,7 +30,7 @@ impl GenericData {
         }
         .into()
     }
-    pub fn get_generic_name_as_string(&self) -> String {
+    pub fn get_generic_name_as_str_or_string(&self) -> proc_macro2::TokenStream {
         let mut generic_param = self.generic_ident.to_string();
 
         if generic_param.starts_with("<") {
@@ -39,6 +39,6 @@ impl GenericData {
             generic_param = generic_param.trim().to_string();
         }
 
-        generic_param
+        quote::quote!(#generic_param.into())
     }
 }

@@ -8,7 +8,7 @@ pub fn generate_data_provider(
         let generic_token_stream = generic.generic.clone();
         let generic_ident = generic.generic_ident.clone();
 
-        let get_generic_type = generic.get_generic_name_as_string();
+        let get_generic_type = generic.get_generic_name_as_str_or_string();
 
         (
             generic_token_stream,
@@ -20,7 +20,7 @@ pub fn generate_data_provider(
         (
             quote::quote! {},
             quote::quote! {},
-            quote::quote!(Some(#struct_name)),
+            quote::quote!(Some(#struct_name.into())),
         )
     };
 
@@ -31,7 +31,7 @@ pub fn generate_data_provider(
                 Self::get_http_data_structure().into_http_data_type_object()
             }
 
-            fn get_generic_type() -> Option<&'static str> {
+            fn get_generic_type() -> Option<rust_extensions::StrOrString<'static>> {
                #get_generic_type
             }
         }
