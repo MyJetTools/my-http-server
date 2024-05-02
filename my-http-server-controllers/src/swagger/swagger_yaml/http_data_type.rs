@@ -64,32 +64,10 @@ pub fn build(yaml_writer: &mut YamlWriter, root_name: &str, data_type: &HttpData
     }
 }
 
-/*
-fn write_object_type(yaml_writer: &mut YamlWriter, struct_id: &str) {
-    yaml_writer.increase_level();
-    yaml_writer.write(
-        "$ref",
-        format!("'#/components/schemas/{}'", struct_id).as_str(),
-    );
-    yaml_writer.decrease_level();
-}
- */
-
 fn write_simple_type(yaml_writer: &mut YamlWriter, param_type: &HttpSimpleType) {
     yaml_writer.write("type", param_type.as_swagger_type());
     yaml_writer.write("format", param_type.as_format());
 }
-
-/*
-fn write_enum_type(yaml_writer: &mut YamlWriter, struct_id: &str) {
-    yaml_writer.increase_level();
-    yaml_writer.write(
-        "$ref",
-        format!("'#/components/schemas/{}'", struct_id).as_str(),
-    );
-    yaml_writer.decrease_level();
-}
- */
 
 fn write_array_element(yaml_writer: &mut YamlWriter, array_element: &ArrayElement) {
     yaml_writer.write("type", "array");

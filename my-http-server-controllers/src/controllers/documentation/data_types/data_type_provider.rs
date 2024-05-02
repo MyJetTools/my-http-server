@@ -119,6 +119,10 @@ impl<T: DataTypeProvider> DataTypeProvider for Vec<T> {
             _ => panic!("Unsupported data type: {:?}", data_type),
         }
     }
+
+    fn get_generic_type() -> Option<&'static str> {
+        T::get_generic_type()
+    }
 }
 
 impl<TValue: DataTypeProvider> DataTypeProvider for HashMap<String, TValue> {
