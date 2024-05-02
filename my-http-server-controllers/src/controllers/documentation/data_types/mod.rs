@@ -14,8 +14,7 @@ pub use http_enum_struct::{EnumType, HttpEnumCase, HttpEnumStructure};
 pub use http_field::HttpField;
 pub use http_object_type::*;
 pub use http_simple_type::HttpSimpleType;
-use rust_extensions::StrOrString;
 
 pub trait InputStructure {
-    fn get_struct_id(&self) -> StrOrString<'static>;
+    fn get_struct_id(&self) -> String;
 }

@@ -1,9 +1,7 @@
-use rust_extensions::StrOrString;
-
 use super::{ArrayElement, HttpDataType, HttpField};
 #[derive(Clone, Debug)]
 pub struct HttpObjectFields {
-    pub struct_id: StrOrString<'static>,
+    pub struct_id: String,
     pub fields: Vec<HttpField>,
 }
 
@@ -14,7 +12,7 @@ pub struct HttpObjectStructure {
 }
 
 impl super::InputStructure for HttpObjectStructure {
-    fn get_struct_id(&self) -> StrOrString<'static> {
+    fn get_struct_id(&self) -> String {
         match &self.generic {
             Some(generic_data) => format!(
                 "{}_{}",
@@ -36,7 +34,7 @@ impl HttpObjectStructure {
         HttpDataType::ArrayOf(ArrayElement::Object(self))
     }
 
-    pub fn new(struct_id: &'static str, generic_struct_id: Option<StrOrString<'static>>) -> Self {
+    pub fn new(struct_id: &'static str, generic_struct_id: Option<String>) -> Self {
         let generic = if let Some(generic_struct_id) = generic_struct_id {
             Some(HttpObjectFields {
                 struct_id: generic_struct_id,

@@ -31,7 +31,7 @@ pub fn generate_data_provider(
                 Self::get_http_data_structure().into_http_data_type_object()
             }
 
-            fn get_generic_type() -> Option<rust_extensions::StrOrString<'static>> {
+            fn get_generic_type() -> Option<String> {
                #get_generic_type
             }
         }

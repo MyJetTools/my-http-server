@@ -1,5 +1,3 @@
-use rust_extensions::StrOrString;
-
 use super::HttpDataType;
 #[derive(Clone, Debug)]
 pub struct HttpEnumCase {
@@ -20,8 +18,8 @@ pub struct HttpEnumStructure {
 }
 
 impl super::InputStructure for HttpEnumStructure {
-    fn get_struct_id(&self) -> StrOrString<'static> {
-        self.struct_id.into()
+    fn get_struct_id(&self) -> String {
+        self.struct_id.to_string()
     }
 }
 
