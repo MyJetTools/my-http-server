@@ -32,29 +32,24 @@ pub fn generate(
                 return vec![json.unwrap()];
             }
 
-            fn deserialize(src: &[&[u8]]) -> Result<Self::Item, String> {
-                if src.len() != 1 {
-                    return Err(format!(
-                        "Invalid messages amount {} during deserialization for action: {}",
-                        src.len(),
-                        Self::ACTION_NAME
-                    ));
+            fn deserialize<'s>(src: impl Iterator<Item = &'s [u8]>) -> Result<Self::Item, String> {
+                for payload in src {
+                    let result = serde_json::from_slice(payload);
+                    if let Err(err) = &result {
+                        return Err(format!(
+                            "Invalid message during deserialization for action: {}. Error: {}",
+                            Self::ACTION_NAME,
+                            err
+                        ));
+                    }
+                    let result: Self = result.unwrap();
+                    return Ok(result);
                 }
 
-                let payload = src.get(0).unwrap();
-
-                let result = serde_json::from_slice(payload);
-
-                if let Err(err) = &result {
-                    return Err(format!(
-                        "Invalid message during deserialization for action: {}. Error: {}",
-                        Self::ACTION_NAME,
-                        err
-                    ));
-                }
-
-                let result: Self = result.unwrap();
-                Ok(result)
+                return Err(format!(
+                    "Can not be 0 parameters amount during deserialization for action: {}",
+                    Self::ACTION_NAME
+                ));
             }
         }
     };
