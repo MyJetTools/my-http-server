@@ -1,8 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    http_headers_to_use::*, HttpFailResult, HttpPath, HttpRequestBody, HttpRequestHeaders,
-    RequestData, RequestIp, UrlEncodedData,
+    http_headers_to_use::*, CookiesReader, HttpFailResult, HttpPath, HttpRequestBody,
+    HttpRequestHeaders, RequestData, RequestIp, UrlEncodedData,
 };
 
 use hyper::{Method, Uri};
@@ -117,6 +117,21 @@ impl HttpRequest {
                 return scheme.as_str();
             }
             None => "http",
+        }
+    }
+
+    pub fn get_cookies(&self) -> CookiesReader {
+        let cookie_header = self.data.headers().try_get_case_insensitive("cookie");
+
+        if cookie_header.is_none() {
+            return CookiesReader::new(None);
+        }
+
+        match cookie_header.unwrap().as_str() {
+            Ok(cookie) => CookiesReader::new(Some(cookie)),
+            Err(_) => {
+                return CookiesReader::new(None);
+            }
         }
     }
 }
