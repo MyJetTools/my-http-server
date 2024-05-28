@@ -27,6 +27,7 @@ lazy_static = "*"
 hyper = { version = "*", features = ["full"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
+serde_yaml = "*"
 async-trait = "*"
 http-body-util = "*"
 hyper-util = { version = "*", features = ["tokio"] }

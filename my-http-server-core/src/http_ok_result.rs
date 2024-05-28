@@ -123,6 +123,16 @@ impl HttpOutput {
         }
     }
 
+    pub fn as_yaml<T: Serialize>(model: T) -> Self {
+        let yaml = serde_yaml::to_string(&model).unwrap();
+
+        Self::Content {
+            headers: None,
+            content_type: Some(WebContentType::Yaml),
+            content: yaml.into_bytes(),
+        }
+    }
+
     pub fn as_redirect(src: &str, permanent: bool) -> Self {
         Self::Redirect {
             url: src.to_string(),

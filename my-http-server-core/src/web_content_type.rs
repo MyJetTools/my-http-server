@@ -7,6 +7,7 @@ pub enum WebContentType {
     JavaScript,
     Json,
     Text,
+    Yaml,
     Raw(String),
 }
 
@@ -20,6 +21,7 @@ impl WebContentType {
             WebContentType::Text => "text/plain; charset=utf-8",
             WebContentType::Png => "image/png",
             WebContentType::Svg => "image/svg+xml",
+            WebContentType::Yaml => "text/yaml",
             WebContentType::Raw(content_type) => content_type.as_str(),
         }
     }
@@ -38,6 +40,8 @@ impl WebContentType {
             "htm" => WebContentType::Html.into(),
             "text" => WebContentType::Text.into(),
             "json" => WebContentType::Json.into(),
+            "yaml" => WebContentType::Yaml.into(),
+            "yml" => WebContentType::Yaml.into(),
             _ => None,
         }
     }
