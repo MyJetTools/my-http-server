@@ -87,8 +87,8 @@ impl HttpRequest {
     }
 
     pub fn get_host<'s>(&'s self) -> &str {
-        if let Some(value) = self.data.headers().try_get_case_sensitive_as_str("host") {
-            return value;
+        if let Some(value) = self.data.headers().try_get_case_insensitive("host") {
+            return value.as_str().unwrap();
         }
         panic!("Host is not set");
     }
