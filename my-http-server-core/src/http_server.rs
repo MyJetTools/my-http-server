@@ -168,7 +168,7 @@ pub async fn handle_requests(
     #[cfg(feature = "with-telemetry")]
     let ctx = request_ctx.telemetry_context.clone();
 
-    let path = StrOrString::create_as_short_string_or_string(request_ctx.request.get_path());
+    let path = request_ctx.request.get_path().to_short_string_or_string();
     let ip =
         StrOrString::create_as_short_string_or_string(request_ctx.request.get_ip().get_real_ip());
 
@@ -208,7 +208,7 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            panic!("Http Server error: [{}]{}", method, path.to_string());
+            panic!("Http Server error: [{}]{}", method, path.as_str());
         }
     };
 

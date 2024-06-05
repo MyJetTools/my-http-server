@@ -1,8 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{
-    http_headers_to_use::*, CookiesReader, HttpFailResult, HttpPath, HttpRequestBody,
-    HttpRequestHeaders, RequestData, RequestIp, UrlEncodedData,
+    http_headers_to_use::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader,
+    HttpRequestBody, HttpRequestHeaders, RequestData, RequestIp, UrlEncodedData,
 };
 
 use hyper::{Method, Uri};
@@ -69,8 +69,8 @@ impl HttpRequest {
         self.data.take_incoming_body()
     }
 
-    pub fn get_path(&self) -> &str {
-        self.data.uri().path()
+    pub fn get_path(&self) -> HttpPathReader {
+        HttpPathReader::new(self.data.uri().path())
     }
 
     pub fn get_ip(&self) -> RequestIp {

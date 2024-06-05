@@ -10,3 +10,5 @@ mod body_content_type;
 pub use body_content_type::*;
 mod cookies_reader;
 pub use cookies_reader::*;
+mod http_path_reader;
+pub use http_path_reader::*;
