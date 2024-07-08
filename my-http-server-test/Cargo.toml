@@ -18,7 +18,6 @@ my-logger = { tag = "1.1.0", git = "https://github.com/MyJetTools/my-logger.git"
 
 tokio = { version = "*", features = ["full"] }
 hyper = { version = "*", features = ["full"] }
-prost = "*"
 serde_json = "*"
 serde = { version = "*", features = ["derive"] }
 async-trait = "*"
