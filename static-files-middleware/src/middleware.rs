@@ -3,6 +3,8 @@ use my_http_server_core::{
     HttpServerRequestFlow, WebContentType,
 };
 
+use crate::FilesAccess;
+
 pub struct FilesMapping {
     pub uri_prefix: HttpPath,
     pub folder_path: String,
@@ -25,6 +27,7 @@ pub struct StaticFilesMiddleware {
     pub file_folders: Option<Vec<FilesMapping>>,
     pub index_files: Option<Vec<String>>,
     pub not_found_file: Option<String>,
+    pub files_access: FilesAccess,
 }
 
 impl StaticFilesMiddleware {
@@ -59,7 +62,13 @@ impl StaticFilesMiddleware {
             file_folders,
             index_files,
             not_found_file: None,
+            files_access: FilesAccess::new(),
         }
+    }
+
+    pub fn enable_files_caching(mut self) -> Self {
+        self.files_access.enable_caching();
+        self
     }
 
     pub fn set_not_found_file(mut self, file_name: String) -> Self {
@@ -80,7 +89,8 @@ impl StaticFilesMiddleware {
             if let Some(index_files) = &self.index_files {
                 for index_file in index_files {
                     let file_name = get_file_name(file_folder, index_file);
-                    if let Ok(file_content) = super::files::get(file_name.as_str()).await {
+
+                    if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
                         let output = HttpOutput::Content {
                             headers: None,
                             content_type: WebContentType::detect_by_extension(path),
@@ -95,7 +105,7 @@ impl StaticFilesMiddleware {
 
         let file = get_file_name(file_folder, path);
 
-        match super::files::get(file.as_str()).await {
+        match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
                 let output = HttpOutput::Content {
                     headers: None,
@@ -118,7 +128,7 @@ impl StaticFilesMiddleware {
         let not_found_file = self.not_found_file.as_ref()?;
         let file = get_file_name(file_folder, not_found_file);
 
-        match super::files::get(file.as_str()).await {
+        match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
                 let output = HttpOutput::Content {
                     headers: None,
@@ -161,7 +171,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
 
         if let Some(result) = self
             .handle_folder(
-                super::files::DEFAULT_FOLDER,
+                super::DEFAULT_FOLDER,
                 ctx.request.http_path.as_str_from_segment(0),
             )
             .await
