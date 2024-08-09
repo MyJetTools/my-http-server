@@ -1,3 +1,3 @@
 mod generate;
-mod struct_prop_ext;
+//mod struct_prop_ext;
 pub use generate::*;

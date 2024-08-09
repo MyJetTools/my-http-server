@@ -2,7 +2,7 @@ use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::server::conn::http1;
 use hyper::{service::service_fn, Response};
-use hyper_util::rt::TokioIo;
+use hyper_util::rt::{TokioExecutor, TokioIo};
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
 #[cfg(feature = "with-telemetry")]
@@ -84,7 +84,38 @@ impl MyHttpServer {
         };
 
         let connections = self.connections.clone();
-        tokio::spawn(start(
+        tokio::spawn(start_http_1(
+            self.addr.clone(),
+            Arc::new(http_server_middlewares),
+            app_states,
+            logger,
+            connections,
+        ));
+    }
+
+    pub fn start_h2(
+        &mut self,
+        app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+        logger: Arc<dyn Logger + Send + Sync + 'static>,
+    ) {
+        let middlewares = self.middlewares.take();
+
+        if middlewares.is_none() {
+            panic!("You can not start HTTP2 server two times");
+        }
+
+        logger.write_info(
+            "Starting Http2 Server".to_string(),
+            format!("Http2 server starts at: {:?}", self.addr),
+            None,
+        );
+
+        let http_server_middlewares = HttpServerMiddlewares {
+            middlewares: middlewares.unwrap(),
+        };
+
+        let connections = self.connections.clone();
+        tokio::spawn(start_http_2(
             self.addr.clone(),
             Arc::new(http_server_middlewares),
             app_states,
@@ -94,7 +125,7 @@ impl MyHttpServer {
     }
 }
 
-pub async fn start(
+pub async fn start_http_1(
     addr: SocketAddr,
     http_server_middlewares: Arc<HttpServerMiddlewares>,
     app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
@@ -141,6 +172,68 @@ pub async fn start(
                 }),
             )
             .with_upgrades();
+
+        let connections_clone = connections.clone();
+        tokio::task::spawn(async move {
+            if let Err(err) = connection.await {
+                println!("Error serving connection: {:?}", err);
+            }
+
+            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        });
+    }
+}
+
+pub async fn start_http_2(
+    addr: SocketAddr,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
+    app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
+    connections: Arc<AtomicI64>,
+) {
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+
+    let http2_builder = Arc::new(hyper::server::conn::http2::Builder::new(
+        TokioExecutor::new(),
+    ));
+
+    loop {
+        if app_states.is_shutting_down() {
+            break;
+        }
+
+        let (stream, socket_addr) = listener.accept().await.unwrap();
+
+        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let io = TokioIo::new(stream);
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
+        let app_states = app_states.clone();
+
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger = logger.clone();
+        let socket_addr = socket_addr.clone();
+        let app_states = app_states.clone();
+
+        let builder = http2_builder.clone();
+
+        let connection = builder.serve_connection(
+            io,
+            service_fn(move |req| {
+                if app_states.is_shutting_down() {
+                    panic!("Application is shutting down");
+                }
+
+                let resp = handle_requests(
+                    req,
+                    http_server_middlewares.clone(),
+                    socket_addr.clone(),
+                    logger.clone(),
+                );
+                resp
+            }),
+        );
 
         let connections_clone = connections.clone();
         tokio::task::spawn(async move {
