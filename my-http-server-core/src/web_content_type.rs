@@ -8,6 +8,7 @@ pub enum WebContentType {
     Json,
     Text,
     Yaml,
+    Wasm,
     Raw(String),
 }
 
@@ -22,6 +23,7 @@ impl WebContentType {
             WebContentType::Png => "image/png",
             WebContentType::Svg => "image/svg+xml",
             WebContentType::Yaml => "text/yaml",
+            WebContentType::Wasm => "application/wasm",
             WebContentType::Raw(content_type) => content_type.as_str(),
         }
     }
@@ -42,6 +44,7 @@ impl WebContentType {
             "json" => WebContentType::Json.into(),
             "yaml" => WebContentType::Yaml.into(),
             "yml" => WebContentType::Yaml.into(),
+            "wasm" => WebContentType::Wasm.into(),
             _ => None,
         }
     }
