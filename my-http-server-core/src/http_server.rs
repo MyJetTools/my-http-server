@@ -132,7 +132,14 @@ pub async fn start_http_1(
     logger: Arc<dyn Logger + Send + Sync + 'static>,
     connections: Arc<AtomicI64>,
 ) {
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await;
+
+    if let Err(err) = &listener {
+        panic!("Error starting http server at {}. Err: {:?}", addr, err);
+    }
+
+    let listener = listener.unwrap();
+
     let mut http1 = http1::Builder::new();
     http1.keep_alive(true);
     loop {
@@ -191,7 +198,13 @@ pub async fn start_http_2(
     logger: Arc<dyn Logger + Send + Sync + 'static>,
     connections: Arc<AtomicI64>,
 ) {
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await;
+
+    if let Err(err) = &listener {
+        panic!("Error starting h2 server at {}. Err: {:?}", addr, err);
+    }
+
+    let listener = listener.unwrap();
 
     let http2_builder = Arc::new(hyper::server::conn::http2::Builder::new(
         TokioExecutor::new(),
