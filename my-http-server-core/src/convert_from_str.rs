@@ -87,7 +87,7 @@ pub fn to_date_time(
         Some(result) => Ok(result),
         None => Err(HttpFailResult::invalid_value_to_parse(format!(
             "Can not parse [{}] with value [{}] as date time  from [{}]",
-            param_name, param_name, src
+            param_name, value, src
         ))),
     }
 }
