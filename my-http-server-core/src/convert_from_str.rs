@@ -86,8 +86,8 @@ pub fn to_date_time(
     match DateTimeAsMicroseconds::from_str(value) {
         Some(result) => Ok(result),
         None => Err(HttpFailResult::invalid_value_to_parse(format!(
-            "Can not parse [{}] as date time  from [{}]",
-            param_name, src
+            "Can not parse [{}] with value [{}] as date time  from [{}]",
+            param_name, param_name, src
         ))),
     }
 }
