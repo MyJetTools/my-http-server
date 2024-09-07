@@ -57,7 +57,7 @@ impl<'s> JsonEncodedValueAsString<'s> {
     }
 
     pub fn as_date_time(&self) -> Result<DateTimeAsMicroseconds, HttpFailResult> {
-        match self.value.as_raw_str(&self.raw) {
+        match self.value.as_unescaped_str(&self.raw) {
             Some(result) => crate::convert_from_str::to_date_time(&self.name, result, "body json"),
             None => Err(HttpFailResult::required_parameter_is_missing(
                 &self.name,
