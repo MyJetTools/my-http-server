@@ -18,3 +18,6 @@ pub mod signal_r {
 pub use static_files_middleware::*;
 
 pub use my_http_server_core::*;
+
+#[cfg(feature = "metrics")]
+pub use my_http_metrics as metrics;

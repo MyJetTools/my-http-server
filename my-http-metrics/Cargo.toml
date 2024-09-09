@@ -1,0 +1,12 @@
+[package]
+name = "my-http-metrics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+my-http-server-core = { path = "../my-http-server-core" }
+metrics = "*"
+tokio = { version = "*", features = ["full"] }
+async-trait = "*"
+stopwatch = "*"
+prometheus = "*"
