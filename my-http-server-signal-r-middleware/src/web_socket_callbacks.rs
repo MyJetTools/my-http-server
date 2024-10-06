@@ -93,7 +93,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
         }
     }
     async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: WebSocketMessage) {
-        #[cfg(feature = "debug_ws")]
+        #[cfg(feature = "debug-ws")]
         println!("Websocket{}, MSG: {:?}", my_web_socket.id, message);
 
         let signal_r = self

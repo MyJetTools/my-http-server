@@ -35,6 +35,8 @@ mod signal_r_telemetry;
 #[cfg(feature = "with-telemetry")]
 pub use signal_r_telemetry::*;
 
+pub extern crate tokio_tungstenite;
+
 pub struct SignalRConnectionId(String);
 
 impl SignalRConnectionId {

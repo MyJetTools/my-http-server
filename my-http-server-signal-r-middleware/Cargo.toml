@@ -23,6 +23,6 @@ my-telemetry = { tag = "1.1.1", git = "https://github.com/MyJetTools/my-telemetr
 tokio = { version = "*", features = ["full"] }
 async-trait = "*"
 hyper = { version = "*", features = ["full"] }
-tokio-tungstenite = "0.23.1"
+tokio-tungstenite = "*"
 futures = "*"
 uuid = { version = "*", features = ["serde", "v4"] }
