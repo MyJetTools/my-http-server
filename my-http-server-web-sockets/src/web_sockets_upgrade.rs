@@ -9,6 +9,7 @@ use http_body_util::Full;
 use hyper::{Request, Response};
 use hyper_tungstenite::tungstenite::Message;
 use hyper_tungstenite::HyperWebsocketStream;
+use rust_extensions::Logger;
 
 use crate::{MyWebSocket, MyWebSocketCallback, WebSocketMessage};
 
@@ -21,6 +22,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
     req: Request<hyper::body::Incoming>,
     callback: Arc<TMyWebSocketCallback>,
     disconnect_timeout: Duration,
+    logs: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> Result<Response<Full<Bytes>>, Error> {
     let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
 
@@ -32,7 +34,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
                 let (ws_sender, ws_receiver) = ws_stream.split();
 
                 let my_web_socket =
-                    MyWebSocket::new(id, addr, ws_sender, query_string, callback.clone());
+                    MyWebSocket::new(id, addr, ws_sender, query_string, callback.clone(), logs);
 
                 let my_web_socket = Arc::new(my_web_socket);
 

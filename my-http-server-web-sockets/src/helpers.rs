@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use my_http_server_core::HttpRequest;
 use my_http_server_core::{HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
+use rust_extensions::Logger;
 
 use crate::MyWebSocketCallback;
 
@@ -12,6 +13,7 @@ pub async fn handle_web_socket_upgrade<
     callback: Arc<TMyWebSocketCallback>,
     id: i64,
     disconnect_timeout: Duration,
+    logs: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> Result<HttpOkResult, HttpFailResult> {
     let query_string = if let Some(query_string) = req.get_uri().query() {
         Some(query_string.to_string())
@@ -30,6 +32,7 @@ pub async fn handle_web_socket_upgrade<
         req,
         callback.clone(),
         disconnect_timeout,
+        logs,
     )
     .await;
 

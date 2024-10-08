@@ -66,6 +66,7 @@ impl<TCtx: Send + Sync + Default + 'static> MiddlewareBuilder<TCtx> {
             self.signal_r_list,
             self.actions,
             self.disconnect_timeout,
+            self.logger,
         )
     }
 }

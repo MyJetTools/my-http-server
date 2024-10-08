@@ -82,7 +82,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
         my_web_socket: Arc<MyWebSocket>,
         disconnect_timeout: Duration,
     ) -> Result<(), HttpFailResult> {
-        #[cfg(feature = "debug_ws")]
+        #[cfg(feature = "debug-ws")]
         println!("connected web_socket:{}", my_web_socket.id);
 
         if let Some(query_string) = my_web_socket.get_query_string() {
@@ -142,7 +142,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
     }
 
     async fn disconnected(&self, my_web_socket: Arc<MyWebSocket>) {
-        #[cfg(feature = "debug_ws")]
+        #[cfg(feature = "debug-ws")]
         println!("disconnected web_socket:{}", my_web_socket.id);
         let find_result = self
             .socket_io_list
@@ -155,7 +155,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
         }
     }
     async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: WebSocketMessage) {
-        #[cfg(feature = "debug_ws")]
+        #[cfg(feature = "debug-ws")]
         println!("Websocket{}, MSG: {:?}", my_web_socket.id, message);
 
         let socket_io = self

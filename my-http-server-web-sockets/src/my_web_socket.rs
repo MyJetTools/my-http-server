@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
 };
@@ -10,6 +11,7 @@ use hyper_tungstenite::{
     HyperWebsocketStream,
 };
 use my_http_server_core::UrlEncodedData;
+use rust_extensions::{date_time::DateTimeAsMicroseconds, Logger};
 use tokio::sync::Mutex;
 
 use crate::MyWebSocketCallback;
@@ -21,6 +23,8 @@ pub struct MyWebSocket {
     callbacks: Arc<dyn MyWebSocketCallback + Send + Sync + 'static>,
     query_string: Option<String>,
     connected: AtomicBool,
+    logs: Arc<dyn Logger + Send + Sync + 'static>,
+    connected_at: DateTimeAsMicroseconds,
 }
 
 impl MyWebSocket {
@@ -30,6 +34,7 @@ impl MyWebSocket {
         write_stream: SplitSink<HyperWebsocketStream, Message>,
         query_string: Option<String>,
         callbacks: Arc<dyn MyWebSocketCallback + Send + Sync + 'static>,
+        logs: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> Self {
         Self {
             write_stream: Mutex::new(write_stream.into()),
@@ -38,6 +43,8 @@ impl MyWebSocket {
             query_string,
             connected: AtomicBool::new(true),
             callbacks,
+            logs,
+            connected_at: DateTimeAsMicroseconds::now(),
         }
     }
 
@@ -54,7 +61,17 @@ impl MyWebSocket {
         let result = self.send_message_if_connected(msg).await;
 
         if let Err(err) = result {
-            println!("Error sending message to websocket {}: {:?}", self.id, err);
+            let mut ctx = HashMap::new();
+
+            ctx.insert("Ip".to_string(), self.addr.to_string());
+            ctx.insert("Id".to_string(), self.id.to_string());
+            ctx.insert("ConnectedAt".to_string(), self.connected_at.to_rfc3339());
+            self.logs.write_warning(
+                "Error sending message to websocket".to_string(),
+                format!("{err}"),
+                Some(ctx),
+            );
+
             self.disconnect().await;
         }
     }
@@ -65,7 +82,16 @@ impl MyWebSocket {
         match UrlEncodedData::from_query_string(str) {
             Ok(result) => Some(result),
             Err(_) => {
-                println!("Can not parse query string: {}", str);
+                let mut ctx = HashMap::new();
+
+                ctx.insert("Ip".to_string(), self.addr.to_string());
+                ctx.insert("Id".to_string(), self.id.to_string());
+                ctx.insert("ConnectedAt".to_string(), self.connected_at.to_rfc3339());
+                self.logs.write_warning(
+                    "WebSocket parsing query string".to_string(),
+                    format!("Invalid query string {}", str.to_string()),
+                    Some(ctx),
+                );
                 return None;
             }
         }

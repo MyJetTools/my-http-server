@@ -18,6 +18,7 @@ pub struct MySignalRMiddleware<TCtx: Send + Sync + Default + 'static> {
     signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
     actions: Arc<MySignalRActions<TCtx>>,
     disconnect_timeout: std::time::Duration,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
 }
 
 impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
@@ -34,6 +35,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
         signal_r_list: Arc<SignalRConnectionsList<TCtx>>,
         actions: MySignalRActions<TCtx>,
         disconnect_timeout: std::time::Duration,
+        logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> Self {
         let hub_name = hub_name.to_lowercase();
 
@@ -50,6 +52,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
             socket_id: Mutex::new(0),
             actions,
             disconnect_timeout,
+            logger,
         }
     }
 
@@ -63,7 +66,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
         &self,
         ctx: &mut HttpContext,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        #[cfg(feature = "debug_ws")]
+        #[cfg(feature = "debug-ws")]
         println!("handle_negotiate_request");
         let query_string = ctx.request.get_query_string()?;
 
@@ -123,6 +126,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
             self.web_socket_callback.clone(),
             id,
             self.disconnect_timeout,
+            self.logger.clone(),
         )
         .await;
 
