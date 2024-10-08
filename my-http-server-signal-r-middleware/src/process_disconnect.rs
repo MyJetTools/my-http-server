@@ -14,7 +14,7 @@ pub async fn process_disconnect<TCtx: Send + Sync + Default + 'static>(
     if let Some(removed_connection) = removed_connection {
         #[cfg(feature = "debug-ws")]
         println!(
-            "SignalR {} is disconnected with connection token {:?}",
+            "SignalR {:?} is disconnected with connection token {:?}",
             removed_connection.connection_id, removed_connection.connection_token
         );
         connect_events.disconnected(&removed_connection).await;

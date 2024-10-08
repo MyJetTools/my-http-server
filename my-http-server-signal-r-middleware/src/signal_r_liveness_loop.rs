@@ -12,7 +12,7 @@ pub async fn start<TCtx: Send + Sync + Default + 'static>(
 ) {
     #[cfg(feature = "debug-ws")]
     println!(
-        "SignalR {} with connection token {:?} started liveness loop",
+        "SignalR {:?} with connection token {:?} started liveness loop",
         my_socket_io_connection.connection_id, my_socket_io_connection.connection_token
     );
 
@@ -25,7 +25,7 @@ pub async fn start<TCtx: Send + Sync + Default + 'static>(
         if now.duration_since(last_incoming).as_positive_or_zero() > ping_disconnect {
             #[cfg(feature = "debug-ws")]
             println!(
-                "SignalR {} with connection token {:?} looks like dead. Disconnecting",
+                "SignalR {:?} with connection token {:?} looks like dead. Disconnecting",
                 my_socket_io_connection.connection_id, my_socket_io_connection.connection_token
             );
             break;

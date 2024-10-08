@@ -37,6 +37,7 @@ pub use signal_r_telemetry::*;
 
 pub extern crate tokio_tungstenite;
 
+#[derive(Debug)]
 pub struct SignalRConnectionId(String);
 
 impl SignalRConnectionId {
@@ -55,6 +56,7 @@ impl SignalRConnectionId {
     }
 }
 
+#[derive(Debug)]
 pub struct SignalRConnectionToken(String);
 impl SignalRConnectionToken {
     pub fn generate() -> Self {
