@@ -11,7 +11,7 @@ pub mod types;
 mod json_encoded_data;
 
 mod request_credentials;
-mod request_flow;
+//mod request_flow;
 mod request_ip;
 mod url_encoded_data;
 
@@ -33,7 +33,7 @@ pub use http_server::*;
 pub use http_server_middleware::HttpServerMiddleware;
 pub use json_encoded_data::JsonEncodedData;
 pub use request_credentials::*;
-pub use request_flow::HttpServerRequestFlow;
+//pub use request_flow::HttpServerRequestFlow;
 pub use request_ip::RequestIp;
 pub use url_encoded_data::UrlEncodedData;
 pub use web_content_type::WebContentType;
@@ -54,4 +54,3 @@ pub use http_headers::*;
 pub mod data_src;
 
 pub extern crate hyper;
-

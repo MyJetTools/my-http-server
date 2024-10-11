@@ -2,9 +2,7 @@ use async_trait::async_trait;
 use hyper::Method;
 use std::sync::Arc;
 
-use my_http_server_core::{
-    HttpContext, HttpFailResult, HttpOkResult, HttpServerMiddleware, HttpServerRequestFlow,
-};
+use my_http_server_core::{HttpContext, HttpFailResult, HttpOkResult, HttpServerMiddleware};
 
 use super::{
     actions::{
@@ -280,57 +278,29 @@ impl HttpServerMiddleware for ControllersMiddleware {
     async fn handle_request(
         &self,
         ctx: &mut HttpContext,
-        get_next: &mut HttpServerRequestFlow,
-    ) -> Result<HttpOkResult, HttpFailResult> {
+    ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         match ctx.request.method {
             Method::GET => {
-                {
-                    if let Some(result) = self
-                        .get
-                        .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
-                        .await
-                    {
-                        return result;
-                    }
-                }
-                return get_next.next(ctx).await;
+                self.get
+                    .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
+                    .await
             }
             Method::POST => {
-                if let Some(result) = self
-                    .post
+                self.post
                     .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
                     .await
-                {
-                    return result;
-                } else {
-                    return get_next.next(ctx).await;
-                }
             }
             Method::PUT => {
-                if let Some(result) = self
-                    .put
+                self.put
                     .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
                     .await
-                {
-                    return result;
-                } else {
-                    return get_next.next(ctx).await;
-                }
             }
             Method::DELETE => {
-                if let Some(result) = self
-                    .delete
+                self.delete
                     .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
                     .await
-                {
-                    return result;
-                } else {
-                    return get_next.next(ctx).await;
-                }
             }
-            _ => {
-                return get_next.next(ctx).await;
-            }
+            _ => None,
         }
     }
 }

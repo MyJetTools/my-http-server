@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use my_http_server_core::{
-    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpServerMiddleware,
-    HttpServerRequestFlow, WebContentType,
+    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpServerMiddleware, WebContentType,
 };
 use rust_extensions::StrOrString;
 
@@ -34,15 +33,14 @@ impl HttpServerMiddleware for SwaggerMiddleware {
     async fn handle_request(
         &self,
         ctx: &mut HttpContext,
-        get_next: &mut HttpServerRequestFlow,
-    ) -> Result<HttpOkResult, HttpFailResult> {
+    ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         if ctx.request.http_path.is_root() {
-            return get_next.next(ctx).await;
+            return None;
         }
 
         if let Some(value) = ctx.request.http_path.get_segment_value_as_str(0) {
             if value != "swagger" {
-                return get_next.next(ctx).await;
+                return None;
             }
         }
 
@@ -56,7 +54,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 permanent: false,
             };
 
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
         if ctx
@@ -69,7 +67,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Html),
                 content: super::resources::INDEX_PAGE.to_vec(),
             };
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
         if ctx
@@ -82,7 +80,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Css),
                 content: super::resources::SWAGGER_UI_CSS.to_vec(),
             };
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
         if ctx
@@ -95,7 +93,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_BUNDLE_JS.to_vec(),
             };
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
         if ctx
@@ -108,7 +106,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_STANDALONE_PRESET_JS.to_vec(),
             };
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
         if ctx
@@ -121,7 +119,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_32.to_vec(),
             };
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
         if ctx
@@ -134,7 +132,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_16.to_vec(),
             };
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
         if ctx
@@ -164,9 +162,9 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 ),
             };
 
-            return output.into_ok_result(false);
+            return Some(output.into_ok_result(false));
         }
 
-        get_next.next(ctx).await
+        None
     }
 }

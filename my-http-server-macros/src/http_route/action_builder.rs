@@ -37,11 +37,6 @@ impl ActionMethod{
   }
 }
 
-#[derive(MacrosParameters)]
-pub struct Test{
-    pub status_code: u16,
-    pub description: String,
-}
 
 #[derive(MacrosParameters)]
 pub struct HttpActionResult<'s>{

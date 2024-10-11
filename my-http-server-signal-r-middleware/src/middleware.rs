@@ -148,14 +148,13 @@ impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalRMi
     async fn handle_request(
         &self,
         ctx: &mut HttpContext,
-        get_next: &mut HttpServerRequestFlow,
-    ) -> Result<HttpOkResult, HttpFailResult> {
+    ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         if !ctx
             .request
             .http_path
             .has_value_at_index_case_insensitive(0, &self.hub_name)
         {
-            return get_next.next(ctx).await;
+            return None;
         }
 
         if ctx
@@ -164,16 +163,16 @@ impl<TCtx: Send + Sync + Default + 'static> HttpServerMiddleware for MySignalRMi
             .try_get_case_insensitive("sec-websocket-key")
             .is_some()
         {
-            return self.handle_websocket_upgrade(ctx).await;
+            return Some(self.handle_websocket_upgrade(ctx).await);
         }
 
         if ctx.request.method == Method::POST {
             if ctx.request.http_path.is_the_same_to(&self.negotiate_path) {
-                return self.handle_negotiate_request(ctx).await;
+                return Some(self.handle_negotiate_request(ctx).await);
             }
         }
 
-        get_next.next(ctx).await
+        None
     }
 }
 

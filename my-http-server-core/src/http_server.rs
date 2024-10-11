@@ -10,12 +10,13 @@ use rust_extensions::date_time::DateTimeAsMicroseconds;
 use rust_extensions::{ApplicationStates, Logger, StrOrString};
 use std::sync::atomic::AtomicI64;
 use std::{collections::HashMap, net::SocketAddr};
+use tokio::sync::Mutex;
 
 use std::sync::Arc;
 
+use crate::HttpOkResult;
 use crate::{
-    request_flow::HttpServerRequestFlow, HttpContext, HttpFailResult, HttpRequest,
-    HttpServerMiddleware, HttpServerMiddlewares,
+    HttpContext, HttpFailResult, HttpRequest, HttpServerMiddleware, HttpServerMiddlewares,
 };
 
 #[derive(Clone)]
@@ -281,32 +282,72 @@ pub async fn handle_requests(
     #[cfg(feature = "with-telemetry")]
     let started = DateTimeAsMicroseconds::now();
 
+    let client_id: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+
+    let client_id_spawned = client_id.clone();
+
     let result = tokio::spawn(async move {
-        let mut flows = HttpServerRequestFlow::new(http_server_middlewares.middlewares.clone());
-        let result = flows.next(&mut request_ctx).await;
-        (result, request_ctx)
+        let mut credentials_assigned = false;
+
+        for middleware in http_server_middlewares.middlewares.iter() {
+            let result = middleware.handle_request(&mut request_ctx).await;
+
+            if let Some(credentials) = request_ctx.credentials.as_ref() {
+                if !credentials_assigned {
+                    credentials_assigned = true;
+                    let mut client_id_access = client_id_spawned.lock().await;
+                    *client_id_access = Some(credentials.get_id().to_string());
+                }
+            }
+
+            if let Some(http_result) = result {
+                return MiddleWareFlowResult {
+                    http_context: request_ctx,
+                    http_result: http_result,
+                };
+            }
+        }
+
+        MiddleWareFlowResult {
+            http_context: request_ctx,
+            http_result: Err(HttpFailResult::as_not_found(
+                "404 - Not Found".to_string(),
+                false,
+            )),
+        }
     });
 
-    let (result, request_ctx) = match result.await {
-        Ok(result) => (result.0, result.1),
+    let result = match result.await {
+        Ok(result) => result,
         Err(err) => {
+            let client_id = client_id.lock().await.take();
             #[cfg(feature = "with-telemetry")]
-            my_telemetry::TELEMETRY_INTERFACE
-                .write_fail(
-                    &ctx,
-                    started,
-                    format!("[{}]{}", method, path.as_str().to_string()),
-                    format!("Panic: {:?}", err),
-                    TelemetryEventTagsBuilder::new()
-                        .add_ip(ip.as_str().to_string())
-                        .build(),
-                )
-                .await;
+            {
+                let mut tags = TelemetryEventTagsBuilder::new().add_ip(ip.as_str().to_string());
+
+                if let Some(client_id) = client_id.as_ref() {
+                    tags = tags.add("client_id", client_id.to_string());
+                }
+
+                my_telemetry::TELEMETRY_INTERFACE
+                    .write_fail(
+                        &ctx,
+                        started,
+                        format!("[{}]{}", method, path.as_str().to_string()),
+                        format!("Panic: {:?}", err),
+                        tags.build(),
+                    )
+                    .await;
+            }
 
             let mut ctx = HashMap::new();
             ctx.insert("path".to_string(), path.as_str().to_string());
             ctx.insert("method".to_string(), method.to_string());
             ctx.insert("ip".to_string(), ip.as_str().to_string());
+
+            if let Some(client_id) = client_id.as_ref() {
+                ctx.insert("client_id".to_string(), client_id.to_string());
+            }
 
             logger.write_error(
                 "HttpRequest".to_string(),
@@ -318,7 +359,7 @@ pub async fn handle_requests(
         }
     };
 
-    match result {
+    match result.http_result {
         Ok(ok_result) => {
             #[cfg(feature = "with-telemetry")]
             let mut ok_result = ok_result;
@@ -328,8 +369,8 @@ pub async fn handle_requests(
                 {
                     let mut tags = ok_result.add_telemetry_tags.take_tags().add_ip(ip);
 
-                    if let Some(credentials) = &request_ctx.credentials {
-                        tags = tags.add("user_id", credentials.get_id().to_string());
+                    if let Some(credentials) = &&result.http_context.credentials {
+                        tags = tags.add("client_id", credentials.get_id().to_string());
                     }
                     my_telemetry::TELEMETRY_INTERFACE
                         .write_success(
@@ -353,11 +394,14 @@ pub async fn handle_requests(
                 if err_result.write_to_log {
                     let mut ctx = HashMap::new();
                     ctx.insert("path".to_string(), path.as_str().to_string());
-                    ctx.insert("method".to_string(), request_ctx.request.method.to_string());
+                    ctx.insert(
+                        "method".to_string(),
+                        result.http_context.request.method.to_string(),
+                    );
                     ctx.insert("ip".to_string(), ip.as_str().to_string());
                     ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
 
-                    if let Some(credentials) = &request_ctx.credentials {
+                    if let Some(credentials) = &&result.http_context.credentials {
                         ctx.insert("client_id".to_string(), credentials.get_id().to_string());
                     }
 
@@ -375,8 +419,8 @@ pub async fn handle_requests(
                 {
                     let mut tags = err_result.add_telemetry_tags.take_tags().add_ip(ip);
 
-                    if let Some(credentials) = &request_ctx.credentials {
-                        tags = tags.add("user_id", credentials.get_id().to_string());
+                    if let Some(credentials) = &result.http_context.credentials {
+                        tags = tags.add("client_id".to_string(), credentials.get_id().to_string());
                     }
 
                     my_telemetry::TELEMETRY_INTERFACE
@@ -402,4 +446,8 @@ fn get_error_text(err: &HttpFailResult) -> &str {
     } else {
         std::str::from_utf8(&err.content).unwrap()
     }
+}
+pub struct MiddleWareFlowResult {
+    pub http_context: HttpContext,
+    pub http_result: Result<HttpOkResult, HttpFailResult>,
 }

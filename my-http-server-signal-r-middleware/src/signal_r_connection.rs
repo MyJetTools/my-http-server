@@ -11,8 +11,6 @@ use rust_extensions::{
 
 use tokio::sync::Mutex;
 
-#[cfg(feature = "with-ctx")]
-use tokio::sync::RwLock;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{SignalRConnectionId, SignalRConnectionToken, SignalRParam};
