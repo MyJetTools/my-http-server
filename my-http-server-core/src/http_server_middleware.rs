@@ -12,6 +12,7 @@ pub trait HttpServerMiddleware {
 }
 
 pub struct HttpRequestData {
+    pub started: DateTimeAsMicroseconds,
     pub method: Method,
     pub path: String,
     pub ip: String,
@@ -42,12 +43,7 @@ impl ResponseData {
 
 #[async_trait]
 pub trait HttpServerTechMiddleware {
-    async fn got_result(
-        &self,
-        started: DateTimeAsMicroseconds,
-        request: &HttpRequestData,
-        http_result: &ResponseData,
-    );
+    async fn got_result(&self, request: &HttpRequestData, http_result: &ResponseData);
 
-    async fn got_panic(&self, started: DateTimeAsMicroseconds, ctx: &HttpRequestData);
+    async fn got_panic(&self, ctx: &HttpRequestData);
 }

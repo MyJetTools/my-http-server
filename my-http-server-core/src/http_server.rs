@@ -292,9 +292,8 @@ pub async fn handle_requests(
         method,
         path: request_ctx.request.get_path().to_string(),
         ip: request_ctx.request.get_ip().get_real_ip().to_string(),
+        started: DateTimeAsMicroseconds::now(),
     });
-
-    let started = DateTimeAsMicroseconds::now();
 
     let client_id: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
@@ -338,9 +337,7 @@ pub async fn handle_requests(
                 let request_data = request_data.clone();
                 tokio::spawn(async move {
                     for middleware in http_server_middlewares.tech_middlewares.iter() {
-                        middleware
-                            .got_result(started, &request_data, &response_data)
-                            .await;
+                        middleware.got_result(&request_data, &response_data).await;
                     }
                 });
             }
@@ -352,7 +349,7 @@ pub async fn handle_requests(
             let request_data_cloned = request_data.clone();
             tokio::spawn(async move {
                 for middleware in http_server_middlewares.tech_middlewares.iter() {
-                    middleware.got_panic(started, &request_data_cloned).await;
+                    middleware.got_panic(&request_data_cloned).await;
                 }
             });
 
