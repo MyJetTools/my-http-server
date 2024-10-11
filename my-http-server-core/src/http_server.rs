@@ -366,7 +366,7 @@ pub async fn handle_requests(
                 my_telemetry::TELEMETRY_INTERFACE
                     .write_fail(
                         &ctx,
-                        started,
+                        request_data.started,
                         format!("[{}]{}", request_data.method, request_data.path.to_string()),
                         format!("Panic: {:?}", err),
                         tags.build(),
@@ -416,7 +416,7 @@ pub async fn handle_requests(
                     my_telemetry::TELEMETRY_INTERFACE
                         .write_success(
                             &ctx,
-                            started,
+                            request_data.started,
                             format!("[{}]{}", request_data.method, request_data.path.to_string()),
                             format!("Status code: {}", ok_result.output.get_status_code()),
                             tags.into(),
@@ -474,7 +474,7 @@ pub async fn handle_requests(
                     my_telemetry::TELEMETRY_INTERFACE
                         .write_fail(
                             &ctx,
-                            started,
+                            request_data.started,
                             format!("[{}]{}", request_data.method, request_data.path.as_str()),
                             format!("Status code: {}", err_result.status_code),
                             tags.into(),
