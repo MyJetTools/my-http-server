@@ -20,6 +20,9 @@ use crate::{
 };
 
 use crate::http_server_middleware::*;
+
+pub const PANIC_HTTP_CODE: u16 = 500;
+
 #[derive(Clone)]
 pub struct HttpConnectionsCounter {
     connections: Arc<AtomicI64>,
@@ -349,7 +352,17 @@ pub async fn handle_requests(
             let request_data_cloned = request_data.clone();
             tokio::spawn(async move {
                 for middleware in http_server_middlewares.tech_middlewares.iter() {
-                    middleware.got_panic(&request_data_cloned).await;
+                    middleware
+                        .got_result(
+                            &request_data_cloned,
+                            &ResponseData {
+                                status_code: PANIC_HTTP_CODE,
+                                content_type: "text/plain".to_string(),
+                                content_length: 0,
+                                has_error: true,
+                            },
+                        )
+                        .await;
                 }
             });
 
@@ -389,11 +402,10 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            panic!(
-                "Http Server error: [{}]{}",
-                request_data.method,
-                request_data.path.as_str()
-            );
+            return Ok(hyper::Response::builder()
+                .status(PANIC_HTTP_CODE)
+                .body("Internal server error".into())
+                .unwrap());
         }
     };
 
