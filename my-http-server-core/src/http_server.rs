@@ -6,8 +6,6 @@ use hyper_util::rt::{TokioExecutor, TokioIo};
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
-#[cfg(feature = "with-telemetry")]
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use rust_extensions::{ApplicationStates, Logger};
 use std::sync::atomic::AtomicI64;
@@ -361,7 +359,8 @@ pub async fn handle_requests(
             let client_id = client_id.lock().await.take();
             #[cfg(feature = "with-telemetry")]
             {
-                let mut tags = TelemetryEventTagsBuilder::new().add_ip(ip.as_str().to_string());
+                let mut tags =
+                    TelemetryEventTagsBuilder::new().add_ip(request_data.ip.as_str().to_string());
 
                 if let Some(client_id) = client_id.as_ref() {
                     tags = tags.add("client_id", client_id.to_string());
@@ -371,7 +370,7 @@ pub async fn handle_requests(
                     .write_fail(
                         &ctx,
                         started,
-                        format!("[{}]{}", method, path.as_str().to_string()),
+                        format!("[{}]{}", request_data.method, request_data.path.to_string()),
                         format!("Panic: {:?}", err),
                         tags.build(),
                     )
@@ -409,16 +408,19 @@ pub async fn handle_requests(
             if ok_result.write_telemetry {
                 #[cfg(feature = "with-telemetry")]
                 {
-                    let mut tags = ok_result.add_telemetry_tags.take_tags().add_ip(ip);
+                    let mut tags = ok_result
+                        .add_telemetry_tags
+                        .take_tags()
+                        .add_ip(request_data.ip.to_string());
 
-                    if let Some(credentials) = &&result.http_context.credentials {
+                    if let Some(credentials) = &flow_execution_result.http_context.credentials {
                         tags = tags.add("client_id", credentials.get_id().to_string());
                     }
                     my_telemetry::TELEMETRY_INTERFACE
                         .write_success(
                             &ctx,
                             started,
-                            format!("[{}]{}", method, path.as_str().to_string()),
+                            format!("[{}]{}", request_data.method, request_data.path.to_string()),
                             format!("Status code: {}", ok_result.output.get_status_code()),
                             tags.into(),
                         )
@@ -463,9 +465,12 @@ pub async fn handle_requests(
 
                 #[cfg(feature = "with-telemetry")]
                 {
-                    let mut tags = err_result.add_telemetry_tags.take_tags().add_ip(ip);
+                    let mut tags = err_result
+                        .add_telemetry_tags
+                        .take_tags()
+                        .add_ip(request_data.ip.to_string());
 
-                    if let Some(credentials) = &result.http_context.credentials {
+                    if let Some(credentials) = &flow_execution_result.http_context.credentials {
                         tags = tags.add("client_id".to_string(), credentials.get_id().to_string());
                     }
 
@@ -473,7 +478,7 @@ pub async fn handle_requests(
                         .write_fail(
                             &ctx,
                             started,
-                            format!("[{}]{}", method, path.as_str()),
+                            format!("[{}]{}", request_data.method, request_data.path.as_str()),
                             format!("Status code: {}", err_result.status_code),
                             tags.into(),
                         )
