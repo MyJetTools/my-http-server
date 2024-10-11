@@ -5,9 +5,11 @@ use hyper::{service::service_fn, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 #[cfg(feature = "with-telemetry")]
 use rust_extensions::date_time::DateTimeAsMicroseconds;
-use rust_extensions::{ApplicationStates, Logger, StrOrString};
+
+use rust_extensions::{ApplicationStates, Logger};
 use std::sync::atomic::AtomicI64;
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::sync::Mutex;
@@ -19,6 +21,7 @@ use crate::{
     HttpContext, HttpFailResult, HttpRequest, HttpServerMiddleware, HttpServerMiddlewares,
 };
 
+use crate::http_server_middleware::*;
 #[derive(Clone)]
 pub struct HttpConnectionsCounter {
     connections: Arc<AtomicI64>,
@@ -33,6 +36,7 @@ impl HttpConnectionsCounter {
 pub struct MyHttpServer {
     pub addr: SocketAddr,
     middlewares: Option<Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
+    tech_middlewares: Option<Vec<Arc<dyn HttpServerTechMiddleware + Send + Sync + 'static>>>,
     connections: Arc<AtomicI64>,
 }
 
@@ -41,6 +45,7 @@ impl MyHttpServer {
         Self {
             addr,
             middlewares: Some(Vec::new()),
+            tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
         }
     }
@@ -49,12 +54,20 @@ impl MyHttpServer {
         &mut self,
         middleware: Arc<dyn HttpServerMiddleware + Send + Sync + 'static>,
     ) {
-        match &mut self.middlewares {
-            Some(middlewares) => middlewares.push(middleware),
-            None => {
-                panic!("Cannot add middleware after server is started");
-            }
+        if self.middlewares.is_none() {
+            panic!("You can not add middleware after starting server");
         }
+        self.middlewares.as_mut().unwrap().push(middleware);
+    }
+
+    pub fn add_tech_middleware(
+        &mut self,
+        middleware: Arc<dyn HttpServerTechMiddleware + Send + Sync + 'static>,
+    ) {
+        if self.middlewares.is_none() {
+            panic!("You can not add tech middleware after starting server");
+        }
+        self.tech_middlewares.as_mut().unwrap().push(middleware);
     }
 
     pub fn get_http_connections_counter(&self) -> HttpConnectionsCounter {
@@ -82,6 +95,7 @@ impl MyHttpServer {
 
         let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
+            tech_middlewares: self.tech_middlewares.take().unwrap(),
         };
 
         let connections = self.connections.clone();
@@ -101,6 +115,7 @@ impl MyHttpServer {
     ) {
         let middlewares = self.middlewares.take();
 
+        let tech_middlewares = self.tech_middlewares.take();
         if middlewares.is_none() {
             panic!("You can not start HTTP2 server two times");
         }
@@ -113,6 +128,7 @@ impl MyHttpServer {
 
         let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
+            tech_middlewares: tech_middlewares.unwrap(),
         };
 
         let connections = self.connections.clone();
@@ -269,27 +285,27 @@ pub async fn handle_requests(
     let req = HttpRequest::new(req, addr);
 
     let method = req.method.clone();
-
     let mut request_ctx = HttpContext::new(req);
 
     #[cfg(feature = "with-telemetry")]
     let ctx = request_ctx.telemetry_context.clone();
 
-    let path = request_ctx.request.get_path().to_short_string_or_string();
-    let ip =
-        StrOrString::create_as_short_string_or_string(request_ctx.request.get_ip().get_real_ip());
+    let request_data = Arc::new(HttpRequestData {
+        method,
+        path: request_ctx.request.get_path().to_string(),
+        ip: request_ctx.request.get_ip().get_real_ip().to_string(),
+    });
 
-    #[cfg(feature = "with-telemetry")]
     let started = DateTimeAsMicroseconds::now();
 
     let client_id: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 
     let client_id_spawned = client_id.clone();
-
-    let result = tokio::spawn(async move {
+    let http_server_middlewares_cloned = http_server_middlewares.clone();
+    let flow_execution_result = tokio::spawn(async move {
         let mut credentials_assigned = false;
 
-        for middleware in http_server_middlewares.middlewares.iter() {
+        for middleware in http_server_middlewares_cloned.middlewares.iter() {
             let result = middleware.handle_request(&mut request_ctx).await;
 
             if let Some(credentials) = request_ctx.credentials.as_ref() {
@@ -317,9 +333,31 @@ pub async fn handle_requests(
         }
     });
 
-    let result = match result.await {
-        Ok(result) => result,
+    let flow_execution_result = match flow_execution_result.await {
+        Ok(flow_execution_result) => {
+            if http_server_middlewares.tech_middlewares.len() > 0 {
+                let response_data = ResponseData::from(&flow_execution_result.http_result);
+                let request_data = request_data.clone();
+                tokio::spawn(async move {
+                    for middleware in http_server_middlewares.tech_middlewares.iter() {
+                        middleware
+                            .got_result(started, &request_data, &response_data)
+                            .await;
+                    }
+                });
+            }
+
+            flow_execution_result
+        }
         Err(err) => {
+            let request_data = Arc::new(request_data);
+            let request_data_cloned = request_data.clone();
+            tokio::spawn(async move {
+                for middleware in http_server_middlewares.tech_middlewares.iter() {
+                    middleware.got_panic(started, &request_data_cloned).await;
+                }
+            });
+
             let client_id = client_id.lock().await.take();
             #[cfg(feature = "with-telemetry")]
             {
@@ -341,9 +379,9 @@ pub async fn handle_requests(
             }
 
             let mut ctx = HashMap::new();
-            ctx.insert("path".to_string(), path.as_str().to_string());
-            ctx.insert("method".to_string(), method.to_string());
-            ctx.insert("ip".to_string(), ip.as_str().to_string());
+            ctx.insert("path".to_string(), request_data.path.to_string());
+            ctx.insert("method".to_string(), request_data.method.to_string());
+            ctx.insert("ip".to_string(), request_data.ip.to_string());
 
             if let Some(client_id) = client_id.as_ref() {
                 ctx.insert("client_id".to_string(), client_id.to_string());
@@ -355,11 +393,15 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            panic!("Http Server error: [{}]{}", method, path.as_str());
+            panic!(
+                "Http Server error: [{}]{}",
+                request_data.method,
+                request_data.path.as_str()
+            );
         }
     };
 
-    match result.http_result {
+    match flow_execution_result.http_result {
         Ok(ok_result) => {
             #[cfg(feature = "with-telemetry")]
             let mut ok_result = ok_result;
@@ -393,15 +435,19 @@ pub async fn handle_requests(
             if err_result.write_telemetry {
                 if err_result.write_to_log {
                     let mut ctx = HashMap::new();
-                    ctx.insert("path".to_string(), path.as_str().to_string());
+                    ctx.insert("path".to_string(), request_data.path.to_string());
                     ctx.insert(
                         "method".to_string(),
-                        result.http_context.request.method.to_string(),
+                        flow_execution_result
+                            .http_context
+                            .request
+                            .method
+                            .to_string(),
                     );
-                    ctx.insert("ip".to_string(), ip.as_str().to_string());
+                    ctx.insert("ip".to_string(), request_data.ip.to_string());
                     ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
 
-                    if let Some(credentials) = &&result.http_context.credentials {
+                    if let Some(credentials) = &flow_execution_result.http_context.credentials {
                         ctx.insert("client_id".to_string(), credentials.get_id().to_string());
                     }
 

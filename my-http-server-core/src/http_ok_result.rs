@@ -48,6 +48,39 @@ impl HttpOutput {
         })
     }
 
+    pub fn get_content_size(&self) -> usize {
+        match self {
+            HttpOutput::Empty => 0,
+            HttpOutput::Content { content, .. } => content.len(),
+            HttpOutput::Redirect { url, .. } => url.len(),
+            HttpOutput::File { content, .. } => content.len(),
+            HttpOutput::Raw(_) => 0,
+        }
+    }
+
+    pub fn get_content_type(&self) -> &str {
+        match self {
+            HttpOutput::Empty => "text/plain",
+            HttpOutput::Content {
+                headers: _,
+                content_type,
+                content: _,
+            } => content_type
+                .as_ref()
+                .map(|ct| ct.as_str())
+                .unwrap_or("text/plain"),
+            HttpOutput::Redirect {
+                url: _,
+                permanent: _,
+            } => "text/plain",
+            HttpOutput::File {
+                file_name: _,
+                content: _,
+            } => "application/octet-stream",
+            HttpOutput::Raw(_) => "text/plain",
+        }
+    }
+
     pub fn into_fail_result(
         self,
         status_code: u16,

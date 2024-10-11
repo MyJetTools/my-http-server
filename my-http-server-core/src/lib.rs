@@ -30,7 +30,7 @@ pub use http_path::HttpPath;
 
 pub use http_server::*;
 
-pub use http_server_middleware::HttpServerMiddleware;
+pub use http_server_middleware::*;
 pub use json_encoded_data::JsonEncodedData;
 pub use request_credentials::*;
 //pub use request_flow::HttpServerRequestFlow;
