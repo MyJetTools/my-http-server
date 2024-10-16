@@ -75,32 +75,6 @@ impl ControllersMiddleware {
                 );
             }
         }
-
-        /*
-        if let Some(route_keys) = action.get_model_routes() {
-            if let Err(err) = http_route.check_route_keys(&route_keys) {
-                panic!("[GET]: {}", err)
-            }
-        }
-
-        let result = self.get.register(HttpAction {
-            handler: action.clone(),
-
-            should_be_authorized: if let Some(desc) = action.get_description() {
-                desc.input_params
-                    .check_parameters(&Method::GET, http_route.route.as_str());
-                desc.should_be_authorized
-            } else {
-                ShouldBeAuthorized::UseGlobal
-            },
-            http_route,
-            description: action,
-        });
-
-        if let Err(err) = result {
-            panic!("Failed to register GET action: {}", err);
-        }
-         */
     }
 
     pub fn register_post_action<

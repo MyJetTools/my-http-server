@@ -138,6 +138,7 @@ impl HttpActions {
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         for action in &self.actions {
             if action.http_route.is_my_path(&ctx.request.http_path) {
+                ctx.process_name = Some(action.http_route.route.clone());
                 match authorization_map.is_authorized(
                     action,
                     &ctx.credentials,

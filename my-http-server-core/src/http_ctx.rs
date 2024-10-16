@@ -7,6 +7,7 @@ pub struct HttpContext {
     pub request: HttpRequest,
     #[cfg(feature = "with-telemetry")]
     pub telemetry_context: MyTelemetryContext,
+    pub process_name: Option<String>,
     pub credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>>,
 }
 
@@ -17,6 +18,7 @@ impl HttpContext {
             credentials: None,
             #[cfg(feature = "with-telemetry")]
             telemetry_context: MyTelemetryContext::new(),
+            process_name: None,
         }
     }
 }

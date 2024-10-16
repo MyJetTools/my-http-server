@@ -425,11 +425,20 @@ pub async fn handle_requests(
                     if let Some(credentials) = &flow_execution_result.http_context.credentials {
                         tags = tags.add("client_id", credentials.get_id().to_string());
                     }
+
+                    let telemetry_data = if let Some(process_name) =
+                        flow_execution_result.http_context.process_name.as_ref()
+                    {
+                        format!("[{}]{}", request_data.method, process_name)
+                    } else {
+                        format!("[{}]{}", request_data.method, request_data.path)
+                    };
+
                     my_telemetry::TELEMETRY_INTERFACE
                         .write_success(
                             &ctx,
                             request_data.started,
-                            format!("[{}]{}", request_data.method, request_data.path.to_string()),
+                            format!("[{}]{}", request_data.method, telemetry_data),
                             format!("Status code: {}", ok_result.output.get_status_code()),
                             tags.into(),
                         )
@@ -483,11 +492,19 @@ pub async fn handle_requests(
                         tags = tags.add("client_id".to_string(), credentials.get_id().to_string());
                     }
 
+                    let telemetry_data = if let Some(process_name) =
+                        flow_execution_result.http_context.process_name.as_ref()
+                    {
+                        format!("[{}]{}", request_data.method, process_name)
+                    } else {
+                        format!("[{}]{}", request_data.method, request_data.path)
+                    };
+
                     my_telemetry::TELEMETRY_INTERFACE
                         .write_fail(
                             &ctx,
                             request_data.started,
-                            format!("[{}]{}", request_data.method, request_data.path.as_str()),
+                            format!("[{}]{}", request_data.method, telemetry_data),
                             format!("Status code: {}", err_result.status_code),
                             tags.into(),
                         )
