@@ -438,7 +438,7 @@ pub async fn handle_requests(
                         .write_success(
                             &ctx,
                             request_data.started,
-                            format!("[{}]{}", request_data.method, telemetry_data),
+                            telemetry_data,
                             format!("Status code: {}", ok_result.output.get_status_code()),
                             tags.into(),
                         )
@@ -504,7 +504,7 @@ pub async fn handle_requests(
                         .write_fail(
                             &ctx,
                             request_data.started,
-                            format!("[{}]{}", request_data.method, telemetry_data),
+                            telemetry_data,
                             format!("Status code: {}", err_result.status_code),
                             tags.into(),
                         )
