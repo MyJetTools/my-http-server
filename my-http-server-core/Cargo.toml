@@ -1,6 +1,6 @@
 [package]
 name = "my-http-server-core"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,7 +17,7 @@ rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-ext
 
 my-json = { tag = "0.2.4", git = "https://github.com/MyJetTools/my-json.git" }
 
-my-telemetry = { tag = "1.1.1", git = "https://github.com/MyJetTools/my-telemetry.git", optional = true }
+my-telemetry = { tag = "1.2.0", git = "https://github.com/MyJetTools/my-telemetry.git", optional = true }
 
 url-utils = { tag = "0.1.2", git = "https://github.com/MyJetTools/url-utils.git" }
 
