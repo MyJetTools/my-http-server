@@ -2,12 +2,14 @@ use std::{sync::Arc, time::Duration};
 
 use my_http_server_core::HttpFailResult;
 use my_http_server_web_sockets::{MyWebSocket, WebSocketMessage};
-use my_json::json_reader::JsonFirstLineReader;
+
+use my_json::json_reader::JsonFirstLineIteratorFromSlice;
+use my_json::json_reader::JsonValueRef;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::MyTelemetryContext;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
-use rust_extensions::array_of_bytes_iterator::SliceIterator;
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
@@ -106,20 +108,23 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
 
             if let WebSocketMessage::String(value) = &message {
                 if signal_r_connection.get_has_greeting() {
-                    let mut json_first_line_iterator: JsonFirstLineReader<SliceIterator> =
+                    let json_first_line_iterator: JsonFirstLineIteratorFromSlice =
                         value.as_bytes().into();
-                    let packet_type = get_payload_type(&mut json_first_line_iterator);
+                    let packet_type = get_payload_type(&json_first_line_iterator);
 
+                    let packet_type = packet_type.as_unescaped_str().unwrap();
                     if packet_type == "1" {
                         #[cfg(feature = "with-telemetry")]
-                        let ctx = MyTelemetryContext::new();
+                        let ctx = MyTelemetryContext::Single(
+                            DateTimeAsMicroseconds::now().unix_microseconds,
+                        );
 
                         #[cfg(feature = "with-telemetry")]
                         let started = rust_extensions::date_time::DateTimeAsMicroseconds::now();
 
-                        let mut json_first_line_iterator: JsonFirstLineReader<SliceIterator> =
+                        let json_first_line_iterator: JsonFirstLineIteratorFromSlice =
                             value.as_bytes().into();
-                        let message = SignalRMessage::parse(&mut json_first_line_iterator);
+                        let message = SignalRMessage::parse(&json_first_line_iterator);
 
                         #[cfg(feature = "with-telemetry")]
                         let ctx_spawned = ctx.clone();
@@ -128,9 +133,15 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
 
                         let connection_spawned = signal_r_connection.clone();
 
-                        let target = message.target.to_string();
+                        let target = message.get_target();
 
-                        let arguments = message.arguments.to_vec();
+                        let arguments = message.get_arguments();
+
+                        #[cfg(feature = "with-telemetry")]
+                        let target_cloned = target.clone();
+
+                        #[cfg(not(feature = "with-telemetry"))]
+                        let target_cloned = target;
 
                         let _result = tokio::spawn(async move {
                             #[cfg(feature = "with-telemetry")]
@@ -139,7 +150,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                                 .on(
                                     connection_spawned,
                                     message.headers,
-                                    target,
+                                    target_cloned,
                                     arguments,
                                     #[cfg(feature = "with-telemetry")]
                                     &mut signal_r_telemetry,
@@ -159,7 +170,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                                         .write_success(
                                             &ctx,
                                             started,
-                                            format!("[SignalR] {}", message.target),
+                                            format!("[SignalR] {}", target),
                                             format!("Executed Ok",),
                                             my_telemetry
                                                 .tags
@@ -174,7 +185,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                                     .write_fail(
                                         &ctx,
                                         started,
-                                        message.target.to_string(),
+                                        target,
                                         format!("{:?}", err),
                                         TelemetryEventTagsBuilder::new()
                                             .add_ip(my_web_socket.addr.ip().to_string())
@@ -196,12 +207,13 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
     }
 }
 
-fn get_payload_type<'s>(first_line_reader: &'s mut JsonFirstLineReader<SliceIterator>) -> &'s str {
+fn get_payload_type<'s>(
+    first_line_reader: &'s JsonFirstLineIteratorFromSlice<'s>,
+) -> JsonValueRef<'s> {
     while let Some(line) = first_line_reader.get_next() {
-        let line = line.unwrap();
-        if line.name.as_unescaped_name(first_line_reader).unwrap() == "type" {
-            let result = line.value.as_unescaped_str(first_line_reader).unwrap();
-            return result;
+        let (name, value) = line.unwrap();
+        if name.as_unescaped_str().unwrap() == "type" {
+            return value;
         }
     }
 
@@ -212,17 +224,17 @@ async fn read_first_payload<TCtx: Send + Sync + Default + 'static>(
     signal_r_connection: &Arc<MySignalRConnection<TCtx>>,
     payload: &str,
 ) {
-    let mut json_reader: JsonFirstLineReader<SliceIterator> = payload.as_bytes().into();
+    let json_reader: JsonFirstLineIteratorFromSlice = payload.as_bytes().into();
 
     let mut protocol = false;
     let mut version = false;
     while let Some(line) = json_reader.get_next() {
-        let line = line.unwrap();
+        let (name, _) = line.unwrap();
 
-        if line.name.as_unescaped_name(&json_reader).unwrap() == "protocol" {
+        if name.as_unescaped_str().unwrap() == "protocol" {
             protocol = true;
         }
-        if line.name.as_unescaped_name(&json_reader).unwrap() == "version" {
+        if name.as_unescaped_str().unwrap() == "version" {
             version = true;
         }
     }

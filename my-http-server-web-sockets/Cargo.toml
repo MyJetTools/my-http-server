@@ -19,4 +19,4 @@ http-body-util = "*"
 hyper-util = { version = "*", features = ["tokio"] }
 tokio-util = { version = "*", features = ["compat"] }
 futures-util = "*"
-rust-extensions = { tag = "0.1.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
+rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-extensions.git" }

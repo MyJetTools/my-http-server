@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use proc_macro2::TokenStream;
-use rust_extensions::StrOrString;
+use types_reader::rust_extensions::StrOrString;
 use types_reader::{PropertyType, StructProperty};
 
 use super::HttpFieldAttribute;

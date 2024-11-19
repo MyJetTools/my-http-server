@@ -1,8 +1,8 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 use syn;
+use types_reader::rust_extensions::date_time::DateTimeAsMicroseconds;
 
 //mod as_token_stream;
 mod attributes;

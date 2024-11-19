@@ -15,7 +15,7 @@ impl<'s> JsonEncodedData<'s> {
             values: SortedVecWithStrKey::new(),
         };
 
-        let mut json_first_line_reader: JsonFirstLineReader<SliceIterator> = raw.into();
+        let json_first_line_reader: JsonFirstLineReader<SliceIterator> = raw.into();
 
         while let Some(line) = json_first_line_reader.get_next() {
             let line = line?;

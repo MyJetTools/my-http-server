@@ -1,32 +1,31 @@
 use std::collections::HashMap;
 
-use my_json::json_reader::JsonFirstLineReader;
-use rust_extensions::array_of_bytes_iterator::SliceIterator;
+use my_json::json_reader::{JsonFirstLineIteratorFromSlice, JsonValueRef};
 
 pub struct SignalRMessage<'s> {
     pub headers: Option<HashMap<String, String>>,
-    pub invocation_id: Option<&'s str>,
-    pub target: &'s str,
-    pub arguments: &'s [u8],
+    pub invocation_id: Option<JsonValueRef<'s>>,
+    pub target: JsonValueRef<'s>,
+    pub arguments: JsonValueRef<'s>,
 }
 
 impl<'s> SignalRMessage<'s> {
-    pub fn parse(json_first_line_reader: &'s mut JsonFirstLineReader<SliceIterator>) -> Self {
+    pub fn parse(json_first_line_reader: &'s JsonFirstLineIteratorFromSlice<'s>) -> Self {
         let mut invocation_id = None;
         let mut target = None;
         let mut arguments = None;
 
         while let Some(line) = json_first_line_reader.get_next() {
-            let line = line.unwrap();
+            let (name, value) = line.unwrap();
 
-            match line.name.as_unescaped_name(json_first_line_reader).unwrap() {
+            match name.as_unescaped_str().unwrap() {
                 "invocationId" => {
-                    invocation_id = Some(line.value);
+                    invocation_id = Some(value);
                 }
                 "arguments" => {
-                    arguments = Some(line.value);
+                    arguments = Some(value);
                 }
-                "target" => target = Some(line.value),
+                "target" => target = Some(value),
                 _ => {}
             }
         }
@@ -41,22 +40,17 @@ impl<'s> SignalRMessage<'s> {
 
         Self {
             headers: None,
-            invocation_id: if let Some(invocation_id) = invocation_id.take() {
-                Some(
-                    invocation_id
-                        .as_unescaped_str(json_first_line_reader)
-                        .unwrap(),
-                )
-            } else {
-                None
-            },
-            target: target
-                .take()
-                .unwrap()
-                .as_unescaped_str(json_first_line_reader)
-                .unwrap()
-                .into(),
-            arguments: arguments.take().unwrap().as_bytes(json_first_line_reader),
+            invocation_id: invocation_id.take(),
+            target: target.take().unwrap(),
+            arguments: arguments.take().unwrap(),
         }
+    }
+
+    pub fn get_target(&self) -> String {
+        self.target.as_unescaped_str().unwrap().to_string()
+    }
+
+    pub fn get_arguments(&self) -> Vec<u8> {
+        self.arguments.as_bytes().to_vec()
     }
 }

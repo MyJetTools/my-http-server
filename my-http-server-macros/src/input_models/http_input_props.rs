@@ -1,4 +1,4 @@
-use rust_extensions::lazy::LazyVec;
+use types_reader::rust_extensions::lazy::LazyVec;
 use types_reader::{MacrosAttribute, StructProperty};
 
 use super::InputField;

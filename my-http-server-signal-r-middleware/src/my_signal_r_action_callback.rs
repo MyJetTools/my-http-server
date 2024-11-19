@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use my_json::json_reader::array_iterator::JsonArrayIterator;
-use rust_extensions::{array_of_bytes_iterator::SliceIterator, Logger};
+use my_json::json_reader::JsonArrayIteratorFromSlice;
+use rust_extensions::Logger;
 
 use crate::{MySignalRConnection, MySignalRPayloadCallbacks, SignalRContractSerializer};
 
@@ -46,7 +46,7 @@ impl<
     ) {
         let mut params = Vec::new();
 
-        let mut json_array_iterator: JsonArrayIterator<SliceIterator> = data.into();
+        let json_array_iterator = JsonArrayIteratorFromSlice::new(data).unwrap();
 
         while let Some(line) = json_array_iterator.get_next() {
             match line {
@@ -67,7 +67,7 @@ impl<
             }
         }
 
-        match TContract::deserialize(params.iter().map(|x| x.as_bytes(&json_array_iterator))) {
+        match TContract::deserialize(params.iter().map(|x| x.as_bytes())) {
             Ok(contract) => {
                 self.callback
                     .on(
