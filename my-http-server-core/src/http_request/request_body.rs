@@ -78,7 +78,7 @@ fn get_body_data_reader_as_url_encoded(
         Err(err) => {
             let result = HttpFailResult {
                 write_telemetry: true,
-                content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
+                content: format!("Can not parse Url Encoded Data. {:?}", err).into_bytes(),
                 content_type: WebContentType::Text,
                 status_code: 412,
                 write_to_log: true,
@@ -113,7 +113,7 @@ fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, H
         Err(err) => {
             let result = HttpFailResult {
                 write_telemetry: true,
-                content: format!("Can not parse Form Data. {:?}", err).into_bytes(),
+                content: format!("Can not parse Json Encoded Data. {:?}", err).into_bytes(),
                 content_type: WebContentType::Text,
                 status_code: 412,
                 write_to_log: true,
