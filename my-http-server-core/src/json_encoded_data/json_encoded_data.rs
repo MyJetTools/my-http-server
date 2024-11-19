@@ -1,4 +1,4 @@
-use my_json::json_reader::{JsonFirstLineReader, JsonParseError};
+use my_json::json_reader::{JsonFirstLineReaderInner, JsonParseError};
 use rust_extensions::{array_of_bytes_iterator::SliceIterator, sorted_vec::SortedVecWithStrKey};
 
 use crate::HttpFailResult;
@@ -15,7 +15,7 @@ impl<'s> JsonEncodedData<'s> {
             values: SortedVecWithStrKey::new(),
         };
 
-        let json_first_line_reader: JsonFirstLineReader<SliceIterator> = raw.into();
+        let json_first_line_reader: JsonFirstLineReaderInner<SliceIterator> = raw.into();
 
         while let Some(line) = json_first_line_reader.get_next() {
             let line = line?;

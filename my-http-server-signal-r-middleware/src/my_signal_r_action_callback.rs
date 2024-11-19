@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use my_json::json_reader::JsonArrayIteratorFromSlice;
+use my_json::json_reader::JsonArrayIterator;
 use rust_extensions::Logger;
 
 use crate::{MySignalRConnection, MySignalRPayloadCallbacks, SignalRContractSerializer};
@@ -46,7 +46,7 @@ impl<
     ) {
         let mut params = Vec::new();
 
-        let json_array_iterator = JsonArrayIteratorFromSlice::new(data).unwrap();
+        let json_array_iterator = JsonArrayIterator::new(data).unwrap();
 
         while let Some(line) = json_array_iterator.get_next() {
             match line {

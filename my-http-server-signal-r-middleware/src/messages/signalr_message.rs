@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use my_json::json_reader::{JsonFirstLineIteratorFromSlice, JsonValueRef};
+use my_json::json_reader::{JsonFirstLineIterator, JsonValueRef};
 
 pub struct SignalRMessage<'s> {
     pub headers: Option<HashMap<String, String>>,
@@ -10,7 +10,7 @@ pub struct SignalRMessage<'s> {
 }
 
 impl<'s> SignalRMessage<'s> {
-    pub fn parse(json_first_line_reader: &'s JsonFirstLineIteratorFromSlice<'s>) -> Self {
+    pub fn parse(json_first_line_reader: &'s JsonFirstLineIterator<'s>) -> Self {
         let mut invocation_id = None;
         let mut target = None;
         let mut arguments = None;

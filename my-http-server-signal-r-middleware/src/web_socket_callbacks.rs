@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use my_http_server_core::HttpFailResult;
 use my_http_server_web_sockets::{MyWebSocket, WebSocketMessage};
 
-use my_json::json_reader::JsonFirstLineIteratorFromSlice;
+use my_json::json_reader::JsonFirstLineIterator;
 use my_json::json_reader::JsonValueRef;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::MyTelemetryContext;
@@ -108,8 +108,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
 
             if let WebSocketMessage::String(value) = &message {
                 if signal_r_connection.get_has_greeting() {
-                    let json_first_line_iterator: JsonFirstLineIteratorFromSlice =
-                        value.as_bytes().into();
+                    let json_first_line_iterator: JsonFirstLineIterator = value.as_bytes().into();
                     let packet_type = get_payload_type(&json_first_line_iterator);
 
                     let packet_type = packet_type.as_unescaped_str().unwrap();
@@ -122,7 +121,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                         #[cfg(feature = "with-telemetry")]
                         let started = rust_extensions::date_time::DateTimeAsMicroseconds::now();
 
-                        let json_first_line_iterator: JsonFirstLineIteratorFromSlice =
+                        let json_first_line_iterator: JsonFirstLineIterator =
                             value.as_bytes().into();
                         let message = SignalRMessage::parse(&json_first_line_iterator);
 
@@ -207,9 +206,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
     }
 }
 
-fn get_payload_type<'s>(
-    first_line_reader: &'s JsonFirstLineIteratorFromSlice<'s>,
-) -> JsonValueRef<'s> {
+fn get_payload_type<'s>(first_line_reader: &'s JsonFirstLineIterator<'s>) -> JsonValueRef<'s> {
     while let Some(line) = first_line_reader.get_next() {
         let (name, value) = line.unwrap();
         if name.as_unescaped_str().unwrap() == "type" {
@@ -224,7 +221,7 @@ async fn read_first_payload<TCtx: Send + Sync + Default + 'static>(
     signal_r_connection: &Arc<MySignalRConnection<TCtx>>,
     payload: &str,
 ) {
-    let json_reader: JsonFirstLineIteratorFromSlice = payload.as_bytes().into();
+    let json_reader: JsonFirstLineIterator = payload.as_bytes().into();
 
     let mut protocol = false;
     let mut version = false;
