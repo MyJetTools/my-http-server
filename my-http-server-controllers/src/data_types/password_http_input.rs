@@ -28,6 +28,12 @@ impl Into<String> for PasswordHttpInputField {
     }
 }
 
+impl AsRef<str> for PasswordHttpInputField {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Into<PasswordHttpInputField> for String {
     fn into(self) -> PasswordHttpInputField {
         PasswordHttpInputField::new(self)
