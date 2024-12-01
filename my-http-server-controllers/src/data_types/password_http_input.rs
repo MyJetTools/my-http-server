@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 pub struct PasswordHttpInputField(String);
 
 impl PasswordHttpInputField {
@@ -28,8 +30,10 @@ impl Into<String> for PasswordHttpInputField {
     }
 }
 
-impl AsRef<str> for PasswordHttpInputField {
-    fn as_ref(&self) -> &str {
+impl Deref for PasswordHttpInputField {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
