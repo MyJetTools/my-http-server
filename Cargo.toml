@@ -6,6 +6,7 @@ members = [
     "my-http-server-macros",
     "my-http-server-web-sockets",
     "my-http-server-signal-r-middleware",
+    "my-http-server-socket-io-middleware",
     "static-files-middleware",
     "signal-r-macros",
 ]

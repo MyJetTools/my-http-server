@@ -1,10 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use hyper::Method;
-use my_http_server::{
-    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpServerMiddleware,
-    HttpServerRequestFlow, RequestData, WebContentType,
-};
+use my_http_server_core::*;
+use rust_extensions::Logger;
 use socket_io_utils::SocketIoSettings;
 use tokio::sync::Mutex;
 
@@ -22,11 +20,13 @@ pub struct MySocketIoEngineMiddleware {
     connections_callback: Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
     pub settings: Arc<SocketIoSettings>,
     disconnect_timeout: Duration,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
 }
 
 impl MySocketIoEngineMiddleware {
     pub fn new(
         connections_callback: Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
+        logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> Self {
         let registered_sockets = Arc::new(SocketIoNameSpaces::new());
         let socket_io_list = Arc::new(SocketIoList::new());
@@ -46,6 +46,7 @@ impl MySocketIoEngineMiddleware {
             connections_callback,
             settings,
             disconnect_timeout: Duration::from_secs(60),
+            logger,
         }
     }
 
@@ -65,17 +66,33 @@ impl HttpServerMiddleware for MySocketIoEngineMiddleware {
     async fn handle_request(
         &self,
         ctx: &mut HttpContext,
-        get_next: &mut HttpServerRequestFlow,
-    ) -> Result<HttpOkResult, HttpFailResult> {
-        if ctx.request.get_path() != self.path_prefix.as_str() {
-            return get_next.next(ctx).await;
+    ) -> Option<Result<HttpOkResult, HttpFailResult>> {
+        if !rust_extensions::str_utils::compare_strings_case_insensitive(
+            ctx.request.http_path.as_str(),
+            self.path_prefix.as_str(),
+        ) {
+            return None;
         }
 
         if ctx
             .request
-            .get_optional_header("sec-websocket-key")
+            .get_headers()
+            .try_get_case_insensitive("sec-websocket-key")
             .is_some()
         {
+            let id = self.get_socket_id().await;
+            let result = my_http_server_web_sockets::handle_web_socket_upgrade(
+                &mut ctx.request,
+                self.web_socket_callback.clone(),
+                id,
+                self.disconnect_timeout,
+                self.logger.clone(),
+            )
+            .await;
+
+            return Some(result);
+
+            /*
             if let RequestData::AsRaw(request) = &mut ctx.request.req {
                 let id = self.get_socket_id().await;
                 return my_http_server_web_sockets::handle_web_socket_upgrade(
@@ -87,28 +104,25 @@ impl HttpServerMiddleware for MySocketIoEngineMiddleware {
                 )
                 .await;
             }
-
-            return get_next.next(ctx).await;
+             */
         }
 
-        if ctx.request.method == Method::GET {
-            if let Some(result) = handle_get_request(
-                ctx,
-                &self.connections_callback,
-                &self.socket_io_list,
-                &self.settings,
-            )
-            .await
-            {
-                return result;
+        match ctx.request.method {
+            Method::GET => {
+                let result = handle_get_request(
+                    ctx,
+                    &self.connections_callback,
+                    &self.socket_io_list,
+                    &self.settings,
+                )
+                .await;
+                return Some(result);
             }
+            Method::POST => {
+                return Some(handle_post_request(ctx));
+            }
+            _ => None,
         }
-
-        if ctx.request.method == Method::POST {
-            return handle_post_request(ctx);
-        }
-
-        get_next.next(ctx).await
     }
 }
 
@@ -117,27 +131,27 @@ async fn handle_get_request(
     connections_callback: &Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
     socket_io_list: &Arc<SocketIoList>,
     settings: &Arc<SocketIoSettings>,
-) -> Option<Result<HttpOkResult, HttpFailResult>> {
+) -> Result<HttpOkResult, HttpFailResult> {
     let query = ctx.request.get_query_string();
 
-    let query = if let Err(fail_result) = query {
-        return Some(Err(fail_result));
-    } else {
-        query.unwrap()
+    let query = match query {
+        Ok(query) => query,
+        Err(err) => {
+            return HttpFailResult::as_fatal_error(format!("{:?}", err)).into_err();
+        }
     };
 
     let sid = query.get_optional("sid");
 
     if let Some(sid) = sid {
-        return Some(
-            HttpOutput::Content {
-                headers: None,
-                content_type: Some(WebContentType::Text),
-                content: socket_io_utils::my_socket_io_messages::compile_connect_payload(sid.value),
-            }
-            .into_ok_result(true)
-            .into(),
-        );
+        let sid = sid.as_str()?;
+        return HttpOutput::Content {
+            headers: None,
+            content_type: Some(WebContentType::Text),
+            content: socket_io_utils::my_socket_io_messages::compile_connect_payload(sid.as_str()),
+        }
+        .into_ok_result(true)
+        .into();
     } else {
         let (_, result) =
             crate::process_connect(connections_callback, socket_io_list, settings, None).await;
@@ -150,7 +164,7 @@ async fn handle_get_request(
         .into_ok_result(true)
         .into();
 
-        Some(result)
+        result
     }
 }
 

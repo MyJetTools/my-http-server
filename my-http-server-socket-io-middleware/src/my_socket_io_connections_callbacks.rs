@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use my_http_server::HttpFailResult;
+use my_http_server_core::*;
 
 use crate::MySocketIoConnection;
 

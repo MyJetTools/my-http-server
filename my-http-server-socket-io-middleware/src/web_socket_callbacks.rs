@@ -1,9 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use hyper_tungstenite::tungstenite::Message;
-use my_http_server::HttpFailResult;
+use my_http_server_core::*;
 use my_http_server_web_sockets::{MyWebSocket, WebSocketMessage};
-use my_json::json_reader::array_parser::ArrayToJsonObjectsSplitter;
+use my_json::json_reader::JsonArrayIterator;
 use socket_io_utils::SocketIoSettings;
 
 use crate::{
@@ -46,12 +46,15 @@ impl WebSocketCallbacks {
             let mut event_data = None;
 
             let mut i = 0;
-            for data in msg.data.as_bytes().split_array_json_to_objects() {
-                let data = data.unwrap();
+
+            let json_array = JsonArrayIterator::new(msg.data.as_bytes().into()).unwrap();
+
+            while let Some(next) = json_array.get_next() {
+                let data = next.unwrap();
                 if i == 0 {
-                    event_name = Some(std::str::from_utf8(data).unwrap());
+                    event_name = Some(data);
                 } else if i == 1 {
-                    event_data = Some(std::str::from_utf8(data).unwrap());
+                    event_data = Some(data);
                 } else {
                     break;
                 }
@@ -62,7 +65,13 @@ impl WebSocketCallbacks {
             let event_name = event_name.unwrap();
             let event_data = event_data.unwrap();
 
-            if let Some(ack_data) = socket.on(&event_name, &event_data).await {
+            if let Some(ack_data) = socket
+                .on(
+                    event_name.as_str().unwrap().as_str(),
+                    event_data.as_str().unwrap().as_str(),
+                )
+                .await
+            {
                 let ack_contract = MySocketIoMessage::Ack(MySocketIoTextPayload {
                     nsp: msg.nsp,
                     data: ack_data,
@@ -80,7 +89,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
     async fn connected(
         &self,
         my_web_socket: Arc<MyWebSocket>,
-        disconnect_timeout: Duration,
+        _disconnect_timeout: Duration,
     ) -> Result<(), HttpFailResult> {
         #[cfg(feature = "debug-ws")]
         println!("connected web_socket:{}", my_web_socket.id);
@@ -111,9 +120,11 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
 
             let sid = sid.unwrap();
 
+            let sid = sid.as_str()?;
+
             match self
                 .socket_io_list
-                .assign_web_socket_to_socket_io(sid.value, my_web_socket.clone())
+                .assign_web_socket_to_socket_io(sid.as_str(), my_web_socket.clone())
                 .await
             {
                 Some(socket_io) => {
@@ -129,7 +140,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
                     my_web_socket
                         .send_message(Message::Text(format!(
                             "Socket.IO with id {} is not found",
-                            sid.value,
+                            sid.as_str(),
                         )))
                         .await;
 
@@ -141,7 +152,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
         Ok(())
     }
 
-    async fn disconnected(&self, my_web_socket: Arc<MyWebSocket>) {
+    async fn disconnected(&self, my_web_socket: &MyWebSocket) {
         #[cfg(feature = "debug-ws")]
         println!("disconnected web_socket:{}", my_web_socket.id);
         let find_result = self
