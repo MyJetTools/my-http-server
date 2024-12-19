@@ -7,7 +7,7 @@ use socket_io_utils::SocketIoSettings;
 use tokio::sync::Mutex;
 
 use crate::{
-    namespaces::SocketIoNameSpaces, MySocketIo, MySocketIoConnectionsCallbacks, SocketIoList,
+    namespaces::SocketIoNameSpaces, MySocketIo, MySocketIoCallbacks, SocketIoList,
     WebSocketCallbacks,
 };
 
@@ -17,7 +17,7 @@ pub struct MySocketIoEngineMiddleware {
     web_socket_callback: Arc<WebSocketCallbacks>,
     socket_io_list: Arc<SocketIoList>,
     registered_sockets: Arc<SocketIoNameSpaces>,
-    connections_callback: Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
+    connections_callback: Arc<dyn MySocketIoCallbacks + Send + Sync + 'static>,
     pub settings: Arc<SocketIoSettings>,
     disconnect_timeout: Duration,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
@@ -25,12 +25,13 @@ pub struct MySocketIoEngineMiddleware {
 
 impl MySocketIoEngineMiddleware {
     pub fn new(
-        connections_callback: Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
+        connections_callback: Arc<dyn MySocketIoCallbacks + Send + Sync + 'static>,
+        settings: Arc<SocketIoSettings>,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> Self {
         let registered_sockets = Arc::new(SocketIoNameSpaces::new());
         let socket_io_list = Arc::new(SocketIoList::new());
-        let settings = Arc::new(SocketIoSettings::default());
+
         Self {
             socket_io_list: socket_io_list.clone(),
 
@@ -128,7 +129,7 @@ impl HttpServerMiddleware for MySocketIoEngineMiddleware {
 
 async fn handle_get_request(
     ctx: &mut HttpContext,
-    connections_callback: &Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
+    connections_callback: &Arc<dyn MySocketIoCallbacks + Send + Sync + 'static>,
     socket_io_list: &Arc<SocketIoList>,
     settings: &Arc<SocketIoSettings>,
 ) -> Result<HttpOkResult, HttpFailResult> {
@@ -145,26 +146,17 @@ async fn handle_get_request(
 
     if let Some(sid) = sid {
         let sid = sid.as_str()?;
-        return HttpOutput::Content {
-            headers: None,
-            content_type: Some(WebContentType::Text),
-            content: socket_io_utils::my_socket_io_messages::compile_connect_payload(sid.as_str()),
-        }
-        .into_ok_result(true)
-        .into();
+
+        let response = socket_io_utils::SocketIoHandshakeOpenModel::from_settings(
+            sid.to_string(),
+            settings.as_ref(),
+        );
+        return HttpOutput::as_json(response).into_ok_result(false);
     } else {
-        let (_, result) =
+        let (_, model) =
             crate::process_connect(connections_callback, socket_io_list, settings, None).await;
 
-        let result = HttpOutput::Content {
-            headers: None,
-            content_type: Some(WebContentType::Text),
-            content: result.into_bytes(),
-        }
-        .into_ok_result(true)
-        .into();
-
-        result
+        return HttpOutput::as_json(model).into_ok_result(false);
     }
 }
 

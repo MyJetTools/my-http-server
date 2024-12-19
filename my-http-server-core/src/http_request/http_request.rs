@@ -74,13 +74,16 @@ impl HttpRequest {
     }
 
     pub fn get_ip(&self) -> RequestIp {
-        if let Some(x_forwarded_for) = self
+        let x_forwarded_for = self
             .data
             .headers()
-            .try_get_case_sensitive_as_str(X_FORWARDED_FOR_HEADER)
-        {
-            let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
-            return RequestIp::Forwarded(result);
+            .try_get_case_sensitive_as_str(X_FORWARDED_FOR_HEADER);
+
+        if let Ok(x_forwarded_for) = x_forwarded_for {
+            if let Some(x_forwarded_for) = x_forwarded_for {
+                let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
+                return RequestIp::Forwarded(result);
+            }
         }
 
         return RequestIp::create_as_single_ip(self.addr.ip().to_string());
@@ -102,12 +105,15 @@ impl HttpRequest {
     }
 
     pub fn get_scheme(&self) -> &str {
-        if let Some(x_forwarded_proto) = self
+        let x_forwarded_proto = self
             .data
             .headers()
-            .try_get_case_sensitive_as_str(X_FORWARDED_PROTO)
-        {
-            return x_forwarded_proto;
+            .try_get_case_sensitive_as_str(X_FORWARDED_PROTO);
+
+        if let Ok(x_forwarded_proto) = x_forwarded_proto {
+            if let Some(x_forwarded_proto) = x_forwarded_proto {
+                return x_forwarded_proto;
+            }
         }
 
         let scheme = self.data.uri().scheme();

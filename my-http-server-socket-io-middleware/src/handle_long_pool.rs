@@ -9,7 +9,7 @@ pub async fn handle_long_pool(app: &AppContext, sid: &str) -> Result<HttpOkResul
         return HttpOutput::Content {
             headers: None,
             content_type: Some(WebContentType::Text),
-            content: format!("SocketId with id {} is not founnd", sid).into_bytes(),
+            content: format!("SocketId with id {} is not found", sid).into_bytes(),
         }
         .into_ok_result(true)
         .into();

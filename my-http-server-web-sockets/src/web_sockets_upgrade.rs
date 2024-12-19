@@ -11,7 +11,7 @@ use hyper_tungstenite::tungstenite::Message;
 use hyper_tungstenite::HyperWebsocketStream;
 use rust_extensions::Logger;
 
-use crate::{MyWebSocket, MyWebSocketCallback, WebSocketMessage};
+use crate::{MyWebSocket, MyWebSocketCallback};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -65,33 +65,7 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     callback: Arc<TMyWebSocketCallback>,
 ) -> Result<(), Error> {
     while let Some(message) = websocket.next().await {
-        let result = match message? {
-            Message::Text(msg) => {
-                send_message(
-                    my_web_socket.clone(),
-                    WebSocketMessage::String(msg),
-                    callback.clone(),
-                )
-                .await
-            }
-            Message::Binary(msg) => {
-                send_message(
-                    my_web_socket.clone(),
-                    WebSocketMessage::Binary(msg),
-                    callback.clone(),
-                )
-                .await
-            }
-            Message::Ping(_) => Ok(()),
-            Message::Pong(_) => Ok(()),
-            Message::Close(_) => Ok(()),
-            Message::Frame(_) => Ok(()),
-        };
-
-        if let Err(err) = result {
-            eprintln!("Error in websocket connection: {}", err);
-            break;
-        }
+        callback_message(my_web_socket.clone(), message?, callback.clone()).await?;
     }
 
     my_web_socket.disconnect().await;
@@ -99,9 +73,9 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     Ok(())
 }
 
-async fn send_message<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
+async fn callback_message<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
     web_socket: Arc<MyWebSocket>,
-    message: WebSocketMessage,
+    message: Message,
     callback: Arc<TMyWebSocketCallback>,
 ) -> Result<(), String> {
     let result = tokio::spawn(async move {

@@ -1,14 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
+use hyper_tungstenite::tungstenite::Message;
 use my_http_server_core::HttpFailResult;
 
 use super::MyWebSocket;
-
-#[derive(Debug)]
-pub enum WebSocketMessage {
-    String(String),
-    Binary(Vec<u8>),
-}
 
 #[async_trait::async_trait]
 pub trait MyWebSocketCallback {
@@ -18,5 +13,5 @@ pub trait MyWebSocketCallback {
         disconnect_timeout: Duration,
     ) -> Result<(), HttpFailResult>;
     async fn disconnected(&self, my_web_socket: &MyWebSocket);
-    async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: WebSocketMessage);
+    async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: Message);
 }

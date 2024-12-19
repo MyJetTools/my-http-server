@@ -15,6 +15,7 @@ pub struct HttpRequestBody {
 impl HttpRequestBody {
     pub fn new(body: Vec<u8>, content_type: Option<String>) -> Result<Self, HttpFailResult> {
         let body_content_type = BodyContentType::detect(body.as_slice(), content_type.as_ref())?;
+
         Ok(Self {
             raw_body: body,
             body_content_type,

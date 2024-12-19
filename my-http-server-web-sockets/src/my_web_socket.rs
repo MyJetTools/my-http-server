@@ -48,17 +48,26 @@ impl MyWebSocket {
         }
     }
 
-    async fn send_message_if_connected(&self, msg: Message) -> Result<(), Error> {
+    async fn send_messages_if_connected(
+        &self,
+        msgs: impl Iterator<Item = Message>,
+    ) -> Result<(), Error> {
         let mut write_access = self.write_stream.lock().await;
         if let Some(stream) = &mut *write_access {
-            return stream.send(msg).await;
+            for msg in msgs {
+                let result = stream.send(msg).await;
+
+                if result.is_err() {
+                    return result;
+                }
+            }
         }
 
         Ok(())
     }
 
-    pub async fn send_message(&self, msg: Message) {
-        let result = self.send_message_if_connected(msg).await;
+    pub async fn send_message(&self, msg: impl Iterator<Item = Message>) {
+        let result = self.send_messages_if_connected(msg).await;
 
         if let Err(err) = result {
             let mut ctx = HashMap::new();

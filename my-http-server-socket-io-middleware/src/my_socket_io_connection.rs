@@ -6,9 +6,8 @@ use rust_extensions::{
     date_time::{AtomicDateTimeAsMicroseconds, DateTimeAsMicroseconds},
     TaskCompletion,
 };
+use socket_io_utils::SocketIoContract;
 use tokio::sync::Mutex;
-
-use socket_io_utils::my_socket_io_messages::*;
 
 pub struct MySocketIoSingleThreaded {
     web_socket: Option<Arc<MyWebSocket>>,
@@ -47,7 +46,8 @@ impl MySocketIoConnection {
 
         write_access.updgraded_to_websocket = true;
         if let Some(mut removed) = write_access.long_pooling.take() {
-            removed.set_error(MySocketIoMessage::Disconnect.as_str().to_string());
+            let payload = SocketIoContract::Close.serialize();
+            removed.set_error(payload.text_frame);
         }
 
         self.has_web_socket
@@ -78,29 +78,33 @@ impl MySocketIoConnection {
             .update(DateTimeAsMicroseconds::now());
     }
 
-    pub async fn send_message(&self, message: &MySocketIoMessage) {
+    pub async fn send_message(&self, message: &SocketIoContract) {
         let web_socket = {
             let read_access = self.single_threaded.lock().await;
             read_access.web_socket.clone()
         };
 
+        let payload = message.serialize();
+
+        let mut to_send = vec![Message::Text(payload.text_frame.into())];
+
+        for binary in payload.binary_frames {
+            to_send.push(Message::Binary(binary.into()));
+        }
+
         if let Some(web_socket) = web_socket {
-            web_socket
-                .send_message(Message::Text(message.as_str().to_string()))
-                .await;
+            web_socket.send_message(to_send.into_iter()).await;
         }
     }
 
     pub async fn add_web_socket(&self, web_socket: Arc<MyWebSocket>) {
-        let new_id = web_socket.id;
+        // let new_id = web_socket.id;
         let mut write_access = self.single_threaded.lock().await;
 
         if let Some(old_websocket) = write_access.web_socket.replace(web_socket) {
+            let socket = SocketIoContract::Close.serialize();
             old_websocket
-                .send_message(hyper_tungstenite::tungstenite::Message::Text(format!(
-                    "SocketIO WebSocket {} has been kicked by Websocket {} ",
-                    old_websocket.id, new_id
-                )))
+                .send_message([Message::Text(socket.text_frame.into())].into_iter())
                 .await;
         }
     }

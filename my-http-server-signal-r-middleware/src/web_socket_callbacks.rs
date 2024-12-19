@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use my_http_server_core::HttpFailResult;
-use my_http_server_web_sockets::{MyWebSocket, WebSocketMessage};
+use my_http_server_web_sockets::MyWebSocket;
 
 use my_json::json_reader::JsonFirstLineIterator;
 use my_json::json_reader::JsonValueRef;
@@ -38,7 +38,12 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
 
             if connection_token.is_none() {
                 my_web_socket
-                    .send_message(Message::Text("id query parameter is missing".to_string()))
+                    .send_message(
+                        [Message::Text(
+                            "id query parameter is missing".to_string().into(),
+                        )]
+                        .into_iter(),
+                    )
                     .await;
                 return Ok(());
             }
@@ -63,10 +68,16 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                 }
                 None => {
                     my_web_socket
-                        .send_message(Message::Text(format!(
-                            "SignalR with connection_token {} is not found",
-                            connection_token.get_raw_str().unwrap(),
-                        )))
+                        .send_message(
+                            [Message::Text(
+                                format!(
+                                    "SignalR with connection_token {} is not found",
+                                    connection_token.get_raw_str().unwrap(),
+                                )
+                                .into(),
+                            )]
+                            .into_iter(),
+                        )
                         .await;
 
                     return Ok(());
@@ -94,7 +105,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
             .await;
         }
     }
-    async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: WebSocketMessage) {
+    async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: Message) {
         #[cfg(feature = "debug-ws")]
         println!("Websocket{}, MSG: {:?}", my_web_socket.id, message);
 
@@ -106,7 +117,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
         if let Some(signal_r_connection) = signal_r.as_ref() {
             signal_r_connection.update_incoming_activity();
 
-            if let WebSocketMessage::String(value) = &message {
+            if let Message::Text(value) = &message {
                 if signal_r_connection.get_has_greeting() {
                     let json_first_line_iterator: JsonFirstLineIterator = value.as_bytes().into();
                     let packet_type = get_payload_type(&json_first_line_iterator);

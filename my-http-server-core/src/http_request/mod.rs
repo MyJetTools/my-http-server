@@ -12,3 +12,5 @@ mod cookies_reader;
 pub use cookies_reader::*;
 mod http_path_reader;
 pub use http_path_reader::*;
+mod content_encoding;
+pub use content_encoding::*;

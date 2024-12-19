@@ -145,7 +145,9 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
 
             unsafe {
                 web_socket
-                    .send_message(Message::Text(String::from_utf8_unchecked(result)))
+                    .send_message(
+                        [Message::Text(String::from_utf8_unchecked(result).into())].into_iter(),
+                    )
                     .await;
             }
         }
@@ -165,7 +167,9 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
         raw_payload.push(30 as char);
 
         if let Some(web_socket) = web_socket {
-            web_socket.send_message(Message::Text(raw_payload)).await;
+            web_socket
+                .send_message([Message::Text(raw_payload.into())].into_iter())
+                .await;
         }
     }
 
@@ -175,10 +179,16 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
 
         if let Some(old_websocket) = write_access.web_socket.replace(web_socket) {
             old_websocket
-                .send_message(Message::Text(format!(
-                    "SignalR WebSocket {} has been kicked by Websocket {} ",
-                    old_websocket.id, new_id
-                )))
+                .send_message(
+                    [Message::Text(
+                        format!(
+                            "SignalR WebSocket {} has been kicked by Websocket {} ",
+                            old_websocket.id, new_id
+                        )
+                        .into(),
+                    )]
+                    .into_iter(),
+                )
                 .await;
         }
     }

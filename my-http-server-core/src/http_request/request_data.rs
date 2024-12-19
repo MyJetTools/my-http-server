@@ -2,6 +2,8 @@ use hyper::{HeaderMap, Uri};
 
 use crate::{HttpFailResult, HttpRequestBody, HttpRequestHeaders};
 
+use super::ContentEncoding;
+
 pub enum RequestData {
     Incoming(Option<hyper::Request<hyper::body::Incoming>>),
     AsBody {
@@ -16,25 +18,18 @@ impl RequestData {
     pub async fn convert_to_body_if_requires(
         &mut self,
     ) -> Result<Option<&HttpRequestBody>, HttpFailResult> {
-        let (uri, headers, bytes, content_type) = match self {
+        let (uri, headers, bytes) = match self {
             Self::Incoming(incoming) => {
                 let incoming = incoming.take().unwrap();
                 let (parts, incoming) = incoming.into_parts();
 
                 let headers = parts.headers;
 
-                let content_type = headers.try_get_case_insensitive("content-type");
+                let content_encoding = headers.get_content_encoding()?;
 
-                let content_type = match content_type {
-                    Some(content_type) => Some(content_type.as_str()?.to_string()),
-                    None => None,
-                };
-                (
-                    parts.uri,
-                    headers,
-                    read_bytes(incoming).await?,
-                    content_type,
-                )
+                let body = read_bytes(content_encoding, incoming).await?;
+
+                (parts.uri, headers, body)
             }
             Self::AsBody { body, .. } => match body.as_ref() {
                 Some(itm) => {
@@ -47,6 +42,13 @@ impl RequestData {
             Self::Taken => {
                 panic!("Body is taken by some middleware before")
             }
+        };
+
+        let content_type = headers.try_get_case_insensitive("content-type");
+
+        let content_type = match content_type {
+            Some(content_type) => Some(content_type.as_str()?.to_string()),
+            None => None,
         };
 
         let body = HttpRequestBody::new(bytes, content_type)?;
@@ -62,7 +64,11 @@ impl RequestData {
         match self {
             Self::Incoming(incoming) => {
                 let incoming = incoming.take().unwrap();
-                let bytes = read_bytes(incoming).await?;
+
+                let content_encoding = incoming.headers().get_content_encoding()?;
+
+                let bytes = read_bytes(content_encoding, incoming).await?;
+
                 let body = HttpRequestBody::new(bytes, None)?;
                 return Ok(body);
             }
@@ -131,11 +137,13 @@ impl RequestData {
 }
 
 async fn read_bytes(
+    body_compression: ContentEncoding,
     incoming: impl hyper::body::Body<Data = hyper::body::Bytes, Error = hyper::Error>,
 ) -> Result<Vec<u8>, HttpFailResult> {
     use http_body_util::BodyExt;
 
     let collected = incoming.collect().await?;
     let bytes = collected.to_bytes();
-    Ok(bytes.into())
+
+    body_compression.decompress_if_needed(bytes)
 }

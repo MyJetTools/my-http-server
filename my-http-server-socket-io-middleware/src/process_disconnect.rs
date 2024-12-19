@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use crate::{MySocketIoConnection, MySocketIoConnectionsCallbacks, SocketIoList};
+use crate::{MySocketIoCallbacks, MySocketIoConnection, SocketIoList};
 
 pub async fn process_disconnect(
     sockets_list: &Arc<SocketIoList>,
     socket_io_connection: &Arc<MySocketIoConnection>,
-    connect_events: &Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
+    connect_events: &Arc<dyn MySocketIoCallbacks + Send + Sync + 'static>,
 ) {
     let removed_connection = sockets_list.remove(socket_io_connection.id.as_str()).await;
 

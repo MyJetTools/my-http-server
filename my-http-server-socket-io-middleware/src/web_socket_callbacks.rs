@@ -2,44 +2,75 @@ use std::{sync::Arc, time::Duration};
 
 use hyper_tungstenite::tungstenite::Message;
 use my_http_server_core::*;
-use my_http_server_web_sockets::{MyWebSocket, WebSocketMessage};
-use my_json::json_reader::JsonArrayIterator;
-use socket_io_utils::SocketIoSettings;
+use my_http_server_web_sockets::MyWebSocket;
+
+use socket_io_utils::{SocketIoContract, SocketIoMessage, SocketIoSettings};
 
 use crate::{
-    namespaces::SocketIoNameSpaces, MySocketIoConnection, MySocketIoConnectionsCallbacks,
-    SocketIoList,
+    namespaces::SocketIoNameSpaces, socket_io_list::SocketIoList, MySocketIoCallbacks,
+    MySocketIoConnection,
 };
-
-use socket_io_utils::{
-    my_socket_io_messages::MySocketIoMessage,
-    my_socket_io_messages::{GrandAccessData, MySocketIoTextPayload},
-};
-
-const DEFAULT_NAMESPACE: &str = "/";
-
-fn get_nsp(value: &Option<String>) -> &str {
-    if let Some(nsp) = &value {
-        nsp
-    } else {
-        DEFAULT_NAMESPACE
-    }
-}
 
 pub struct WebSocketCallbacks {
     pub socket_io_list: Arc<SocketIoList>,
     pub registered_sockets: Arc<SocketIoNameSpaces>,
-    pub connections_callback: Arc<dyn MySocketIoConnectionsCallbacks + Send + Sync + 'static>,
+    pub connections_callback: Arc<dyn MySocketIoCallbacks + Send + Sync + 'static>,
     pub settings: Arc<SocketIoSettings>,
 }
 
 impl WebSocketCallbacks {
-    async fn callback_message(
+    async fn handle_socket_io_message(
         &self,
-        socket_io: &Arc<MySocketIoConnection>,
-        msg: MySocketIoTextPayload,
+        socket_io: Arc<MySocketIoConnection>,
+        msg: SocketIoMessage,
     ) {
-        let nsp_str = get_nsp(&msg.nsp);
+        match msg {
+            SocketIoMessage::Connect { namespace, sid } => {
+                println!(
+                    "Namespace: {}, SID: {:?}",
+                    namespace.as_str(),
+                    sid.map(|itm| itm.to_string())
+                );
+            }
+            SocketIoMessage::Disconnect { namespace } => {
+                println!("Disconnect: {}.", namespace.as_str(),);
+            }
+            SocketIoMessage::Event {
+                namespace,
+                data,
+                ack,
+            } => {
+                let response = self
+                    .connections_callback
+                    .on_callback(&socket_io, namespace.as_str(), data)
+                    .await;
+
+                if let Some(ack) = ack {
+                    let response = SocketIoMessage::Ack {
+                        namespace,
+                        data: response.unwrap_or_default(),
+                        ack,
+                    };
+
+                    socket_io.send_message(&response.into()).await;
+                }
+            }
+            SocketIoMessage::Ack {
+                namespace: _,
+                data: _,
+                ack: _,
+            } => {}
+            SocketIoMessage::ConnectError { namespace, message } => {
+                println!(
+                    "Namespace: {}, ConnectError: {}",
+                    namespace.as_str(),
+                    message.as_str()
+                );
+            }
+        }
+
+        /*
+        let nsp_str = msg.get_namespace();
 
         if let Some(socket) = self.registered_sockets.get(nsp_str).await {
             let mut event_name = None;
@@ -80,7 +111,9 @@ impl WebSocketCallbacks {
 
                 socket_io.send_message(&ack_contract).await;
             }
+
         }
+        */
     }
 }
 
@@ -106,14 +139,19 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
                 )
                 .await;
 
-                my_web_socket.send_message(Message::Text(response)).await;
+                let payload = SocketIoContract::Open(response).serialize();
+
+                my_web_socket
+                    .send_message([Message::Text(payload.text_frame.into())].into_iter())
+                    .await;
+
+                let settings = self.settings.clone();
 
                 tokio::spawn(super::socket_io_livness_loop::start(
                     self.connections_callback.clone(),
                     self.socket_io_list.clone(),
                     socket_io,
-                    self.settings.get_ping_timeout(),
-                    self.settings.get_ping_interval(),
+                    settings,
                 ));
                 return Ok(());
             }
@@ -128,20 +166,22 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
                 .await
             {
                 Some(socket_io) => {
+                    let settings = self.settings.clone();
                     tokio::spawn(super::socket_io_livness_loop::start(
                         self.connections_callback.clone(),
                         self.socket_io_list.clone(),
                         socket_io,
-                        self.settings.get_ping_timeout(),
-                        self.settings.get_ping_interval(),
+                        settings,
                     ));
                 }
                 None => {
                     my_web_socket
-                        .send_message(Message::Text(format!(
-                            "Socket.IO with id {} is not found",
-                            sid.as_str(),
-                        )))
+                        .send_message(
+                            [Message::Text(
+                                format!("Socket.IO with id {} is not found", sid.as_str(),).into(),
+                            )]
+                            .into_iter(),
+                        )
                         .await;
 
                     return Ok(());
@@ -165,67 +205,39 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
                 .await;
         }
     }
-    async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: WebSocketMessage) {
+    async fn on_message(&self, my_web_socket: Arc<MyWebSocket>, message: Message) {
         #[cfg(feature = "debug-ws")]
         println!("Websocket{}, MSG: {:?}", my_web_socket.id, message);
 
-        let socket_io = self
+        let socket_io_connection = self
             .socket_io_list
             .get_by_web_socket_id(my_web_socket.id)
-            .await;
+            .await
+            .unwrap();
 
-        if let Some(socket_io_ref) = socket_io.as_ref() {
-            socket_io_ref.update_incoming_activity();
-        }
+        socket_io_connection.update_incoming_activity();
+        //if let Some(socket_io_ref) = socket_io.as_ref() {}
 
-        if let WebSocketMessage::String(value) = &message {
-            if value == socket_io_utils::my_socket_io_messages::ENGINE_IO_PING_PROBE_PAYLOAD {
-                my_web_socket
-                    .send_message(Message::Text(
-                        socket_io_utils::my_socket_io_messages::ENGINE_IO_PONG_PROBE_PAYLOAD
-                            .to_string(),
-                    ))
-                    .await;
-                return;
-            }
+        if let Message::Text(value) = &message {
+            let contract = socket_io_utils::SocketIoContract::deserialize(value.as_str());
 
-            if value == socket_io_utils::my_socket_io_messages::ENGINE_IO_UPGRADE_PAYLOAD {
-                if let Some(socket_io) = socket_io.as_ref() {
-                    socket_io.upgrade_to_websocket().await;
-                } else {
-                    my_web_socket
-                        .send_message(Message::Text("SocketIo not found".to_string()))
+            match contract {
+                socket_io_utils::SocketIoContract::Open(_) => {
+                    println!("Open is a server side message")
+                }
+                socket_io_utils::SocketIoContract::Close => {
+                    println!("Close is a server side message")
+                }
+                socket_io_utils::SocketIoContract::Ping { with_probe: _ } => {}
+                socket_io_utils::SocketIoContract::Pong { with_probe: _ } => {}
+                socket_io_utils::SocketIoContract::Message(message) => {
+                    self.handle_socket_io_message(socket_io_connection, message)
                         .await;
-                    my_web_socket.disconnect().await;
                 }
-                return;
-            }
-
-            if let Some(message) = MySocketIoMessage::parse(value.as_str()) {
-                match message {
-                    MySocketIoMessage::Message(message) => {
-                        if let Some(socket_io_connection) = socket_io.as_ref() {
-                            self.callback_message(socket_io_connection, message).await;
-                        }
-                    }
-                    MySocketIoMessage::RequestAccess(nsp) => {
-                        if let Some(socket_io_connection) = socket_io.as_ref() {
-                            let nsp_str = get_nsp(&nsp);
-
-                            if self.registered_sockets.has_nsp(nsp_str).await {
-                                let granted_message =
-                                    MySocketIoMessage::GrandAccess(GrandAccessData {
-                                        nsp,
-                                        sid: socket_io_connection.id.clone(),
-                                    });
-
-                                socket_io_connection.send_message(&granted_message).await;
-                            }
-                        }
-                    }
-
-                    _ => {}
+                socket_io_utils::SocketIoContract::Upgrade => {
+                    println!("Upgrade is a server side message")
                 }
+                socket_io_utils::SocketIoContract::Noop => {}
             }
         }
     }
