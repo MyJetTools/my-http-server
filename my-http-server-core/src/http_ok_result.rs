@@ -166,11 +166,8 @@ impl HttpOutput {
         }
     }
 
-    pub fn as_redirect(src: &str, permanent: bool) -> Self {
-        Self::Redirect {
-            url: src.to_string(),
-            permanent,
-        }
+    pub fn as_redirect(url: String, permanent: bool) -> Self {
+        Self::Redirect { url, permanent }
     }
 
     pub fn as_usize(number: usize) -> Self {
