@@ -49,10 +49,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             let host = ctx.request.get_host();
             let new_url = format!("{}://{}/swagger/index.html", scheme, host);
 
-            let output = HttpOutput::Redirect {
-                url: new_url,
-                permanent: false,
-            };
+            let output = HttpOutput::as_redirect(new_url, false);
 
             return Some(output.into_ok_result(false));
         }

@@ -89,7 +89,7 @@ impl HttpRequest {
         return RequestIp::create_as_single_ip(self.addr.ip().to_string());
     }
 
-    pub fn get_host<'s>(&'s self) -> &str {
+    pub fn get_host(&self) -> &str {
         if let Some(value) = self.data.headers().try_get_case_insensitive("host") {
             return value.as_str().unwrap();
         }

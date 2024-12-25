@@ -17,7 +17,7 @@ impl<'s> FormDataReader<'s> {
 
         Self { data }
     }
-    pub fn get_required(&'s self, name: &str) -> Result<&'s FormDataItem, HttpFailResult> {
+    pub fn get_required(&'s self, name: &str) -> Result<&'s FormDataItem<'s>, HttpFailResult> {
         for itm in &self.data {
             if itm.get_name() == name {
                 return Ok(itm);
@@ -27,7 +27,7 @@ impl<'s> FormDataReader<'s> {
         HttpFailResult::required_parameter_is_missing(name, SRC_FORM_DATA).into_err()
     }
 
-    pub fn get_optional(&'s self, name: &str) -> Option<&'s FormDataItem> {
+    pub fn get_optional(&'s self, name: &str) -> Option<&'s FormDataItem<'s>> {
         for itm in &self.data {
             if itm.get_name() == name {
                 return Some(itm);

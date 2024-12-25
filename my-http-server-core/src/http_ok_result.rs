@@ -14,6 +14,7 @@ pub enum HttpOutput {
     },
 
     Redirect {
+        headers: Option<HashMap<String, String>>,
         url: String,
         permanent: bool,
     },
@@ -71,6 +72,7 @@ impl HttpOutput {
                 .unwrap_or("text/plain"),
             HttpOutput::Redirect {
                 url: _,
+                headers: _,
                 permanent: _,
             } => "text/plain",
             HttpOutput::File {
@@ -112,6 +114,7 @@ impl HttpOutput {
             HttpOutput::Redirect {
                 url: _,
                 permanent: _,
+                headers: _,
             } => {
                 panic!("Redirect can not be turned into Http Fail result")
             }
@@ -167,7 +170,11 @@ impl HttpOutput {
     }
 
     pub fn as_redirect(url: String, permanent: bool) -> Self {
-        Self::Redirect { url, permanent }
+        Self::Redirect {
+            url,
+            permanent,
+            headers: None,
+        }
     }
 
     pub fn as_usize(number: usize) -> Self {
@@ -190,7 +197,11 @@ impl HttpOutput {
                 content_type: _,
                 content: _,
             } => 200,
-            Self::Redirect { url: _, permanent } => {
+            Self::Redirect {
+                url: _,
+                permanent,
+                headers: _,
+            } => {
                 if *permanent {
                     301
                 } else {
@@ -272,11 +283,23 @@ impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkR
                 builder.body(full_body).unwrap()
             }
 
-            HttpOutput::Redirect { url, permanent: _ } => Response::builder()
-                .status(status_code)
-                .header("Location", url)
-                .body(create_empty_body())
-                .unwrap(),
+            HttpOutput::Redirect {
+                url,
+                permanent: _,
+                headers,
+            } => {
+                let mut builder = Response::builder()
+                    .status(status_code)
+                    .header("Location", url);
+
+                if let Some(headers) = headers {
+                    for (key, value) in headers {
+                        builder = builder.header(key, value);
+                    }
+                }
+
+                builder.body(create_empty_body()).unwrap()
+            }
             HttpOutput::Empty => Response::builder()
                 .status(status_code)
                 .body(create_empty_body())
