@@ -37,18 +37,25 @@ impl WebSocketCallbacks {
             }
             SocketIoMessage::Event {
                 namespace,
+                event_name,
                 data,
                 ack,
             } => {
                 let response = self
                     .connections_callback
-                    .on_callback(&socket_io, namespace.as_str(), data)
+                    .on_callback(
+                        &socket_io,
+                        namespace.as_str(),
+                        event_name.as_str(),
+                        data.as_str(),
+                    )
                     .await;
 
                 if let Some(ack) = ack {
                     let response = SocketIoMessage::Ack {
                         namespace,
-                        data: response.unwrap_or_default(),
+                        event_name,
+                        data: response.unwrap_or_default().into(),
                         ack,
                     };
 
@@ -58,6 +65,7 @@ impl WebSocketCallbacks {
             SocketIoMessage::Ack {
                 namespace: _,
                 data: _,
+                event_name: _,
                 ack: _,
             } => {}
             SocketIoMessage::ConnectError { namespace, message } => {

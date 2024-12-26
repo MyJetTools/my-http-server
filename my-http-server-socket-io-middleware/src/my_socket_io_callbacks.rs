@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use my_http_server_core::*;
-use socket_io_utils::SocketIoEventParameter;
 
 use crate::MySocketIoConnection;
 
@@ -14,6 +13,7 @@ pub trait MySocketIoCallbacks {
         &self,
         socket_io: &Arc<MySocketIoConnection>,
         ns: &str,
-        data: Vec<SocketIoEventParameter>,
-    ) -> Option<Vec<SocketIoEventParameter>>;
+        event_name: &str,
+        data: &str,
+    ) -> Option<String>;
 }
