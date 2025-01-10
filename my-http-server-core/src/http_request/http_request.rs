@@ -96,6 +96,19 @@ impl HttpRequest {
         panic!("Host is not set");
     }
 
+    pub fn get_path_and_query(&self) -> &str {
+        match self.data.uri().path_and_query() {
+            Some(path_and_query) => path_and_query.as_str(),
+            None => {
+                let path = self.data.uri().path();
+                if path.is_empty() {
+                    return "/";
+                }
+                path
+            }
+        }
+    }
+
     pub fn get_headers(&self) -> &impl HttpRequestHeaders {
         self.data.headers()
     }
