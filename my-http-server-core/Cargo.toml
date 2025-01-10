@@ -33,3 +33,4 @@ http-body-util = "*"
 hyper-util = { version = "*", features = ["tokio"] }
 flate2 = "*"
 brotli = "*"
+http = "*"

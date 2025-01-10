@@ -1,3 +1,4 @@
+use http_body_util::BodyExt;
 use rust_extensions::StrOrString;
 
 use crate::{http_headers_to_use::*, HttpOkResult, WebContentType};
@@ -168,13 +169,15 @@ impl HttpFailResult {
     }
 }
 
-impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpFailResult {
-    fn into(self) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
+impl Into<crate::MyHttpServerResponse> for HttpFailResult {
+    fn into(self) -> crate::MyHttpServerResponse {
         let full_body = http_body_util::Full::new(hyper::body::Bytes::from(self.content));
         let builder = hyper::Response::builder()
             .status(self.status_code)
             .header(CONTENT_TYPE_HEADER, self.content_type.as_str());
 
-        builder.body(full_body).unwrap()
+        builder
+            .body(full_body.map_err(|itm| itm.to_string()).boxed())
+            .unwrap()
     }
 }

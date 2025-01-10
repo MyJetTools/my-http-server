@@ -1,7 +1,6 @@
-use http_body_util::Full;
-use hyper::body::Bytes;
 use hyper::server::conn::http1;
-use hyper::{service::service_fn, Response};
+use hyper::service::service_fn;
+use hyper::StatusCode;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
@@ -21,7 +20,7 @@ use crate::{
 
 use crate::http_server_middleware::*;
 
-pub const PANIC_HTTP_CODE: u16 = 500;
+pub const PANIC_HTTP_CODE: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
 
 #[derive(Clone)]
 pub struct HttpConnectionsCounter {
@@ -282,7 +281,7 @@ pub async fn handle_requests(
     http_server_middlewares: Arc<HttpServerMiddlewares>,
     addr: SocketAddr,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
-) -> hyper::Result<Response<Full<Bytes>>> {
+) -> hyper::Result<crate::MyHttpServerResponse> {
     let req = HttpRequest::new(req, addr);
 
     let method = req.method.clone();
@@ -356,7 +355,7 @@ pub async fn handle_requests(
                         .got_result(
                             &request_data_cloned,
                             &ResponseData {
-                                status_code: PANIC_HTTP_CODE,
+                                status_code: PANIC_HTTP_CODE.as_u16(),
                                 content_type: "text/plain".to_string(),
                                 content_length: 0,
                                 has_error: true,
@@ -402,10 +401,9 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            return Ok(hyper::Response::builder()
-                .status(PANIC_HTTP_CODE)
-                .body("Internal server error".into())
-                .unwrap());
+            let response = crate::utils::compile_response(PANIC_HTTP_CODE, "Internal server error");
+
+            return Ok(response);
         }
     };
 

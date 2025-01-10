@@ -54,3 +54,8 @@ pub use http_headers::*;
 pub mod data_src;
 
 pub extern crate hyper;
+
+pub type MyHttpServerResponse =
+    hyper::Response<http_body_util::combinators::BoxBody<hyper::body::Bytes, String>>;
+
+pub mod utils;

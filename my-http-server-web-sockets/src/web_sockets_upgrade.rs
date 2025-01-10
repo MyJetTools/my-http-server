@@ -3,10 +3,8 @@ use std::{net::SocketAddr, time::Duration};
 
 use futures::StreamExt;
 use futures_util::stream::SplitStream;
-use hyper::body::Bytes;
 
-use http_body_util::Full;
-use hyper::{Request, Response};
+use hyper::Request;
 use hyper_tungstenite::tungstenite::Message;
 use hyper_tungstenite::HyperWebsocketStream;
 use rust_extensions::Logger;
@@ -23,7 +21,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
     callback: Arc<TMyWebSocketCallback>,
     disconnect_timeout: Duration,
     logs: Arc<dyn Logger + Send + Sync + 'static>,
-) -> Result<Response<Full<Bytes>>, Error> {
+) -> Result<my_http_server_core::MyHttpServerResponse, Error> {
     let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
 
     tokio::spawn(async move {
@@ -55,7 +53,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
         }
     });
 
-    Ok(response)
+    Ok(my_http_server_core::utils::from_full_body(response))
 }
 
 /// Handle a websocket connection.

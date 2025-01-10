@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{HttpFailResult, WebContentType};
-use hyper::{body::Bytes, Response};
+use hyper::Response;
 use serde::Serialize;
 
 pub enum HttpOutput {
@@ -24,7 +24,7 @@ pub enum HttpOutput {
         content: Vec<u8>,
     },
 
-    Raw(hyper::Response<http_body_util::Full<hyper::body::Bytes>>),
+    Raw(crate::MyHttpServerResponse),
 }
 
 impl HttpOutput {
@@ -257,8 +257,8 @@ impl Into<Result<HttpOkResult, HttpFailResult>> for HttpOkResult {
     }
 }
 
-impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkResult {
-    fn into(self) -> hyper::Response<http_body_util::Full<hyper::body::Bytes>> {
+impl Into<crate::MyHttpServerResponse> for HttpOkResult {
+    fn into(self) -> crate::MyHttpServerResponse {
         let status_code = self.get_status_code();
 
         return match self.output {
@@ -279,8 +279,7 @@ impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkR
                     builder = builder.header("content-type", content_type.as_str());
                 }
 
-                let full_body = http_body_util::Full::new(hyper::body::Bytes::from(content));
-                builder.body(full_body).unwrap()
+                crate::utils::build_response(builder, content)
             }
 
             HttpOutput::Redirect {
@@ -298,12 +297,12 @@ impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkR
                     }
                 }
 
-                builder.body(create_empty_body()).unwrap()
+                crate::utils::build_response(builder, vec![])
             }
-            HttpOutput::Empty => Response::builder()
-                .status(status_code)
-                .body(create_empty_body())
-                .unwrap(),
+            HttpOutput::Empty => {
+                let builder = Response::builder().status(status_code);
+                crate::utils::build_response(builder, vec![])
+            }
 
             HttpOutput::Raw(body) => body,
             HttpOutput::File { file_name, content } => {
@@ -315,13 +314,8 @@ impl Into<hyper::Response<http_body_util::Full<hyper::body::Bytes>>> for HttpOkR
                     ),
                 );
 
-                let full_body = http_body_util::Full::new(hyper::body::Bytes::from(content));
-                builder.status(status_code).body(full_body).unwrap()
+                crate::utils::build_response(builder, content)
             }
         };
     }
-}
-
-fn create_empty_body() -> http_body_util::Full<Bytes> {
-    http_body_util::Full::new(hyper::body::Bytes::new())
 }
