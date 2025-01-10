@@ -1,8 +1,7 @@
-use http_body_util::BodyExt;
 use rust_extensions::StrOrString;
 
 use crate::{http_headers_to_use::*, HttpOkResult, WebContentType};
-
+use my_hyper_utils::*;
 #[derive(Debug, Clone)]
 pub struct HttpFailResult {
     pub content_type: WebContentType,
@@ -169,15 +168,12 @@ impl HttpFailResult {
     }
 }
 
-impl Into<crate::MyHttpServerResponse> for HttpFailResult {
-    fn into(self) -> crate::MyHttpServerResponse {
-        let full_body = http_body_util::Full::new(hyper::body::Bytes::from(self.content));
+impl Into<MyHttpResponse> for HttpFailResult {
+    fn into(self) -> MyHttpResponse {
         let builder = hyper::Response::builder()
             .status(self.status_code)
             .header(CONTENT_TYPE_HEADER, self.content_type.as_str());
 
-        builder
-            .body(full_body.map_err(|itm| itm.to_string()).boxed())
-            .unwrap()
+        (builder, self.content).to_my_http_response()
     }
 }

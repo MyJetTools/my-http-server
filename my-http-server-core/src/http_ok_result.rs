@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{HttpFailResult, WebContentType};
 use hyper::Response;
+use my_hyper_utils::*;
 use serde::Serialize;
 
 pub enum HttpOutput {
@@ -24,7 +25,7 @@ pub enum HttpOutput {
         content: Vec<u8>,
     },
 
-    Raw(crate::MyHttpServerResponse),
+    Raw(MyHttpResponse),
 }
 
 impl HttpOutput {
@@ -257,8 +258,8 @@ impl Into<Result<HttpOkResult, HttpFailResult>> for HttpOkResult {
     }
 }
 
-impl Into<crate::MyHttpServerResponse> for HttpOkResult {
-    fn into(self) -> crate::MyHttpServerResponse {
+impl Into<my_hyper_utils::MyHttpResponse> for HttpOkResult {
+    fn into(self) -> MyHttpResponse {
         let status_code = self.get_status_code();
 
         return match self.output {
@@ -279,7 +280,7 @@ impl Into<crate::MyHttpServerResponse> for HttpOkResult {
                     builder = builder.header("content-type", content_type.as_str());
                 }
 
-                crate::utils::build_response(builder, content)
+                (builder, content).to_my_http_response()
             }
 
             HttpOutput::Redirect {
@@ -297,11 +298,11 @@ impl Into<crate::MyHttpServerResponse> for HttpOkResult {
                     }
                 }
 
-                crate::utils::build_response(builder, vec![])
+                (builder, vec![]).to_my_http_response()
             }
             HttpOutput::Empty => {
                 let builder = Response::builder().status(status_code);
-                crate::utils::build_response(builder, vec![])
+                (builder, vec![]).to_my_http_response()
             }
 
             HttpOutput::Raw(body) => body,
@@ -314,7 +315,7 @@ impl Into<crate::MyHttpServerResponse> for HttpOkResult {
                     ),
                 );
 
-                crate::utils::build_response(builder, content)
+                (builder, content).to_my_http_response()
             }
         };
     }

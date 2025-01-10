@@ -19,6 +19,7 @@ use crate::{
 };
 
 use crate::http_server_middleware::*;
+use my_hyper_utils::*;
 
 pub const PANIC_HTTP_CODE: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
 
@@ -281,7 +282,7 @@ pub async fn handle_requests(
     http_server_middlewares: Arc<HttpServerMiddlewares>,
     addr: SocketAddr,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
-) -> hyper::Result<crate::MyHttpServerResponse> {
+) -> hyper::Result<my_hyper_utils::MyHttpResponse> {
     let req = HttpRequest::new(req, addr);
 
     let method = req.method.clone();
@@ -401,9 +402,7 @@ pub async fn handle_requests(
                 Some(ctx),
             );
 
-            let response = crate::utils::compile_response(PANIC_HTTP_CODE, "Internal server error");
-
-            return Ok(response);
+            return Ok((PANIC_HTTP_CODE, "Internal server error").to_my_http_response());
         }
     };
 

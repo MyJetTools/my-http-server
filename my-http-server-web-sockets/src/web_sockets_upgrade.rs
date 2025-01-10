@@ -13,6 +13,8 @@ use crate::{MyWebSocket, MyWebSocketCallback};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
+use my_http_server_core::my_hyper_utils::*;
+
 pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
     id: i64,
     addr: SocketAddr,
@@ -21,7 +23,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
     callback: Arc<TMyWebSocketCallback>,
     disconnect_timeout: Duration,
     logs: Arc<dyn Logger + Send + Sync + 'static>,
-) -> Result<my_http_server_core::MyHttpServerResponse, Error> {
+) -> Result<MyHttpResponse, Error> {
     let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
 
     tokio::spawn(async move {
@@ -53,7 +55,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
         }
     });
 
-    Ok(my_http_server_core::utils::from_full_body(response))
+    Ok(response.to_my_http_response())
 }
 
 /// Handle a websocket connection.
