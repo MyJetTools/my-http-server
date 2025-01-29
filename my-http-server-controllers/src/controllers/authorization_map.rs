@@ -1,4 +1,5 @@
 use my_http_server_core::RequestCredentials;
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use super::{
     actions::GetShouldBeAuthorized, documentation::ShouldBeAuthorized, ControllersAuthorization,
@@ -55,6 +56,7 @@ impl AuthorizationMap {
         action: &TGetShouldBeAuthorized,
         request_credentials: &Option<Box<dyn RequestCredentials + Send + Sync + 'static>>,
         ip: &str,
+        now: DateTimeAsMicroseconds,
     ) -> AuthorizationResult {
         match action.get_should_be_authorized() {
             ShouldBeAuthorized::Yes => {
@@ -67,7 +69,7 @@ impl AuthorizationMap {
             ShouldBeAuthorized::YesWithClaims(action_claims) => {
                 if let Some(req_credentials) = request_credentials {
                     if let Some(claim_name) =
-                        action_claims.authorized_by_claims(ip, req_credentials.get_claims())
+                        action_claims.authorized_by_claims(ip, req_credentials.get_claims(), now)
                     {
                         return AuthorizationResult::NotAuthorized(claim_name);
                     } else {
@@ -84,9 +86,11 @@ impl AuthorizationMap {
                         if let Some(req_credentials) = request_credentials {
                             let global_claims = global_auth.get_global_claims();
 
-                            if let Some(claim_name) =
-                                global_claims.authorized_by_claims(ip, req_credentials.get_claims())
-                            {
+                            if let Some(claim_name) = global_claims.authorized_by_claims(
+                                ip,
+                                req_credentials.get_claims(),
+                                now,
+                            ) {
                                 return AuthorizationResult::NotAuthorized(claim_name);
                             } else {
                                 return AuthorizationResult::Allowed;
@@ -112,7 +116,6 @@ mod tests {
     use crate::controllers::RequiredClaims;
 
     use super::*;
-    use rust_extensions::date_time::*;
 
     pub struct HttpActionMock {
         value: ShouldBeAuthorized,
@@ -166,7 +169,9 @@ mod tests {
 
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> = None;
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.is_allowed());
     }
@@ -182,7 +187,8 @@ mod tests {
 
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> = None;
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.not_authenticated());
     }
@@ -198,7 +204,8 @@ mod tests {
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> =
             Some(Box::new(RequestCredentialsMock { value: None }));
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.is_allowed());
     }
@@ -219,7 +226,9 @@ mod tests {
 
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> = None;
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.is_allowed());
     }
@@ -241,7 +250,9 @@ mod tests {
 
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> = None;
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.not_authenticated());
     }
@@ -263,7 +274,9 @@ mod tests {
 
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> = None;
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.not_authenticated());
     }
@@ -278,7 +291,8 @@ mod tests {
 
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> = None;
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.not_authenticated());
     }
@@ -296,7 +310,8 @@ mod tests {
         let client_credentials: Option<Box<dyn RequestCredentials + Send + Sync + 'static>> =
             Some(Box::new(RequestCredentialsMock { value: None }));
 
-        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1");
+        let now = DateTimeAsMicroseconds::now();
+        let result = auth_map.is_authorized(&action, &client_credentials, "127.0.0.1", now);
 
         assert!(result.not_authorized());
     }

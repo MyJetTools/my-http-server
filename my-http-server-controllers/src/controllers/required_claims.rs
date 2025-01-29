@@ -1,4 +1,5 @@
 use my_http_server_core::RequestClaim;
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 #[derive(Debug, Clone)]
 pub struct RequiredClaims {
@@ -32,6 +33,7 @@ impl RequiredClaims {
         &self,
         request_ip: &str,
         request_claims: Option<Vec<RequestClaim>>,
+        now: DateTimeAsMicroseconds,
     ) -> Option<String> {
         // No Claims means - we are authorized
         if self.required_claims.len() == 0 {
@@ -40,7 +42,17 @@ impl RequiredClaims {
 
         if let Some(request_claims) = request_claims {
             for required_claim in &self.required_claims {
-                let request_claim = request_claims.iter().find(|c| c.id == required_claim);
+                let request_claim = request_claims.iter().find(|c| {
+                    if c.id != required_claim {
+                        return false;
+                    }
+
+                    if c.expires < now {
+                        return false;
+                    }
+
+                    true
+                });
 
                 let Some(request_claim) = request_claim else {
                     return Some(required_claim.to_owned());

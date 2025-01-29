@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use hyper::Method;
 use my_http_server_core::{HttpContext, HttpFailResult, HttpOkResult};
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use super::{
     documentation::{HttpActionDescription, ShouldBeAuthorized},
@@ -136,6 +137,7 @@ impl HttpActions {
         authorization_map: &AuthorizationMap,
         auth_error_factory: &Option<Arc<dyn AuthErrorFactory + Send + Sync + 'static>>,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
+        let now = DateTimeAsMicroseconds::now();
         for action in &self.actions {
             if action.http_route.is_my_path(&ctx.request.http_path) {
                 ctx.process_name = Some(action.http_route.route.clone());
@@ -143,6 +145,7 @@ impl HttpActions {
                     action,
                     &ctx.credentials,
                     ctx.request.get_ip().get_real_ip(),
+                    now,
                 ) {
                     super::AuthorizationResult::Allowed => {
                         return Some(action.handler.handle_request(&action.http_route, ctx).await);
