@@ -25,10 +25,10 @@ impl HttpOkResultBuilder {
     }
 
     pub fn add_header(
-        &mut self,
+        mut self,
         key: impl Into<StrOrString<'static>>,
         value: impl Into<StrOrString<'static>>,
-    ) -> &mut Self {
+    ) -> Self {
         let key = key.into();
         let value = value.into();
 
@@ -39,11 +39,35 @@ impl HttpOkResultBuilder {
             .as_mut()
             .unwrap()
             .insert(key.to_string(), value.to_string());
+
         self
     }
 
-    pub fn set_cookie<'s>(&mut self, cookie: impl Into<Cookie>) -> &mut Self {
-        self.cookies.set_cookie(cookie);
+    pub fn add_headers(
+        mut self,
+        headers: impl Iterator<
+            Item = (
+                impl Into<StrOrString<'static>>,
+                impl Into<StrOrString<'static>>,
+            ),
+        >,
+    ) -> Self {
+        for header in headers {
+            self = self.add_header(header.0, header.1);
+        }
+
+        self
+    }
+
+    pub fn set_cookie(mut self, cookie: impl Into<Cookie>) -> Self {
+        self.cookies = self.cookies.set_cookie(cookie);
+        self
+    }
+
+    pub fn set_cookies(mut self, cookies: impl IntoIterator<Item = impl Into<Cookie>>) -> Self {
+        for cookie in cookies {
+            self.cookies = self.cookies.set_cookie(cookie);
+        }
 
         self
     }

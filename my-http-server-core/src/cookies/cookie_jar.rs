@@ -11,8 +11,16 @@ impl CookieJar {
         }
     }
 
-    pub fn set_cookie<'s>(&mut self, cookie: impl Into<Cookie>) {
+    pub fn set_cookie<'s>(mut self, cookie: impl Into<Cookie>) -> Self {
         self.cookies.push(cookie.into());
+        self
+    }
+
+    pub fn set_cookies(mut self, cookies: impl Iterator<Item = impl Into<Cookie>>) -> Self {
+        for cookie in cookies {
+            self.cookies.push(cookie.into());
+        }
+        self
     }
 
     pub fn get_cookies(&self) -> impl Iterator<Item = &Cookie> {
@@ -32,16 +40,13 @@ mod test {
 
     #[test]
     fn test() {
-        let mut cookies = CookieJar::new();
-
-        cookies.set_cookie(
-            Cookie::new("Test", "Value")
-                .set_domain("/")
-                .set_max_age(24 * 60 * 60),
-        );
-
-        cookies.set_cookie(("Test2".to_string(), "Value".to_string()));
-
-        cookies.set_cookie(("Test3", "Value".to_string()));
+        let _ = CookieJar::new()
+            .set_cookie(
+                Cookie::new("Test", "Value")
+                    .set_domain("/")
+                    .set_max_age(24 * 60 * 60),
+            )
+            .set_cookie(("Test2".to_string(), "Value".to_string()))
+            .set_cookie(("Test3", "Value".to_string()));
     }
 }
