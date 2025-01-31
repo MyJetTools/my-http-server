@@ -54,7 +54,6 @@ pub use http_headers::*;
 pub mod data_src;
 pub extern crate hyper;
 pub extern crate my_hyper_utils;
-mod cookie_jar;
-pub use cookie_jar::*;
+pub mod cookies;
 mod http_ok_result_builder;
 pub use http_ok_result_builder::*;

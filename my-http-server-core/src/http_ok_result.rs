@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{CookieJar, HttpFailResult, HttpOkResultBuilder, WebContentType};
+use crate::{cookies::*, HttpFailResult, HttpOkResultBuilder, WebContentType};
 use hyper::Response;
 use my_hyper_utils::*;
 use rust_extensions::StrOrString;

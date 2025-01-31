@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use rust_extensions::{date_time::DateTimeAsMicroseconds, StrOrString};
+use rust_extensions::StrOrString;
 
-use crate::{CookieJar, HttpOutput, WebContentType};
+use crate::{cookies::*, HttpOutput, WebContentType};
 
 pub struct HttpOkResultBuilder {
     headers: Option<HashMap<String, String>>,
@@ -42,13 +42,8 @@ impl HttpOkResultBuilder {
         self
     }
 
-    pub fn set_cookie<'s>(
-        &mut self,
-        cookie_name: impl Into<StrOrString<'static>>,
-        value: impl Into<StrOrString<'s>>,
-        expires_at: DateTimeAsMicroseconds,
-    ) -> &mut Self {
-        self.cookies.set_cookie(cookie_name, value, expires_at);
+    pub fn set_cookie<'s>(&mut self, cookie: impl Into<Cookie>) -> &mut Self {
+        self.cookies.set_cookie(cookie);
 
         self
     }
