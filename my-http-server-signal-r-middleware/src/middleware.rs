@@ -85,13 +85,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
             None,
         )
         .await;
-        HttpOutput::Content {
-            headers: None,
-            content_type: Some(WebContentType::Text),
-            content: response.into_bytes(),
-        }
-        .into_ok_result(true)
-        .into()
+        HttpOutput::as_text(response).into_ok_result(true).into()
     }
 
     async fn handle_websocket_upgrade(
@@ -108,12 +102,10 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
             .await;
 
         if signal_r_connection.is_none() {
-            return HttpOutput::Content {
-                headers: None,
-                content_type: Some(WebContentType::Text),
-                content: format!("Connection '{}' not found", connection_id_or_token.as_str())
-                    .into_bytes(),
-            }
+            return HttpOutput::as_text(format!(
+                "Connection '{}' not found",
+                connection_id_or_token.as_str()
+            ))
             .into_ok_result(true)
             .into();
         }

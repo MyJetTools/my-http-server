@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{HttpFailResult, WebContentType};
+use crate::{CookieJar, HttpFailResult, HttpOkResultBuilder, WebContentType};
 use hyper::Response;
 use my_hyper_utils::*;
+use rust_extensions::StrOrString;
 use serde::Serialize;
 
 pub enum HttpOutput {
@@ -11,6 +12,7 @@ pub enum HttpOutput {
     Content {
         headers: Option<HashMap<String, String>>,
         content_type: Option<WebContentType>,
+        set_cookies: Option<CookieJar>,
         content: Vec<u8>,
     },
 
@@ -29,6 +31,10 @@ pub enum HttpOutput {
 }
 
 impl HttpOutput {
+    pub fn from_builder() -> HttpOkResultBuilder {
+        HttpOkResultBuilder::new()
+    }
+
     pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
         Ok(HttpOkResult {
             write_telemetry,
@@ -67,6 +73,7 @@ impl HttpOutput {
                 headers: _,
                 content_type,
                 content: _,
+                set_cookies: _,
             } => content_type
                 .as_ref()
                 .map(|ct| ct.as_str())
@@ -103,6 +110,7 @@ impl HttpOutput {
                 headers: _,
                 content_type,
                 content,
+                set_cookies: _,
             } => HttpFailResult {
                 content_type: content_type.unwrap_or(WebContentType::Text),
                 status_code: status_code,
@@ -142,11 +150,13 @@ impl HttpOutput {
         Err(result)
     }
 
-    pub fn as_text(text: String) -> Self {
+    pub fn as_text<'s>(text: impl Into<StrOrString<'s>>) -> Self {
+        let text = text.into().to_string();
         Self::Content {
             headers: None,
             content_type: Some(WebContentType::Text),
             content: text.into_bytes(),
+            set_cookies: None,
         }
     }
 
@@ -157,6 +167,7 @@ impl HttpOutput {
             headers: None,
             content_type: Some(WebContentType::Json),
             content: json,
+            set_cookies: None,
         }
     }
 
@@ -167,6 +178,7 @@ impl HttpOutput {
             headers: None,
             content_type: Some(WebContentType::Yaml),
             content: yaml.into_bytes(),
+            set_cookies: None,
         }
     }
 
@@ -183,6 +195,7 @@ impl HttpOutput {
             headers: None,
             content_type: Some(WebContentType::Text),
             content: number.to_string().into_bytes(),
+            set_cookies: None,
         }
     }
 
@@ -197,6 +210,7 @@ impl HttpOutput {
                 headers: _,
                 content_type: _,
                 content: _,
+                set_cookies: _,
             } => 200,
             Self::Redirect {
                 url: _,
@@ -247,6 +261,7 @@ impl Into<HttpOkResult> for String {
                 headers: None,
                 content_type: Some(WebContentType::Text),
                 content: self.into_bytes(),
+                set_cookies: None,
             },
         }
     }
@@ -267,6 +282,7 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOkResult {
                 headers,
                 content_type,
                 content,
+                set_cookies,
             } => {
                 let mut builder = Response::builder();
 
@@ -278,6 +294,12 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOkResult {
 
                 if let Some(content_type) = content_type {
                     builder = builder.header("content-type", content_type.as_str());
+                }
+
+                if let Some(cookies) = set_cookies {
+                    for itm in cookies.get_cookies() {
+                        builder = builder.header("Set-Cookie", itm.to_string());
+                    }
                 }
 
                 (builder, content).to_my_http_response()

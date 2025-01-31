@@ -63,6 +63,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 headers: None,
                 content_type: Some(WebContentType::Html),
                 content: super::resources::INDEX_PAGE.to_vec(),
+                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -76,6 +77,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 headers: None,
                 content_type: Some(WebContentType::Css),
                 content: super::resources::SWAGGER_UI_CSS.to_vec(),
+                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -89,6 +91,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 headers: None,
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_BUNDLE_JS.to_vec(),
+                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -102,6 +105,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 headers: None,
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_STANDALONE_PRESET_JS.to_vec(),
+                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -115,6 +119,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 headers: None,
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_32.to_vec(),
+                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -128,6 +133,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                 headers: None,
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_16.to_vec(),
+                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -157,6 +163,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                     scheme.as_ref(),
                     global_fail_results,
                 ),
+                set_cookies: None,
             };
 
             return Some(output.into_ok_result(false));

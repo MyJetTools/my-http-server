@@ -161,11 +161,5 @@ async fn handle_get_request(
 }
 
 fn handle_post_request(_ctx: &mut HttpContext) -> Result<HttpOkResult, HttpFailResult> {
-    return HttpOutput::Content {
-        headers: None,
-        content_type: Some(WebContentType::Text),
-        content: "ok".to_string().into_bytes(),
-    }
-    .into_ok_result(true)
-    .into();
+    return HttpOutput::as_text("ok").into_ok_result(true).into();
 }

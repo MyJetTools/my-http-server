@@ -95,6 +95,7 @@ impl StaticFilesMiddleware {
                             headers: None,
                             content_type: WebContentType::detect_by_extension(path),
                             content: file_content,
+                            set_cookies: None,
                         };
 
                         return Some(output.into_ok_result(false));
@@ -111,6 +112,7 @@ impl StaticFilesMiddleware {
                     headers: None,
                     content_type: WebContentType::detect_by_extension(path),
                     content: file_content,
+                    set_cookies: None,
                 };
 
                 return Some(output.into_ok_result(false));
@@ -134,6 +136,7 @@ impl StaticFilesMiddleware {
                     headers: None,
                     content_type: WebContentType::detect_by_extension(not_found_file),
                     content: file_content,
+                    set_cookies: None,
                 };
 
                 return Some(output.into_ok_result(false));
