@@ -6,6 +6,7 @@ pub struct Cookie {
     pub expires_at: Option<DateTimeAsMicroseconds>,
     pub max_age: Option<u64>,
     pub domain: Option<StrOrString<'static>>,
+    pub path: Option<StrOrString<'static>>,
     pub http_only: bool,
     pub partitioned: bool,
 }
@@ -20,6 +21,7 @@ impl Cookie {
             domain: None,
             http_only: false,
             partitioned: false,
+            path: None,
         }
     }
     pub fn set_expires_at(mut self, expires_at: DateTimeAsMicroseconds) -> Self {
@@ -37,6 +39,11 @@ impl Cookie {
         self
     }
 
+    pub fn set_path(mut self, path: impl Into<StrOrString<'static>>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+
     pub fn set_http_only(mut self) -> Self {
         self.http_only = true;
         self
@@ -49,6 +56,10 @@ impl Cookie {
 
     pub fn to_string(&self) -> String {
         let mut result = format!("{}={}", self.name, self.value);
+
+        if let Some(path) = &self.path {
+            add_element(&mut result, "Path", path.as_str());
+        }
 
         if let Some(expires_at) = self.expires_at {
             add_element(&mut result, "Expires", expires_at.to_rfc7231().as_str());
@@ -84,6 +95,7 @@ impl Into<Cookie> for (String, String) {
             domain: None,
             http_only: false,
             partitioned: false,
+            path: None,
         }
     }
 }
@@ -98,6 +110,7 @@ impl Into<Cookie> for (&'static str, String) {
             domain: None,
             http_only: false,
             partitioned: false,
+            path: None,
         }
     }
 }
@@ -112,6 +125,7 @@ impl Into<Cookie> for (String, String, DateTimeAsMicroseconds) {
             domain: None,
             http_only: false,
             partitioned: false,
+            path: None,
         }
     }
 }
@@ -126,6 +140,7 @@ impl Into<Cookie> for (&'static str, String, DateTimeAsMicroseconds) {
             domain: None,
             http_only: false,
             partitioned: false,
+            path: None,
         }
     }
 }
