@@ -6,6 +6,8 @@ pub struct Cookie {
     pub expires_at: Option<DateTimeAsMicroseconds>,
     pub max_age: Option<u64>,
     pub domain: Option<StrOrString<'static>>,
+    pub http_only: bool,
+    pub partitioned: bool,
 }
 
 impl Cookie {
@@ -16,6 +18,8 @@ impl Cookie {
             expires_at: None,
             max_age: None,
             domain: None,
+            http_only: false,
+            partitioned: false,
         }
     }
     pub fn set_expires_at(mut self, expires_at: DateTimeAsMicroseconds) -> Self {
@@ -30,6 +34,16 @@ impl Cookie {
 
     pub fn set_domain(mut self, domain: impl Into<StrOrString<'static>>) -> Self {
         self.domain = Some(domain.into());
+        self
+    }
+
+    pub fn set_http_only(mut self) -> Self {
+        self.http_only = true;
+        self
+    }
+
+    pub fn set_partitioned(mut self) -> Self {
+        self.partitioned = true;
         self
     }
 
@@ -48,6 +62,14 @@ impl Cookie {
             add_element(&mut result, "Domain", domain.as_str());
         }
 
+        if self.http_only {
+            add_empty_element(&mut result, "HttpOnly");
+        }
+
+        if self.http_only {
+            add_empty_element(&mut result, "Partitioned");
+        }
+
         result
     }
 }
@@ -60,6 +82,8 @@ impl Into<Cookie> for (String, String) {
             expires_at: None,
             max_age: None,
             domain: None,
+            http_only: false,
+            partitioned: false,
         }
     }
 }
@@ -72,6 +96,8 @@ impl Into<Cookie> for (&'static str, String) {
             expires_at: None,
             max_age: None,
             domain: None,
+            http_only: false,
+            partitioned: false,
         }
     }
 }
@@ -84,6 +110,8 @@ impl Into<Cookie> for (String, String, DateTimeAsMicroseconds) {
             expires_at: Some(self.2),
             max_age: None,
             domain: None,
+            http_only: false,
+            partitioned: false,
         }
     }
 }
@@ -96,6 +124,8 @@ impl Into<Cookie> for (&'static str, String, DateTimeAsMicroseconds) {
             expires_at: Some(self.2),
             max_age: None,
             domain: None,
+            http_only: false,
+            partitioned: false,
         }
     }
 }
@@ -104,4 +134,9 @@ fn add_element(result: &mut String, name: &str, value: &str) {
     result.push_str(name);
     result.push('=');
     result.push_str(value);
+}
+
+fn add_empty_element(result: &mut String, name: &str) {
+    result.push_str("; ");
+    result.push_str(name);
 }
