@@ -23,12 +23,12 @@ impl<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>
     MyWebsocketMiddleware<TMyWebSocketCallback>
 {
     pub fn new(
-        path: StrOrString<'static>,
+        path: impl Into<StrOrString<'static>>,
         callbacks: Arc<TMyWebSocketCallback>,
         logger: Arc<dyn Logger + Send + Sync + 'static>,
     ) -> Self {
         Self {
-            path,
+            path: path.into(),
             callbacks,
             socket_id: AtomicI64::new(0),
             disconnect_timeout: Duration::from_secs(60),
