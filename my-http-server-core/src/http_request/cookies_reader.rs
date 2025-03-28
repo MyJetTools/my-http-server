@@ -24,6 +24,31 @@ impl<'s> CookiesReader<'s> {
 
         None
     }
+
+    pub fn iterate_all(&'s self) -> Vec<(&'s str, String)> {
+        if self.src.is_none() {
+            return vec![];
+        }
+
+        let mut result = Vec::new();
+
+        for kv in self.src.unwrap().split(';') {
+            let mut kv = kv.split("=");
+
+            let key = kv.next().unwrap();
+            let value =
+                url_utils::url_decoder::decode_as_str_or_string(kv.next().unwrap_or_default());
+
+            let value = match value {
+                Ok(value) => value.to_string(),
+                Err(_) => String::new(),
+            };
+
+            result.push((key, value));
+        }
+
+        result
+    }
 }
 
 #[cfg(test)]
