@@ -65,7 +65,21 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     callback: Arc<TMyWebSocketCallback>,
 ) -> Result<(), Error> {
     while let Some(message) = websocket.next().await {
-        callback_message(my_web_socket.clone(), message?, callback.clone()).await?;
+        let message = match message {
+            Ok(message) => message,
+            Err(err) => {
+                println!("Getting WS message error:{}", err);
+                my_web_socket.disconnect().await;
+                return Err(err.into());
+            }
+        };
+
+        let result = callback_message(my_web_socket.clone(), message, callback.clone()).await;
+
+        if let Err(err) = result {
+            my_web_socket.disconnect().await;
+            return Err(err.into());
+        }
     }
 
     my_web_socket.disconnect().await;
