@@ -24,14 +24,11 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
     disconnect_timeout: Duration,
     logs: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> Result<MyHttpResponse, Error> {
-    println!("Upgrading websocket: {}", id);
     let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
 
     tokio::spawn(async move {
-        println!("Websocket Before await: {}", id);
         let ws_stream = websocket.await;
 
-        println!("Websocket After await: {}", id);
         match ws_stream {
             Ok(ws_stream) => {
                 let (ws_sender, ws_receiver) = ws_stream.split();
@@ -78,28 +75,18 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     callback: Arc<TMyWebSocketCallback>,
     disconnect_timeout: Duration,
 ) -> Result<(), Error> {
-    println!("Started websocket loop for ws:{}", my_web_socket.id);
     loop {
         let future = websocket.next();
 
         let result = tokio::time::timeout(disconnect_timeout, future).await;
 
         if result.is_err() {
-            println!(
-                "No activity on websocket {}. Disconnecting",
-                my_web_socket.id
-            );
-            let err = "No activity".to_string();
-            return Err(err.into());
+            break;
         }
 
         let message = result.unwrap();
 
         if message.is_none() {
-            println!(
-                "No message for websocket: {}. Disconnecting",
-                my_web_socket.id
-            );
             break;
         }
 
