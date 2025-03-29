@@ -24,11 +24,14 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
     disconnect_timeout: Duration,
     logs: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> Result<MyHttpResponse, Error> {
+    println!("Upgrading websocket: {}", id);
     let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
 
     tokio::spawn(async move {
+        println!("Websocket Before await: {}", id);
         let ws_stream = websocket.await;
 
+        println!("Websocket After await: {}", id);
         match ws_stream {
             Ok(ws_stream) => {
                 let (ws_sender, ws_receiver) = ws_stream.split();
@@ -42,6 +45,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
                     .connected(my_web_socket.clone(), disconnect_timeout)
                     .await
                     .unwrap();
+                println!("Websocket Connected: {}", id);
 
                 let my_web_socket_cloned = my_web_socket.clone();
 
