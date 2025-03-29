@@ -53,7 +53,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
                 )
                 .await
                 {
-                    eprintln!("Error after serving websocket connection: {e}");
+                    println!("Error after serving websocket connection: {e}");
                 }
 
                 my_web_socket.disconnect().await;
@@ -92,6 +92,10 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
         let message = result.unwrap();
 
         if message.is_none() {
+            println!(
+                "No message for websocket: {}. Disconnecting",
+                my_web_socket.id
+            );
             break;
         }
 
