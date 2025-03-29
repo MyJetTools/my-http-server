@@ -45,9 +45,18 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
 
                 let my_web_socket_cloned = my_web_socket.clone();
 
-                if let Err(e) = serve_websocket(my_web_socket_cloned, ws_receiver, callback).await {
+                if let Err(e) = serve_websocket(
+                    my_web_socket_cloned,
+                    ws_receiver,
+                    callback,
+                    disconnect_timeout,
+                )
+                .await
+                {
                     eprintln!("Error in websocket connection: {e}");
                 }
+
+                my_web_socket.disconnect().await;
             }
             Err(err) => {
                 println!("Error in websocket connection: {}", err);
@@ -63,8 +72,26 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     my_web_socket: Arc<MyWebSocket>,
     mut websocket: SplitStream<HyperWebsocketStream>,
     callback: Arc<TMyWebSocketCallback>,
+    disconnect_timeout: Duration,
 ) -> Result<(), Error> {
-    while let Some(message) = websocket.next().await {
+    loop {
+        let future = websocket.next();
+
+        let result = tokio::time::timeout(disconnect_timeout, future).await;
+
+        if result.is_err() {
+            let err = "No activity".to_string();
+            return Err(err.into());
+        }
+
+        let message = result.unwrap();
+
+        if message.is_none() {
+            break;
+        }
+
+        let message = message.unwrap();
+
         let message = match message {
             Ok(message) => message,
             Err(err) => {
@@ -81,8 +108,6 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
             return Err(err.into());
         }
     }
-
-    my_web_socket.disconnect().await;
 
     Ok(())
 }
