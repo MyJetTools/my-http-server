@@ -42,7 +42,6 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
                     .connected(my_web_socket.clone(), disconnect_timeout)
                     .await
                     .unwrap();
-                println!("Websocket Connected: {}", id);
 
                 let my_web_socket_cloned = my_web_socket.clone();
 
