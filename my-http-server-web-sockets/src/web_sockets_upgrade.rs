@@ -53,7 +53,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
                 )
                 .await
                 {
-                    eprintln!("Error in websocket connection: {e}");
+                    eprintln!("Error after serving websocket connection: {e}");
                 }
 
                 my_web_socket.disconnect().await;
@@ -74,12 +74,17 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
     callback: Arc<TMyWebSocketCallback>,
     disconnect_timeout: Duration,
 ) -> Result<(), Error> {
+    println!("Started websocket loop for ws:{}", my_web_socket.id);
     loop {
         let future = websocket.next();
 
         let result = tokio::time::timeout(disconnect_timeout, future).await;
 
         if result.is_err() {
+            println!(
+                "No activity on websocket {}. Disconnecting",
+                my_web_socket.id
+            );
             let err = "No activity".to_string();
             return Err(err.into());
         }
