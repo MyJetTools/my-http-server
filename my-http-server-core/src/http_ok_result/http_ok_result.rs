@@ -160,14 +160,14 @@ impl HttpOutput {
         }
     }
 
-    pub fn as_json<T: Serialize>(model: T) -> Self {
+    pub fn as_json<T: Serialize>(model: T) -> HttpOkResultBuilder {
         let json = serde_json::to_vec(&model).unwrap();
 
-        Self::Content {
+        HttpOkResultBuilder {
             headers: None,
             content_type: Some(WebContentType::Json),
-            content: json,
-            set_cookies: None,
+            cookies: Default::default(),
+            body: json,
         }
     }
 

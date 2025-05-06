@@ -25,7 +25,7 @@ pub use form_data_reader::{FormDataItem, FormDataReader};
 
 pub use http_ctx::HttpContext;
 pub use http_fail_result::HttpFailResult;
-pub use http_ok_result::{HttpOkResult, HttpOutput, IntoHttpOkResult};
+pub use http_ok_result::*;
 pub use http_path::HttpPath;
 
 pub use http_server::*;
@@ -55,5 +55,3 @@ pub mod data_src;
 pub extern crate hyper;
 pub extern crate my_hyper_utils;
 pub mod cookies;
-mod http_ok_result_builder;
-pub use http_ok_result_builder::*;

@@ -2,12 +2,15 @@ use std::collections::HashMap;
 
 use rust_extensions::StrOrString;
 
-use crate::{cookies::*, HttpOutput, WebContentType};
+use crate::{cookies::*, HttpFailResult, HttpOutput, WebContentType};
+
+use super::HttpOkResult;
 
 pub struct HttpOkResultBuilder {
-    headers: Option<HashMap<String, String>>,
-    content_type: Option<WebContentType>,
-    cookies: CookieJar,
+    pub(crate) headers: Option<HashMap<String, String>>,
+    pub(crate) content_type: Option<WebContentType>,
+    pub(crate) cookies: CookieJar,
+    pub(crate) body: Vec<u8>,
 }
 
 impl HttpOkResultBuilder {
@@ -15,7 +18,8 @@ impl HttpOkResultBuilder {
         Self {
             headers: None,
             content_type: None,
-            cookies: CookieJar::new(),
+            cookies: Default::default(),
+            body: Default::default(),
         }
     }
 
@@ -70,6 +74,24 @@ impl HttpOkResultBuilder {
         }
 
         self
+    }
+
+    pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
+        Ok(HttpOkResult {
+            write_telemetry,
+            #[cfg(feature = "with-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
+            output: HttpOutput::Content {
+                headers: self.headers,
+                content_type: self.content_type,
+                set_cookies: if self.cookies.is_empty() {
+                    None
+                } else {
+                    Some(self.cookies)
+                },
+                content: self.body,
+            },
+        })
     }
 
     pub fn build(self, content: Vec<u8>) -> HttpOutput {

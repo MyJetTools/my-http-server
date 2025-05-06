@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Default)]
 pub struct CookieJar {
     cookies: Vec<Cookie>,
 }
