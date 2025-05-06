@@ -6,14 +6,14 @@ use crate::{cookies::*, HttpFailResult, HttpOutput, WebContentType};
 
 use super::HttpOkResult;
 
-pub struct HttpOkResultBuilder {
+pub struct HttpResultBuilder {
     pub(crate) headers: Option<HashMap<String, String>>,
     pub(crate) content_type: Option<WebContentType>,
     pub(crate) cookies: Option<CookieJar>,
     pub(crate) body: Vec<u8>,
 }
 
-impl HttpOkResultBuilder {
+impl HttpResultBuilder {
     pub fn new() -> Self {
         Self {
             headers: None,
@@ -110,5 +110,20 @@ impl HttpOkResultBuilder {
             set_cookies: self.cookies,
             content,
         }
+    }
+
+    pub fn into_fail_result(
+        self,
+        status_code: u16,
+        write_telemetry: bool,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        HttpFailResult {
+            content_type: self.content_type.unwrap_or(WebContentType::Text),
+            status_code,
+            content: self.body,
+            write_telemetry,
+            write_to_log: true,
+        }
+        .into()
     }
 }

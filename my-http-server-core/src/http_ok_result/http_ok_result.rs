@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{cookies::*, HttpFailResult, HttpOkResultBuilder, WebContentType};
+use crate::{cookies::*, HttpFailResult, HttpResultBuilder, WebContentType};
 use hyper::Response;
 use my_hyper_utils::*;
 use rust_extensions::StrOrString;
@@ -31,8 +31,8 @@ pub enum HttpOutput {
 }
 
 impl HttpOutput {
-    pub fn from_builder() -> HttpOkResultBuilder {
-        HttpOkResultBuilder::new()
+    pub fn from_builder() -> HttpResultBuilder {
+        HttpResultBuilder::new()
     }
 
     pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
@@ -151,10 +151,10 @@ impl HttpOutput {
         Err(result)
     }
 
-    pub fn as_text<'s>(text: impl Into<StrOrString<'s>>) -> HttpOkResultBuilder {
+    pub fn as_text<'s>(text: impl Into<StrOrString<'s>>) -> HttpResultBuilder {
         let text = text.into().to_string();
 
-        HttpOkResultBuilder {
+        HttpResultBuilder {
             headers: None,
             content_type: Some(WebContentType::Text),
             cookies: Default::default(),
@@ -162,10 +162,10 @@ impl HttpOutput {
         }
     }
 
-    pub fn as_json<T: Serialize>(model: T) -> HttpOkResultBuilder {
+    pub fn as_json<T: Serialize>(model: T) -> HttpResultBuilder {
         let json = serde_json::to_vec(&model).unwrap();
 
-        HttpOkResultBuilder {
+        HttpResultBuilder {
             headers: None,
             content_type: Some(WebContentType::Json),
             cookies: Default::default(),
@@ -173,10 +173,10 @@ impl HttpOutput {
         }
     }
 
-    pub fn as_yaml<T: Serialize>(model: T) -> HttpOkResultBuilder {
+    pub fn as_yaml<T: Serialize>(model: T) -> HttpResultBuilder {
         let yaml = serde_yaml::to_string(&model).unwrap();
 
-        HttpOkResultBuilder {
+        HttpResultBuilder {
             headers: None,
             content_type: Some(WebContentType::Yaml),
             cookies: Default::default(),
