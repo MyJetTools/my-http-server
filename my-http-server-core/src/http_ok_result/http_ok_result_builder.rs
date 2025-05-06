@@ -9,7 +9,7 @@ use super::HttpOkResult;
 pub struct HttpOkResultBuilder {
     pub(crate) headers: Option<HashMap<String, String>>,
     pub(crate) content_type: Option<WebContentType>,
-    pub(crate) cookies: CookieJar,
+    pub(crate) cookies: Option<CookieJar>,
     pub(crate) body: Vec<u8>,
 }
 
@@ -64,14 +64,27 @@ impl HttpOkResultBuilder {
     }
 
     pub fn set_cookie(mut self, cookie: impl Into<Cookie>) -> Self {
-        self.cookies = self.cookies.set_cookie(cookie);
+        let cookie_jar = match self.cookies.take() {
+            Some(cookie_jar) => cookie_jar,
+            None => CookieJar::new(),
+        };
+
+        self.cookies = Some(cookie_jar.set_cookie(cookie));
+
         self
     }
 
     pub fn set_cookies(mut self, cookies: impl IntoIterator<Item = impl Into<Cookie>>) -> Self {
+        let mut cookie_jar = match self.cookies.take() {
+            Some(cookies) => cookies,
+            None => CookieJar::new(),
+        };
+
         for cookie in cookies {
-            self.cookies = self.cookies.set_cookie(cookie);
+            cookie_jar = cookie_jar.set_cookie(cookie);
         }
+
+        self.cookies = Some(cookie_jar);
 
         self
     }
@@ -84,11 +97,7 @@ impl HttpOkResultBuilder {
             output: HttpOutput::Content {
                 headers: self.headers,
                 content_type: self.content_type,
-                set_cookies: if self.cookies.is_empty() {
-                    None
-                } else {
-                    Some(self.cookies)
-                },
+                set_cookies: self.cookies,
                 content: self.body,
             },
         })
@@ -98,11 +107,7 @@ impl HttpOkResultBuilder {
         HttpOutput::Content {
             headers: self.headers,
             content_type: self.content_type,
-            set_cookies: if self.cookies.is_empty() {
-                None
-            } else {
-                Some(self.cookies)
-            },
+            set_cookies: self.cookies,
             content,
         }
     }

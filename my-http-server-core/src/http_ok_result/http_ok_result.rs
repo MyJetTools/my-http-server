@@ -68,7 +68,7 @@ impl HttpOutput {
 
     pub fn get_content_type(&self) -> &str {
         match self {
-            HttpOutput::Empty => "text/plain",
+            HttpOutput::Empty => "text/plain".into(),
             HttpOutput::Content {
                 headers: _,
                 content_type,
@@ -77,17 +77,18 @@ impl HttpOutput {
             } => content_type
                 .as_ref()
                 .map(|ct| ct.as_str())
-                .unwrap_or("text/plain"),
+                .unwrap_or("text/plain")
+                .into(),
             HttpOutput::Redirect {
                 url: _,
                 headers: _,
                 permanent: _,
-            } => "text/plain",
+            } => "text/plain".into(),
             HttpOutput::File {
                 file_name: _,
                 content: _,
             } => "application/octet-stream",
-            HttpOutput::Raw(_) => "text/plain",
+            HttpOutput::Raw(_) => "text/plain".into(),
         }
     }
 
@@ -98,7 +99,7 @@ impl HttpOutput {
     ) -> Result<HttpOkResult, HttpFailResult> {
         let result = match self {
             HttpOutput::Empty => HttpFailResult {
-                content_type: WebContentType::Text,
+                content_type: WebContentType::Text.into(),
                 status_code: status_code,
                 content: Vec::new(),
                 write_telemetry,
@@ -150,13 +151,14 @@ impl HttpOutput {
         Err(result)
     }
 
-    pub fn as_text<'s>(text: impl Into<StrOrString<'s>>) -> Self {
+    pub fn as_text<'s>(text: impl Into<StrOrString<'s>>) -> HttpOkResultBuilder {
         let text = text.into().to_string();
-        Self::Content {
+
+        HttpOkResultBuilder {
             headers: None,
             content_type: Some(WebContentType::Text),
-            content: text.into_bytes(),
-            set_cookies: None,
+            cookies: Default::default(),
+            body: text.into_bytes(),
         }
     }
 
@@ -171,14 +173,14 @@ impl HttpOutput {
         }
     }
 
-    pub fn as_yaml<T: Serialize>(model: T) -> Self {
+    pub fn as_yaml<T: Serialize>(model: T) -> HttpOkResultBuilder {
         let yaml = serde_yaml::to_string(&model).unwrap();
 
-        Self::Content {
+        HttpOkResultBuilder {
             headers: None,
             content_type: Some(WebContentType::Yaml),
-            content: yaml.into_bytes(),
-            set_cookies: None,
+            cookies: Default::default(),
+            body: yaml.into_bytes(),
         }
     }
 
