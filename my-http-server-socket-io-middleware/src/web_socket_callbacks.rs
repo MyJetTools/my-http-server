@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use hyper_tungstenite::tungstenite::Message;
 use my_http_server_core::*;
-use my_http_server_web_sockets::MyWebSocket;
+use my_http_server_web_sockets::{MyWebSocket, MyWebSocketHttpRequest};
 
 use socket_io_utils::{SocketIoContract, SocketIoMessage, SocketIoSettings};
 
@@ -130,6 +130,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
     async fn connected(
         &self,
         my_web_socket: Arc<MyWebSocket>,
+        _request: MyWebSocketHttpRequest,
         _disconnect_timeout: Duration,
     ) -> Result<(), HttpFailResult> {
         #[cfg(feature = "debug-ws")]

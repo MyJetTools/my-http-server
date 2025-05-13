@@ -9,7 +9,7 @@ use hyper_tungstenite::tungstenite::Message;
 use hyper_tungstenite::HyperWebsocketStream;
 use rust_extensions::Logger;
 
-use crate::{MyWebSocket, MyWebSocketCallback};
+use crate::{MyWebSocket, MyWebSocketCallback, MyWebSocketHttpRequest};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -24,6 +24,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
     disconnect_timeout: Duration,
     logs: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> Result<MyHttpResponse, Error> {
+    let http_request = MyWebSocketHttpRequest::new(&req);
     let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
 
     tokio::spawn(async move {
@@ -39,7 +40,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
                 let my_web_socket = Arc::new(my_web_socket);
 
                 callback
-                    .connected(my_web_socket.clone(), disconnect_timeout)
+                    .connected(my_web_socket.clone(), http_request, disconnect_timeout)
                     .await
                     .unwrap();
 

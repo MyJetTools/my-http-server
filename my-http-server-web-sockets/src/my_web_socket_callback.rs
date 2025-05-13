@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use my_http_server_core::HttpFailResult;
 
-use crate::WsMessage;
+use crate::{MyWebSocketHttpRequest, WsMessage};
 
 use super::MyWebSocket;
 
@@ -11,6 +11,7 @@ pub trait MyWebSocketCallback {
     async fn connected(
         &self,
         my_web_socket: Arc<MyWebSocket>,
+        http_request: MyWebSocketHttpRequest,
         disconnect_timeout: Duration,
     ) -> Result<(), HttpFailResult>;
     async fn disconnected(&self, my_web_socket: &MyWebSocket);

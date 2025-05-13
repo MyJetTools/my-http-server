@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Duration};
 use my_http_server_core::HttpFailResult;
 use my_http_server_web_sockets::MyWebSocket;
 
+use my_http_server_web_sockets::MyWebSocketHttpRequest;
 use my_json::json_reader::JsonFirstLineIterator;
 use my_json::json_reader::JsonValueRef;
 #[cfg(feature = "with-telemetry")]
@@ -28,6 +29,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
     async fn connected(
         &self,
         my_web_socket: Arc<MyWebSocket>,
+        _request: MyWebSocketHttpRequest,
         disconnect_timeout: Duration,
     ) -> Result<(), HttpFailResult> {
         #[cfg(feature = "debug-ws")]
