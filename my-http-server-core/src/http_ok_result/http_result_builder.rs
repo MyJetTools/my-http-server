@@ -23,7 +23,7 @@ impl HttpResultBuilder {
         }
     }
 
-    pub fn set_content_type(&mut self, content_type: WebContentType) -> &mut Self {
+    pub fn set_content_type(mut self, content_type: WebContentType) -> Self {
         self.content_type = Some(content_type);
         self
     }
