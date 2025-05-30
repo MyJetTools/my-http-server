@@ -43,7 +43,7 @@ fn generate_reading(
         PropertyType::OptionOf(sub_type) => {
             super::utils::verify_default_value(input_field, &sub_type)?;
 
-            let sub_type = sub_type.get_token_stream();
+            let sub_type_tokens = sub_type.get_token_stream();
 
             let default_value = input_field.get_default_value_opt_case()?;
 
@@ -51,7 +51,7 @@ fn generate_reading(
 
             let line = quote::quote! {
                 let #let_field_name = if let Some(value) = #data_src.get_optional(#input_field_name){
-                    let value: #sub_type = value.try_into()?;
+                    let value: #sub_type_tokens = value.try_into()?;
                     Some(value)
                 }else{
                     #default_value
