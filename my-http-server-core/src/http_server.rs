@@ -183,16 +183,14 @@ pub async fn start_http_1(
             .serve_connection(
                 io,
                 service_fn(move |req| {
-                    if app_states.is_shutting_down() {
-                        panic!("Application is shutting down");
-                    }
-
                     let resp = handle_requests(
                         req,
                         http_server_middlewares.clone(),
                         socket_addr.clone(),
                         logger.clone(),
+                        app_states.is_shutting_down(),
                     );
+
                     resp
                 }),
             )
@@ -252,15 +250,12 @@ pub async fn start_http_2(
         let connection = builder.serve_connection(
             io,
             service_fn(move |req| {
-                if app_states.is_shutting_down() {
-                    panic!("Application is shutting down");
-                }
-
                 let resp = handle_requests(
                     req,
                     http_server_middlewares.clone(),
                     socket_addr.clone(),
                     logger.clone(),
+                    app_states.is_shutting_down(),
                 );
                 resp
             }),
@@ -282,7 +277,12 @@ pub async fn handle_requests(
     http_server_middlewares: Arc<HttpServerMiddlewares>,
     addr: SocketAddr,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
+    app_is_shutting_down: bool,
 ) -> hyper::Result<my_hyper_utils::MyHttpResponse> {
+    if app_is_shutting_down {
+        return compile_app_is_shutting_down_http_response();
+    }
+
     let req = HttpRequest::new(req, addr);
 
     let method = req.method.clone();
@@ -524,4 +524,10 @@ fn get_error_text(err: &HttpFailResult) -> &str {
 pub struct MiddleWareFlowResult {
     pub http_context: HttpContext,
     pub http_result: Result<HttpOkResult, HttpFailResult>,
+}
+
+fn compile_app_is_shutting_down_http_response() -> hyper::Result<my_hyper_utils::MyHttpResponse> {
+    let builder = hyper::Response::builder().status(502);
+    let content = "Application is shutting down";
+    hyper::Result::Ok((builder, content.as_bytes().to_vec()).to_my_http_response())
 }
