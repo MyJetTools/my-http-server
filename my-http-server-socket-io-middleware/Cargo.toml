@@ -17,9 +17,9 @@ rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-ext
     "with-tokio",
 ] }
 my-json = { tag = "0.3.1", git = "https://github.com/MyJetTools/my-json.git" }
-tokio = { version = "*", features = ["full"] }
+tokio = { version = "*" }
 async-trait = "*"
-hyper = { version = "*", features = ["full"] }
+hyper = { version = "*" }
 hyper-tungstenite = "*"
 futures = "*"
 uuid = { version = "*", features = ["serde", "v4"] }

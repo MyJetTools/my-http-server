@@ -8,9 +8,9 @@ edition = "2018"
 [dependencies]
 rust-extensions = { tag = "1.0.4", git = "https://github.com/MyJetTools/rust-extensions.git" }
 
-tokio = { version = "*", features = ["full"] }
+tokio = { version = "*" }
 lazy_static = "*"
-hyper = { version = "*", features = ["full"] }
+hyper = { version = "*" }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 async-trait = "*"

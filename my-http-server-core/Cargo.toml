@@ -21,10 +21,10 @@ my-telemetry = { tag = "1.2.2", git = "https://github.com/MyJetTools/my-telemetr
 
 url-utils = { tag = "0.1.3", git = "https://github.com/MyJetTools/url-utils.git" }
 
-tokio = { version = "*", features = ["full"] }
+tokio = { version = "*" }
 
 lazy_static = "*"
-hyper = { version = "*", features = ["full"] }
+hyper = { version = "*", features = ["http1", "http2", "server"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 serde_yaml = "*"
