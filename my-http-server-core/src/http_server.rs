@@ -153,7 +153,9 @@ pub async fn start_http_1(
     let listener = tokio::net::TcpListener::bind(addr).await;
 
     if let Err(err) = &listener {
-        panic!("Error starting http server at {}. Err: {:?}", addr, err);
+        let err = format!("Can not start http server at {}. Err: {:?}", addr, err);
+        eprintln!("{}", err);
+        panic!("{}", err);
     }
 
     let listener = listener.unwrap();
