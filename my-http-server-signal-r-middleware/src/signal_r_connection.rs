@@ -1,8 +1,6 @@
-use std::{
-    net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::sync::{atomic::AtomicBool, Arc};
 
+use my_http_server_core::SocketAddress;
 use my_http_server_web_sockets::MyWebSocket;
 use rust_extensions::{
     date_time::{AtomicDateTimeAsMicroseconds, DateTimeAsMicroseconds},
@@ -215,10 +213,10 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRConnection<TCtx> {
     pub fn is_connected(&self) -> bool {
         self.connected.load(std::sync::atomic::Ordering::Relaxed)
     }
-    pub async fn get_addr(&self) -> Option<SocketAddr> {
+    pub async fn get_addr(&self) -> Option<SocketAddress> {
         let read_access = self.single_threaded.lock().await;
         if let Some(web_socket) = &read_access.web_socket {
-            return Some(web_socket.addr);
+            return Some(web_socket.addr.clone());
         }
         None
     }

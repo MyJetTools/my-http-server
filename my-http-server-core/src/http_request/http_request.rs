@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
     http_headers_to_use::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader,
@@ -8,9 +8,31 @@ use crate::{
 use hyper::{Method, Uri};
 use url_utils::url_decoder::UrlDecodeError;
 
+#[derive(Debug, Clone)]
+pub enum SocketAddress {
+    Tcp(SocketAddr),
+    Unix(Arc<String>),
+}
+
+impl SocketAddress {
+    pub fn to_string(&self) -> String {
+        match self {
+            SocketAddress::Tcp(socket_addr) => socket_addr.to_string(),
+            SocketAddress::Unix(addr) => addr.to_string(),
+        }
+    }
+
+    pub fn ip_as_string(&self) -> String {
+        match self {
+            SocketAddress::Tcp(socket_addr) => socket_addr.ip().to_string(),
+            SocketAddress::Unix(addr) => addr.to_string(),
+        }
+    }
+}
+
 pub struct HttpRequest {
     pub data: RequestData,
-    pub addr: SocketAddr,
+    pub addr: SocketAddress,
     pub content_type_header: Option<String>,
     key_values: Option<HashMap<String, Vec<u8>>>,
     pub method: Method,
@@ -18,7 +40,7 @@ pub struct HttpRequest {
 }
 
 impl HttpRequest {
-    pub fn new(req: hyper::Request<hyper::body::Incoming>, addr: SocketAddr) -> Self {
+    pub fn new(req: hyper::Request<hyper::body::Incoming>, addr: SocketAddress) -> Self {
         let method = req.method().clone();
 
         let http_path = HttpPath::from_str(req.uri().path());
@@ -86,7 +108,7 @@ impl HttpRequest {
             }
         }
 
-        return RequestIp::create_as_single_ip(self.addr.ip().to_string());
+        return RequestIp::create_as_single_ip(self.addr.ip_as_string());
     }
 
     pub fn get_host(&self) -> &str {

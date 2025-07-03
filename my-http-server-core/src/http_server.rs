@@ -13,10 +13,10 @@ use tokio::sync::Mutex;
 
 use std::sync::Arc;
 
-use crate::HttpOkResult;
 use crate::{
     HttpContext, HttpFailResult, HttpRequest, HttpServerMiddleware, HttpServerMiddlewares,
 };
+use crate::{HttpOkResult, SocketAddress};
 
 use crate::http_server_middleware::*;
 use my_hyper_utils::*;
@@ -34,8 +34,14 @@ impl HttpConnectionsCounter {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ListenAddr {
+    Tcp(SocketAddr),
+    Unix(Arc<String>),
+}
+
 pub struct MyHttpServer {
-    pub addr: SocketAddr,
+    pub addr: ListenAddr,
     middlewares: Option<Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
     tech_middlewares: Option<Vec<Arc<dyn HttpServerTechMiddleware + Send + Sync + 'static>>>,
     connections: Arc<AtomicI64>,
@@ -44,7 +50,17 @@ pub struct MyHttpServer {
 impl MyHttpServer {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
-            addr,
+            addr: ListenAddr::Tcp(addr),
+            middlewares: Some(Vec::new()),
+            tech_middlewares: Some(Vec::new()),
+            connections: Arc::new(AtomicI64::new(0)),
+        }
+    }
+
+    #[cfg(unix)]
+    pub fn new_as_unix_socket(unix_socket_addr: String) -> Self {
+        Self {
+            addr: ListenAddr::Unix(Arc::new(unix_socket_addr)),
             middlewares: Some(Vec::new()),
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
@@ -100,13 +116,28 @@ impl MyHttpServer {
         };
 
         let connections = self.connections.clone();
-        tokio::spawn(start_http_1(
-            self.addr.clone(),
-            Arc::new(http_server_middlewares),
-            app_states,
-            logger,
-            connections,
-        ));
+        match &self.addr {
+            ListenAddr::Tcp(socket_addr) => {
+                let socket_addr = socket_addr.clone();
+                tokio::spawn(start_http_1(
+                    socket_addr,
+                    Arc::new(http_server_middlewares),
+                    app_states,
+                    logger,
+                    connections,
+                ));
+            }
+            ListenAddr::Unix(unix_socket_addr) => {
+                let unix_socket_addr = unix_socket_addr.clone();
+                tokio::spawn(start_http_1_unix_socket(
+                    unix_socket_addr,
+                    Arc::new(http_server_middlewares),
+                    app_states,
+                    logger,
+                    connections,
+                ));
+            }
+        }
     }
 
     pub fn start_h2(
@@ -133,13 +164,22 @@ impl MyHttpServer {
         };
 
         let connections = self.connections.clone();
-        tokio::spawn(start_http_2(
-            self.addr.clone(),
-            Arc::new(http_server_middlewares),
-            app_states,
-            logger,
-            connections,
-        ));
+
+        match &self.addr {
+            ListenAddr::Tcp(socket_addr) => {
+                let socket_addr = socket_addr.clone();
+                tokio::spawn(start_http_2(
+                    socket_addr,
+                    Arc::new(http_server_middlewares),
+                    app_states,
+                    logger,
+                    connections,
+                ));
+            }
+            ListenAddr::Unix(_) => {
+                panic!("Unix socket does not support Http2 yet");
+            }
+        }
     }
 }
 
@@ -179,6 +219,87 @@ pub async fn start_http_1(
         let http_server_middlewares = http_server_middlewares.clone();
         let logger = logger.clone();
         let socket_addr = socket_addr.clone();
+        let app_states = app_states.clone();
+
+        let connection = http1
+            .serve_connection(
+                io,
+                service_fn(move |req| {
+                    let resp = handle_requests(
+                        req,
+                        http_server_middlewares.clone(),
+                        SocketAddress::Tcp(socket_addr.clone()),
+                        logger.clone(),
+                        app_states.is_shutting_down(),
+                    );
+
+                    resp
+                }),
+            )
+            .with_upgrades();
+
+        let connections_clone = connections.clone();
+        tokio::task::spawn(async move {
+            if let Err(err) = connection.await {
+                println!("Error serving connection: {:?}", err);
+            }
+
+            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        });
+    }
+}
+
+#[cfg(not(unix))]
+pub async fn start_http_1_unix_socket(
+    unix_socket: Arc<String>,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
+    app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
+    connections: Arc<AtomicI64>,
+) {
+    panic!("Unix socket is not supported by OS");
+}
+
+#[cfg(unix)]
+pub async fn start_http_1_unix_socket(
+    unix_socket: Arc<String>,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
+    app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
+    connections: Arc<AtomicI64>,
+) {
+    let listener = tokio::net::UnixListener::bind(unix_socket.as_str());
+
+    if let Err(err) = &listener {
+        let err = format!(
+            "Can not start http server at {}. Err: {:?}",
+            unix_socket, err
+        );
+        eprintln!("{}", err);
+        panic!("{}", err);
+    }
+
+    let listener = listener.unwrap();
+
+    let mut http1 = http1::Builder::new();
+    http1.keep_alive(true);
+    loop {
+        if app_states.is_shutting_down() {
+            break;
+        }
+
+        let (stream, socket_addr) = listener.accept().await.unwrap();
+
+        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let io = TokioIo::new(stream);
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
+        let app_states = app_states.clone();
+
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger = logger.clone();
+        let socket_addr = SocketAddress::Unix(Arc::new(format!("{:?}", socket_addr)));
         let app_states = app_states.clone();
 
         let connection = http1
@@ -255,7 +376,7 @@ pub async fn start_http_2(
                 let resp = handle_requests(
                     req,
                     http_server_middlewares.clone(),
-                    socket_addr.clone(),
+                    SocketAddress::Tcp(socket_addr.clone()),
                     logger.clone(),
                     app_states.is_shutting_down(),
                 );
@@ -277,7 +398,7 @@ pub async fn start_http_2(
 pub async fn handle_requests(
     req: hyper::Request<hyper::body::Incoming>,
     http_server_middlewares: Arc<HttpServerMiddlewares>,
-    addr: SocketAddr,
+    addr: SocketAddress,
     logger: Arc<dyn Logger + Send + Sync + 'static>,
     app_is_shutting_down: bool,
 ) -> hyper::Result<my_hyper_utils::MyHttpResponse> {

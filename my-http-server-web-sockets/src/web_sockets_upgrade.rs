@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::{net::SocketAddr, time::Duration};
+use std::time::Duration;
 
 use futures::StreamExt;
 use futures_util::stream::SplitStream;
@@ -13,11 +13,11 @@ use crate::{MyWebSocket, MyWebSocketCallback, MyWebSocketHttpRequest};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-use my_http_server_core::my_hyper_utils::*;
+use my_http_server_core::{my_hyper_utils::*, SocketAddress};
 
 pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
     id: i64,
-    addr: SocketAddr,
+    addr: SocketAddress,
     query_string: Option<String>,
     req: Request<hyper::body::Incoming>,
     callback: Arc<TMyWebSocketCallback>,

@@ -186,7 +186,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                                             format!("Executed Ok",),
                                             my_telemetry
                                                 .tags
-                                                .add_ip(my_web_socket.addr.ip().to_string())
+                                                .add_ip(my_web_socket.addr.ip_as_string())
                                                 .build(),
                                         )
                                         .await;
@@ -200,7 +200,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                                         target,
                                         format!("{:?}", err),
                                         TelemetryEventTagsBuilder::new()
-                                            .add_ip(my_web_socket.addr.ip().to_string())
+                                            .add_ip(my_web_socket.addr.ip_as_string())
                                             .build(),
                                     )
                                     .await;

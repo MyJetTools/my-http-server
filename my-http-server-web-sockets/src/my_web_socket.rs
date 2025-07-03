@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -10,7 +9,7 @@ use hyper_tungstenite::{
     tungstenite::{Error, Message},
     HyperWebsocketStream,
 };
-use my_http_server_core::UrlEncodedData;
+use my_http_server_core::{SocketAddress, UrlEncodedData};
 use rust_extensions::{date_time::DateTimeAsMicroseconds, Logger};
 use tokio::sync::Mutex;
 
@@ -18,7 +17,7 @@ use crate::MyWebSocketCallback;
 
 pub struct MyWebSocket {
     pub write_stream: Mutex<Option<SplitSink<HyperWebsocketStream, Message>>>,
-    pub addr: SocketAddr,
+    pub addr: SocketAddress,
     pub id: i64,
     callbacks: Arc<dyn MyWebSocketCallback + Send + Sync + 'static>,
     query_string: Option<String>,
@@ -30,7 +29,7 @@ pub struct MyWebSocket {
 impl MyWebSocket {
     pub fn new(
         id: i64,
-        addr: SocketAddr,
+        addr: SocketAddress,
         write_stream: SplitSink<HyperWebsocketStream, Message>,
         query_string: Option<String>,
         callbacks: Arc<dyn MyWebSocketCallback + Send + Sync + 'static>,
