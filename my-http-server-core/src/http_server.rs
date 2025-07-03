@@ -268,6 +268,7 @@ pub async fn start_http_1_unix_socket(
     logger: Arc<dyn Logger + Send + Sync + 'static>,
     connections: Arc<AtomicI64>,
 ) {
+    let _ = tokio::fs::remove_file(unix_socket.as_str()).await;
     let listener = tokio::net::UnixListener::bind(unix_socket.as_str());
 
     if let Err(err) = &listener {
