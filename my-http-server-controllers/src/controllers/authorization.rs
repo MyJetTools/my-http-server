@@ -1,5 +1,6 @@
 use super::RequiredClaims;
 
+#[derive(Debug, Clone)]
 pub enum ControllersAuthorization {
     BasicAuthentication {
         global: bool,
