@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use my_http_server_core::{HttpContext, HttpFailResult, HttpOkResult, HttpServerMiddleware};
 
+use crate::actions::OptionsAction;
+
 use super::{
     actions::{
         DeleteAction, GetAction, GetDescription, HandleHttpRequest, HttpAction, HttpActions,
@@ -20,6 +22,7 @@ pub struct ControllersMiddleware {
     pub post: HttpActions,
     pub put: HttpActions,
     pub delete: HttpActions,
+    pub options: HttpActions,
     pub http_objects: Vec<HttpObjectStructure>,
     pub authorization_map: AuthorizationMap,
     pub auth_error_factory: Option<Arc<dyn AuthErrorFactory + Send + Sync + 'static>>,
@@ -35,6 +38,7 @@ impl ControllersMiddleware {
             post: HttpActions::new(Method::POST),
             put: HttpActions::new(Method::PUT),
             delete: HttpActions::new(Method::DELETE),
+            options: HttpActions::new(Method::OPTIONS),
             http_objects: Vec::new(),
             authorization_map: AuthorizationMap::new(authorization),
             auth_error_factory,
@@ -100,32 +104,6 @@ impl ControllersMiddleware {
                 );
             }
         }
-
-        /*
-        if let Some(route_keys) = action.get_model_routes() {
-            if let Err(err) = http_route.check_route_keys(&route_keys) {
-                panic!("[POST]: {}", err)
-            }
-        }
-
-        let result = self.post.register(HttpAction {
-            handler: action.clone(),
-
-            should_be_authorized: if let Some(desc) = action.get_description() {
-                desc.input_params
-                    .check_parameters(&Method::POST, http_route.route.as_str());
-                desc.should_be_authorized
-            } else {
-                ShouldBeAuthorized::UseGlobal
-            },
-            http_route,
-            description: action,
-        });
-
-        if let Err(err) = result {
-            panic!("Failed to register POST action: {}", err);
-        }
-         */
     }
 
     pub fn register_put_action<
@@ -151,32 +129,6 @@ impl ControllersMiddleware {
                 );
             }
         }
-
-        /*
-        if let Some(route_keys) = action.get_model_routes() {
-            if let Err(err) = http_route.check_route_keys(&route_keys) {
-                panic!("[PUT]: {}", err)
-            }
-        }
-
-        let result = self.put.register(HttpAction {
-            handler: action.clone(),
-
-            should_be_authorized: if let Some(desc) = action.get_description() {
-                desc.input_params
-                    .check_parameters(&Method::PUT, http_route.route.as_str());
-                desc.should_be_authorized
-            } else {
-                ShouldBeAuthorized::UseGlobal
-            },
-            http_route,
-            description: action,
-        });
-
-        if let Err(err) = result {
-            panic!("Failed to register PUT action: {}", err);
-        }
-         */
     }
 
     pub fn register_delete_action<
@@ -202,32 +154,31 @@ impl ControllersMiddleware {
                 );
             }
         }
+    }
 
-        /*
-        if let Some(route_keys) = action.get_model_routes() {
-            if let Err(err) = http_route.check_route_keys(&route_keys) {
-                panic!("[DELETE]: {}", err)
+    pub fn register_options_action<
+        TOptionsAction: OptionsAction + HandleHttpRequest + GetDescription + Send + Sync + 'static,
+    >(
+        &mut self,
+        action: Arc<TOptionsAction>,
+    ) {
+        let route = action.get_route();
+
+        let model_routes = action.get_model_routes();
+
+        self.options
+            .register_action(action.clone(), route, model_routes.clone(), false);
+
+        if let Some(deprecated_rotes) = action.get_deprecated_routes() {
+            for deprecated_route in deprecated_rotes {
+                self.options.register_action(
+                    action.clone(),
+                    deprecated_route,
+                    model_routes.clone(),
+                    true,
+                );
             }
         }
-
-        let result = self.delete.register(HttpAction {
-            handler: action.clone(),
-
-            should_be_authorized: if let Some(desc) = action.get_description() {
-                desc.input_params
-                    .check_parameters(&Method::DELETE, http_route.route.as_str());
-                desc.should_be_authorized
-            } else {
-                ShouldBeAuthorized::UseGlobal
-            },
-            http_route,
-            description: action,
-        });
-
-        if let Err(err) = result {
-            panic!("Failed to register DELETE action: {}", err);
-        }
-         */
     }
 
     pub fn list_of_get_route_actions(&self) -> &Vec<HttpAction> {
@@ -244,6 +195,10 @@ impl ControllersMiddleware {
 
     pub fn list_of_delete_route_actions<'s>(&self) -> &Vec<HttpAction> {
         self.delete.get_actions()
+    }
+
+    pub fn list_of_options_route_actions<'s>(&self) -> &Vec<HttpAction> {
+        self.options.get_actions()
     }
 }
 

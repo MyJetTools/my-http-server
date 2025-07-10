@@ -15,7 +15,9 @@ pub enum ActionMethod{
     #[value("PUT")]
     Put,
     #[value("DELETE")]
-    Delete
+    Delete,
+    #[value("OPTIONS")]
+    Options
 }
 
 impl ActionMethod{
@@ -32,6 +34,9 @@ impl ActionMethod{
         }
         ActionMethod::Delete => {
             quote::quote!(my_http_server::controllers::actions::DeleteAction)
+        }
+        ActionMethod::Options => {
+            quote::quote!(my_http_server::controllers::actions::OptionsAction)
         }
     }
   }

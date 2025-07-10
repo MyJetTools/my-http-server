@@ -33,6 +33,12 @@ pub trait DeleteAction {
     fn get_model_routes(&self) -> Option<Vec<&'static str>>;
 }
 
+pub trait OptionsAction {
+    fn get_route(&self) -> &'static str;
+    fn get_deprecated_routes(&self) -> Option<Vec<&'static str>>;
+    fn get_model_routes(&self) -> Option<Vec<&'static str>>;
+}
+
 #[async_trait::async_trait]
 pub trait HandleHttpRequest {
     async fn handle_request(
