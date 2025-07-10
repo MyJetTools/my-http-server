@@ -229,6 +229,11 @@ impl HttpServerMiddleware for ControllersMiddleware {
                     .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
                     .await
             }
+            Method::OPTIONS => {
+                self.options
+                    .handle_request(ctx, &self.authorization_map, &self.auth_error_factory)
+                    .await
+            }
             _ => None,
         }
     }
