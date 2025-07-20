@@ -1,11 +1,11 @@
-use rust_extensions::{ShortString, StrOrString};
+use rust_extensions::MaybeShortString;
 
 use crate::HttpFailResult;
 
 pub enum BodyContentType {
     Json,
     UrlEncoded,
-    FormData(StrOrString<'static>),
+    FormData(MaybeShortString),
     Unknown,
     Empty,
 }
@@ -17,21 +17,14 @@ impl BodyContentType {
         }
 
         if let Some(content_type) = content_type {
-            let lower_case = StrOrString::create_as_short_string_or_string(content_type);
+            let lower_case = MaybeShortString::from_str(content_type);
             let lower_case = lower_case.as_str();
             if lower_case.contains("multipart/form-data") {
                 let boundary = extract_web_form_boundary(content_type);
 
                 match boundary {
                     Some(boundary_src) => {
-                        let boundary_short_string = ShortString::from_str(boundary_src);
-
-                        if boundary_short_string.is_none() {
-                            return Ok(Self::FormData(boundary_src.to_string().into()));
-                        }
-                        return Ok(Self::FormData(StrOrString::create_as_short_string(
-                            boundary_short_string.unwrap(),
-                        )));
+                        return Ok(Self::FormData(MaybeShortString::from_str(boundary_src)));
                     }
                     None => {
                         return Err(HttpFailResult::as_fatal_error(format!(

@@ -1,4 +1,4 @@
-use rust_extensions::{slice_of_u8_utils::SliceOfU8Ext, StrOrString};
+use rust_extensions::{slice_of_u8_utils::SliceOfU8Ext, MaybeShortString};
 
 use crate::{form_data_reader::ContentDispositionParser, HttpFailResult};
 
@@ -75,7 +75,7 @@ impl<'s> FormDataItem<'s> {
 
             let double_quote_pos = double_quote_pos.unwrap();
 
-            let header_name = StrOrString::from_str_convert_to_lower_case(
+            let header_name = MaybeShortString::from_str_as_lower_case(
                 std::str::from_utf8(&src[pos..double_quote_pos]).unwrap(),
             );
 
