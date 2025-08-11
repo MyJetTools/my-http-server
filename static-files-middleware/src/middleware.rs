@@ -4,6 +4,7 @@ use my_http_server_core::{
     HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath, HttpServerMiddleware,
     WebContentType,
 };
+use rust_extensions::StrOrString;
 
 use crate::FilesAccess;
 
@@ -70,8 +71,8 @@ impl StaticFilesMiddleware {
         }
     }
 
-    pub fn add_header(mut self, name: String, value: String) -> Self {
-        self.headers.insert(name, value);
+    pub fn add_header(mut self, name: StrOrString<'static>, value: StrOrString<'static>) -> Self {
+        self.headers.insert(name.to_string(), value.to_string());
         self
     }
 
