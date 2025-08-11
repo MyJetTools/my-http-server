@@ -71,8 +71,8 @@ impl StaticFilesMiddleware {
         }
     }
 
-    pub fn add_header(mut self, name: StrOrString<'static>, value: StrOrString<'static>) -> Self {
-        self.headers.insert(name.to_string(), value.to_string());
+    pub fn add_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.insert(name.into(), value.into());
         self
     }
 
