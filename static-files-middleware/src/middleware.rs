@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use my_http_server_core::{
-    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath, HttpServerMiddleware,
-    WebContentType,
+    AddHttpHeaders, HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath,
+    HttpServerMiddleware, WebContentType,
 };
 
 use crate::FilesAccess;
@@ -199,6 +199,12 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         }
 
         None
+    }
+}
+
+impl AddHttpHeaders for StaticFilesMiddleware {
+    fn add_header(&mut self, header_name: impl Into<String>, header_value: impl Into<String>) {
+        self.headers.insert(header_name.into(), header_value.into());
     }
 }
 

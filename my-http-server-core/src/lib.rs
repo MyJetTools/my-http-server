@@ -44,7 +44,6 @@ mod encoded_value;
 
 pub use encoded_value::*;
 
-mod http_headers_to_use;
 mod http_request;
 pub use http_request::*;
 pub mod convert_from_str;

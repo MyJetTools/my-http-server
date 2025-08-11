@@ -1,8 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
-    http_headers_to_use::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader,
-    HttpRequestBody, HttpRequestHeaders, RequestData, RequestIp, UrlEncodedData,
+    http_headers::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader, HttpRequestBody,
+    HttpRequestHeaders, RequestData, RequestIp, UrlEncodedData,
 };
 
 use hyper::{Method, Uri};

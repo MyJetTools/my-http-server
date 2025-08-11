@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rust_extensions::StrOrString;
 
-use crate::{cookies::*, HttpFailResult, HttpOutput, WebContentType};
+use crate::{cookies::*, AddHttpHeaders, HttpFailResult, HttpOutput, WebContentType};
 
 use super::HttpOkResult;
 
@@ -127,5 +127,17 @@ impl HttpResultBuilder {
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
         .into()
+    }
+}
+
+impl AddHttpHeaders for HttpResultBuilder {
+    fn add_header(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        if self.headers.is_none() {
+            self.headers = Some(HashMap::new());
+        }
+        self.headers
+            .as_mut()
+            .unwrap()
+            .insert(key.into(), value.into());
     }
 }
