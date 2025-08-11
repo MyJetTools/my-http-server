@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use my_http_server_core::{
     HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath, HttpServerMiddleware,
     WebContentType,
@@ -28,6 +30,7 @@ pub struct StaticFilesMiddleware {
     pub index_files: Option<Vec<String>>,
     pub not_found_file: Option<String>,
     pub files_access: FilesAccess,
+    pub headers: HashMap<String, String>,
 }
 
 impl StaticFilesMiddleware {
@@ -63,7 +66,13 @@ impl StaticFilesMiddleware {
             index_files,
             not_found_file: None,
             files_access: FilesAccess::new(),
+            headers: HashMap::new(),
         }
+    }
+
+    pub fn add_header(mut self, name: String, value: String) -> Self {
+        self.headers.insert(name, value);
+        self
     }
 
     pub fn enable_files_caching(mut self) -> Self {
@@ -80,6 +89,14 @@ impl StaticFilesMiddleware {
         self
     }
 
+    fn get_headers(&self) -> Option<HashMap<String, String>> {
+        if self.headers.is_empty() {
+            None
+        } else {
+            Some(self.headers.clone())
+        }
+    }
+
     async fn handle_folder(
         &self,
         file_folder: &str,
@@ -92,7 +109,7 @@ impl StaticFilesMiddleware {
 
                     if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
                         let output = HttpOutput::Content {
-                            headers: None,
+                            headers: self.get_headers(),
                             content_type: WebContentType::detect_by_extension(path),
                             content: file_content,
                             set_cookies: None,
@@ -109,7 +126,7 @@ impl StaticFilesMiddleware {
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
                 let output = HttpOutput::Content {
-                    headers: None,
+                    headers: self.get_headers(),
                     content_type: WebContentType::detect_by_extension(path),
                     content: file_content,
                     set_cookies: None,
@@ -133,7 +150,7 @@ impl StaticFilesMiddleware {
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
                 let output = HttpOutput::Content {
-                    headers: None,
+                    headers: self.get_headers(),
                     content_type: WebContentType::detect_by_extension(not_found_file),
                     content: file_content,
                     set_cookies: None,
