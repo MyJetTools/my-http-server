@@ -141,7 +141,7 @@ mod tests {
             "test"
         }
 
-        fn get_claims(&self) -> Option<Vec<RequestClaim>> {
+        fn get_claims<'s>(&'s self) -> Option<Vec<RequestClaim<'s>>> {
             let value = self.value.as_ref()?;
             let mut result = Vec::with_capacity(value.len());
 
