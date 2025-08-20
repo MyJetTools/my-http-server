@@ -233,6 +233,100 @@ impl HttpOutput {
             .into(),
         }
     }
+
+    pub fn as_not_found(text: impl Into<String>) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 404,
+            headers: Default::default(),
+            content_type: WebContentType::Text.into(),
+            cookies: Default::default(),
+            content: text.into().into_bytes(),
+        }
+    }
+
+    pub fn as_unauthorized(text: Option<&str>) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 401,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            cookies: None,
+            content: if let Some(text) = text {
+                format!("Unauthorized request: {}", text).into_bytes()
+            } else {
+                format!("Unauthorized request").into_bytes()
+            },
+        }
+    }
+
+    pub fn as_validation_error(text: impl Into<StrOrString<'static>>) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 400,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            cookies: None,
+            content: format!("Validation error: {}", text.into().as_str()).into_bytes(),
+        }
+    }
+
+    pub fn as_forbidden(text: Option<impl Into<String>>) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 403,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            cookies: None,
+            content: if let Some(text) = text {
+                text.into().into_bytes()
+            } else {
+                format!("Forbidden").into_bytes()
+            },
+        }
+    }
+
+    pub fn invalid_value_to_parse(reason: impl Into<String>) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 400,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            cookies: None,
+            content: reason.into().into_bytes(),
+        }
+    }
+
+    pub fn required_parameter_is_missing(
+        param_name: &str,
+        where_is_parameter: &str,
+    ) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 400,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            cookies: None,
+            content: format!(
+                "Required parameter [{param_name}] is missing in {where_is_parameter}"
+            )
+            .into_bytes(),
+        }
+    }
+
+    pub fn as_fatal_error(text: impl Into<String>) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 500,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            cookies: None,
+            content: text.into().into_bytes(),
+        }
+    }
+
+    pub fn as_not_supported_content_type(text: impl Into<String>) -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 415,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            cookies: None,
+            content: text.into().into_bytes(),
+        }
+    }
 }
 
 impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {

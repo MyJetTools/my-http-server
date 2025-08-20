@@ -151,7 +151,7 @@ impl HttpResultBuilder {
         }
     }
 
-    pub fn into_fail_result(
+    pub fn into_err(
         self,
         write_log: bool,
         write_telemetry: bool,
@@ -159,6 +159,11 @@ impl HttpResultBuilder {
         let output = self.build();
 
         Err(HttpFailResult::new(output, write_log, write_telemetry))
+    }
+
+    pub fn into_http_fail_result(self, write_log: bool, write_telemetry: bool) -> HttpFailResult {
+        let output = self.build();
+        HttpFailResult::new(output, write_log, write_telemetry)
     }
 }
 

@@ -47,7 +47,7 @@ pub async fn handle_web_socket_upgrade<
             return HttpOutput::from_builder()
                 .set_status_code(400)
                 .set_content_as_text(content)
-                .into_fail_result(false, false);
+                .into_err(false, false);
         }
     }
 }

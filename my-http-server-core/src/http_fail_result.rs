@@ -61,110 +61,36 @@ impl HttpFailResult {
     }
 
     pub fn as_not_found(text: impl Into<String>, write_telemetry: bool) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 404,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: text.into().into_bytes(),
-        };
-
-        Self::new(output, false, write_telemetry)
+        HttpOutput::as_not_found(text).into_http_fail_result(false, write_telemetry)
     }
 
     pub fn as_unauthorized(text: Option<&str>) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 401,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: if let Some(text) = text {
-                format!("Unauthorized request: {}", text).into_bytes()
-            } else {
-                format!("Unauthorized request").into_bytes()
-            },
-        };
-
-        Self::new(output, false, false)
+        HttpOutput::as_unauthorized(text).into_http_fail_result(false, false)
     }
 
     pub fn as_validation_error(text: impl Into<StrOrString<'static>>) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 400,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: format!("Validation error: {}", text.into().as_str()).into_bytes(),
-        };
-
-        Self::new(output, false, true)
+        HttpOutput::as_validation_error(text).into_http_fail_result(false, true)
     }
 
     pub fn as_forbidden(text: Option<impl Into<String>>) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 403,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: if let Some(text) = text {
-                text.into().into_bytes()
-            } else {
-                format!("Forbidden").into_bytes()
-            },
-        };
-
-        Self::new(output, false, true)
+        HttpOutput::as_forbidden(text).into_http_fail_result(false, true)
     }
 
     pub fn invalid_value_to_parse(reason: impl Into<String>) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 400,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: reason.into().into_bytes(),
-        };
-
-        Self::new(output, true, true)
+        HttpOutput::invalid_value_to_parse(reason).into_http_fail_result(true, true)
     }
 
     pub fn required_parameter_is_missing(param_name: &str, where_is_parameter: &str) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 400,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: format!(
-                "Required parameter [{param_name}] is missing in {where_is_parameter}"
-            )
-            .into_bytes(),
-        };
-
-        Self::new(output, false, true)
+        HttpOutput::required_parameter_is_missing(param_name, where_is_parameter)
+            .into_http_fail_result(false, true)
     }
 
     pub fn as_fatal_error(text: impl Into<String>) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 500,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: text.into().into_bytes(),
-        };
-
-        Self::new(output, true, true)
+        HttpOutput::as_fatal_error(text).into_http_fail_result(true, true)
     }
 
     pub fn as_not_supported_content_type(text: impl Into<String>) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 415,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: text.into().into_bytes(),
-        };
-
-        Self::new(output, true, true)
+        HttpOutput::as_not_supported_content_type(text).into_http_fail_result(true, true)
     }
 }
 
