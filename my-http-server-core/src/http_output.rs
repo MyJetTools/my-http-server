@@ -107,18 +107,16 @@ impl HttpOutput {
         }
     }
 
-    pub fn into_fail_result(
+    pub fn into_err(
         self,
+        write_log: bool,
         write_telemetry: bool,
-        write_logs: bool,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        Err(HttpFailResult {
-            write_telemetry,
-            write_to_log: write_logs,
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-            output: self,
-        })
+        Err(self.into_http_fail_result(write_log, write_telemetry))
+    }
+
+    pub fn into_http_fail_result(self, write_log: bool, write_telemetry: bool) -> HttpFailResult {
+        HttpFailResult::new(self, write_log, write_telemetry)
     }
 
     pub fn as_text<'s>(text: impl Into<StrOrString<'s>>) -> HttpResultBuilder {
