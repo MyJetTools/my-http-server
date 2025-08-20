@@ -1,5 +1,6 @@
 use rust_extensions::{date_time::DateTimeAsMicroseconds, StrOrString};
 
+#[derive(Debug)]
 pub struct Cookie {
     pub name: String,
     pub value: String,

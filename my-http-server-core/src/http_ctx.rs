@@ -1,5 +1,7 @@
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::MyTelemetryContext;
+#[cfg(feature = "with-telemetry")]
+use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use crate::{HttpRequest, RequestCredentials};
 
@@ -17,7 +19,9 @@ impl HttpContext {
             request,
             credentials: None,
             #[cfg(feature = "with-telemetry")]
-            telemetry_context: MyTelemetryContext::new(),
+            telemetry_context: MyTelemetryContext::Single(
+                DateTimeAsMicroseconds::now().unix_microseconds,
+            ),
             process_name: None,
         }
     }

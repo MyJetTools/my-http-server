@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     data_src::*, form_data_reader::FormDataReader, BodyContentType, BodyDataReader, HttpFailResult,
-    JsonEncodedData, UrlEncodedData, WebContentType,
+    HttpOutput, JsonEncodedData, UrlEncodedData, WebContentType,
 };
 
 pub struct HttpRequestBody {
@@ -52,7 +52,7 @@ impl HttpRequestBody {
         }
     }
 
-    pub fn get_body_data_reader(&self) -> Result<BodyDataReader, HttpFailResult> {
+    pub fn get_body_data_reader<'s>(&'s self) -> Result<BodyDataReader<'s>, HttpFailResult> {
         match &self.body_content_type {
             BodyContentType::Json => get_body_data_reader_as_json_encoded(self.raw_body.as_slice()),
             BodyContentType::UrlEncoded => {
@@ -71,24 +71,21 @@ impl HttpRequestBody {
     }
 }
 
-fn get_body_data_reader_as_url_encoded(
-    body_as_str: &str,
-) -> Result<BodyDataReader, HttpFailResult> {
+fn get_body_data_reader_as_url_encoded<'s>(
+    body_as_str: &'s str,
+) -> Result<BodyDataReader<'s>, HttpFailResult> {
     match UrlEncodedData::from_body(body_as_str) {
         Ok(result) => return Ok(BodyDataReader::crate_as_url_encoded_data(result)),
         Err(err) => {
-            let result = HttpFailResult {
-                write_telemetry: true,
-                content: format!("Can not parse Url Encoded Data. {:?}", err).into_bytes(),
-                content_type: WebContentType::Text,
+            let output = HttpOutput::Content {
                 status_code: 412,
-                write_to_log: true,
                 headers: Default::default(),
-                #[cfg(feature = "with-telemetry")]
-                add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
+                content_type: WebContentType::Text.into(),
+                set_cookies: Default::default(),
+                content: format!("Can not parse Url Encoded Data. {:?}", err).into_bytes(),
             };
 
-            return Err(result);
+            return Err(HttpFailResult::new(output, true, true));
         }
     }
 }
@@ -109,22 +106,21 @@ impl<T: DeserializeOwned> TryInto<HashMap<String, T>> for HttpRequestBody {
     }
 }
 
-fn get_body_data_reader_as_json_encoded(body: &[u8]) -> Result<BodyDataReader, HttpFailResult> {
+fn get_body_data_reader_as_json_encoded<'s>(
+    body: &'s [u8],
+) -> Result<BodyDataReader<'s>, HttpFailResult> {
     match JsonEncodedData::new(body) {
         Ok(result) => Ok(BodyDataReader::create_as_json_encoded_data(result)),
         Err(err) => {
-            let result = HttpFailResult {
-                write_telemetry: true,
-                content: format!("Can not parse Json Encoded Data. {:?}", err).into_bytes(),
-                content_type: WebContentType::Text,
+            let output = HttpOutput::Content {
                 status_code: 412,
-                write_to_log: true,
                 headers: Default::default(),
-                #[cfg(feature = "with-telemetry")]
-                add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
+                content_type: WebContentType::Text.into(),
+                set_cookies: Default::default(),
+                content: format!("Can not parse Json Encoded Data. {:?}", err).into_bytes(),
             };
 
-            return Err(result);
+            return Err(HttpFailResult::new(output, true, true));
         }
     }
 }

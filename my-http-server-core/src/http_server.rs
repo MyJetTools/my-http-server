@@ -7,6 +7,7 @@ use my_telemetry::TelemetryEventTagsBuilder;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 
 use rust_extensions::{ApplicationStates, Logger};
+
 use std::sync::atomic::AtomicI64;
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::sync::Mutex;
@@ -481,7 +482,7 @@ pub async fn handle_requests(
                             &request_data_cloned,
                             &ResponseData {
                                 status_code: PANIC_HTTP_CODE.as_u16(),
-                                content_type: "text/plain".to_string(),
+                                content_type: Some("text/plain".into()),
                                 content_length: 0,
                                 has_error: true,
                             },
@@ -567,7 +568,7 @@ pub async fn handle_requests(
                 }
             }
 
-            Ok(ok_result.into())
+            Ok(ok_result.output.into())
         }
         Err(err_result) => {
             #[cfg(feature = "with-telemetry")]
@@ -586,7 +587,10 @@ pub async fn handle_requests(
                             .to_string(),
                     );
                     ctx.insert("ip".to_string(), request_data.ip.to_string());
-                    ctx.insert("httpCode".to_string(), err_result.status_code.to_string());
+                    ctx.insert(
+                        "httpCode".to_string(),
+                        err_result.output.get_status_code().to_string(),
+                    );
 
                     if let Some(credentials) = &flow_execution_result.http_context.credentials {
                         ctx.insert("client_id".to_string(), credentials.get_id().to_string());
@@ -596,7 +600,7 @@ pub async fn handle_requests(
                         "HttpRequest".to_string(),
                         format!(
                             "Http request finished with error: {}",
-                            get_error_text(&err_result)
+                            err_result.output.get_text_as_error()
                         ),
                         Some(ctx),
                     );
@@ -626,25 +630,18 @@ pub async fn handle_requests(
                             &ctx,
                             request_data.started,
                             telemetry_data,
-                            format!("Status code: {}", err_result.status_code),
+                            format!("Status code: {}", err_result.output.get_status_code()),
                             tags.into(),
                         )
                         .await;
                 }
             }
 
-            Ok(err_result.into())
+            Ok(err_result.output.into())
         }
     }
 }
 
-fn get_error_text(err: &HttpFailResult) -> &str {
-    if err.content.len() > 256 {
-        std::str::from_utf8(&err.content[..256]).unwrap()
-    } else {
-        std::str::from_utf8(&err.content).unwrap()
-    }
-}
 pub struct MiddleWareFlowResult {
     pub http_context: HttpContext,
     pub http_result: Result<HttpOkResult, HttpFailResult>,

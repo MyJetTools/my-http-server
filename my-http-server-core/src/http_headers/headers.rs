@@ -5,7 +5,7 @@ use hyper::HeaderMap;
 use crate::{data_src::SRC_HEADER, ContentEncoding, HeaderValue, HttpFailResult};
 
 pub trait HttpRequestHeaders {
-    fn try_get_case_sensitive(&self, header_name: &'static str) -> Option<HeaderValue>;
+    fn try_get_case_sensitive<'s>(&'s self, header_name: &'static str) -> Option<HeaderValue<'s>>;
     fn try_get_case_sensitive_as_str(
         &self,
         header_name: &str,
@@ -14,12 +14,13 @@ pub trait HttpRequestHeaders {
         &self,
         header_name: &str,
     ) -> Result<Option<&str>, HttpFailResult>;
-    fn try_get_case_insensitive(&self, header_name: &'static str) -> Option<HeaderValue>;
+    fn try_get_case_insensitive<'s>(&'s self, header_name: &'static str)
+        -> Option<HeaderValue<'s>>;
 
-    fn get_required_case_sensitive(
-        &self,
+    fn get_required_case_sensitive<'s>(
+        &'s self,
         header_name: &'static str,
-    ) -> Result<HeaderValue, HttpFailResult> {
+    ) -> Result<HeaderValue<'s>, HttpFailResult> {
         match self.try_get_case_sensitive(header_name) {
             Some(value) => Ok(value),
             None => Err(HttpFailResult::required_parameter_is_missing(
@@ -29,10 +30,10 @@ pub trait HttpRequestHeaders {
         }
     }
 
-    fn get_required_case_insensitive(
-        &self,
+    fn get_required_case_insensitive<'s>(
+        &'s self,
         header_name: &'static str,
-    ) -> Result<HeaderValue, HttpFailResult> {
+    ) -> Result<HeaderValue<'s>, HttpFailResult> {
         match self.try_get_case_insensitive(header_name) {
             Some(value) => Ok(value),
             None => Err(HttpFailResult::required_parameter_is_missing(
@@ -54,7 +55,7 @@ pub trait HttpRequestHeaders {
 }
 
 impl HttpRequestHeaders for HeaderMap {
-    fn try_get_case_sensitive(&self, header_name: &'static str) -> Option<HeaderValue> {
+    fn try_get_case_sensitive<'s>(&'s self, header_name: &'static str) -> Option<HeaderValue<'s>> {
         let result = self.get(header_name)?;
 
         Some(HeaderValue::from_header_value(header_name, result))
@@ -94,7 +95,10 @@ impl HttpRequestHeaders for HeaderMap {
         Ok(Some(value))
     }
 
-    fn try_get_case_insensitive(&self, header_name: &'static str) -> Option<HeaderValue> {
+    fn try_get_case_insensitive<'s>(
+        &'s self,
+        header_name: &'static str,
+    ) -> Option<HeaderValue<'s>> {
         for (key, value) in self {
             if rust_extensions::str_utils::compare_strings_case_insensitive(
                 key.as_str(),

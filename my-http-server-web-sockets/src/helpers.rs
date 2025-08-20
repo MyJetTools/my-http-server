@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use my_http_server_core::HttpRequest;
-use my_http_server_core::{HttpFailResult, HttpOkResult, HttpOutput, WebContentType};
+use my_http_server_core::{HttpFailResult, HttpOkResult, HttpOutput};
 use rust_extensions::Logger;
 
 use crate::MyWebSocketCallback;
@@ -43,13 +43,11 @@ pub async fn handle_web_socket_upgrade<
         Err(err) => {
             let content = format!("Can not upgrade websocket. Reason: {}", err);
             println!("{}", content);
-            return Err(HttpFailResult::new(
-                WebContentType::Text,
-                400,
-                content.into_bytes(),
-                false,
-                false,
-            ));
+
+            return HttpOutput::from_builder()
+                .set_status_code(400)
+                .set_content_as_text(content)
+                .into_fail_result(false, false);
         }
     }
 }

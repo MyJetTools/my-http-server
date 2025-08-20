@@ -22,7 +22,7 @@ impl HttpField {
         self.data_type.is_binary()
     }
 
-    pub fn get_query_field_name(&self) -> StrOrString {
+    pub fn get_query_field_name<'s>(&'s self) -> StrOrString<'s> {
         match &self.data_type {
             HttpDataType::SimpleType(_) => StrOrString::create_as_str(self.name.as_str()),
             HttpDataType::Object(_) => StrOrString::create_as_str(self.name.as_str()),

@@ -13,7 +13,7 @@ pub enum HttpFieldAttribute<'s> {
 }
 
 impl<'s> HttpFieldAttribute<'s> {
-    pub fn get_default(&self) -> Option<HttpInputDefaultValue> {
+    pub fn get_default(&'s self) -> Option<HttpInputDefaultValue<'s>> {
         let default_attr = match self {
             Self::HttpHeader(http_header) => http_header.default.clone(),
             Self::HttpQuery(http_query) => http_query.default.clone(),

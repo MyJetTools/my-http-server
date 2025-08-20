@@ -89,11 +89,15 @@ impl StaticFilesMiddleware {
         self
     }
 
-    fn get_headers(&self) -> Option<HashMap<String, String>> {
+    fn get_headers<'s>(&'s self) -> Option<impl Iterator<Item = (&'s str, &'s str)>> {
         if self.headers.is_empty() {
             None
         } else {
-            Some(self.headers.clone())
+            Some(
+                self.headers
+                    .iter()
+                    .map(|itm| (itm.0.as_str(), itm.1.as_str())),
+            )
         }
     }
 
@@ -108,14 +112,13 @@ impl StaticFilesMiddleware {
                     let file_name = get_file_name(file_folder, index_file);
 
                     if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
-                        let output = HttpOutput::Content {
-                            headers: self.get_headers(),
-                            content_type: WebContentType::detect_by_extension(path),
-                            content: file_content,
-                            set_cookies: None,
-                        };
+                        let result = HttpOutput::from_builder()
+                            .add_headers_opt(self.get_headers())
+                            .set_content_type_opt(WebContentType::detect_by_extension(path))
+                            .set_content(file_content)
+                            .into_ok_result(false);
 
-                        return Some(output.into_ok_result(false));
+                        return Some(result);
                     }
                 }
             }
@@ -125,14 +128,13 @@ impl StaticFilesMiddleware {
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
-                let output = HttpOutput::Content {
-                    headers: self.get_headers(),
-                    content_type: WebContentType::detect_by_extension(path),
-                    content: file_content,
-                    set_cookies: None,
-                };
+                let result = HttpOutput::from_builder()
+                    .add_headers_opt(self.get_headers())
+                    .set_content_type_opt(WebContentType::detect_by_extension(path))
+                    .set_content(file_content)
+                    .into_ok_result(false);
 
-                return Some(output.into_ok_result(false));
+                return Some(result);
             }
             Err(_) => {
                 return self.handle_not_found(file_folder).await;
@@ -149,14 +151,13 @@ impl StaticFilesMiddleware {
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
-                let output = HttpOutput::Content {
-                    headers: self.get_headers(),
-                    content_type: WebContentType::detect_by_extension(not_found_file),
-                    content: file_content,
-                    set_cookies: None,
-                };
+                let result = HttpOutput::from_builder()
+                    .add_headers_opt(self.get_headers())
+                    .set_content_type_opt(WebContentType::detect_by_extension(not_found_file))
+                    .set_content(file_content)
+                    .into_ok_result(false);
 
-                return Some(output.into_ok_result(false));
+                return Some(result);
             }
             Err(_) => {
                 return None;

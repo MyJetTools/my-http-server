@@ -7,19 +7,21 @@ use crate::{cookies::*, AddHttpHeaders, HttpFailResult, HttpOutput, WebContentTy
 use super::HttpOkResult;
 
 pub struct HttpResultBuilder {
+    pub(crate) status_code: u16,
     pub(crate) headers: Option<HashMap<String, String>>,
     pub(crate) content_type: Option<WebContentType>,
     pub(crate) cookies: Option<CookieJar>,
-    pub(crate) body: Vec<u8>,
+    pub(crate) content: Vec<u8>,
 }
 
 impl HttpResultBuilder {
     pub fn new() -> Self {
         Self {
+            status_code: 200,
             headers: None,
             content_type: None,
             cookies: Default::default(),
-            body: Default::default(),
+            content: Default::default(),
         }
     }
 
@@ -28,10 +30,17 @@ impl HttpResultBuilder {
         self
     }
 
-    pub fn add_header(
+    pub fn set_content_type_opt(mut self, content_type: Option<WebContentType>) -> Self {
+        if let Some(content_type) = content_type {
+            self.content_type = Some(content_type);
+        }
+        self
+    }
+
+    pub fn add_header<'s>(
         mut self,
-        key: impl Into<StrOrString<'static>>,
-        value: impl Into<StrOrString<'static>>,
+        key: impl Into<StrOrString<'s>>,
+        value: impl Into<StrOrString<'s>>,
     ) -> Self {
         let key = key.into();
         let value = value.into();
@@ -63,6 +72,21 @@ impl HttpResultBuilder {
         self
     }
 
+    pub fn add_headers_opt<'s>(
+        mut self,
+        headers: Option<
+            impl Iterator<Item = (impl Into<StrOrString<'s>>, impl Into<StrOrString<'s>>)>,
+        >,
+    ) -> Self {
+        if let Some(headers) = headers {
+            for header in headers {
+                self = self.add_header(header.0, header.1);
+            }
+        }
+
+        self
+    }
+
     pub fn set_cookie(mut self, cookie: impl Into<Cookie>) -> Self {
         let cookie_jar = match self.cookies.take() {
             Some(cookie_jar) => cookie_jar,
@@ -89,45 +113,52 @@ impl HttpResultBuilder {
         self
     }
 
+    pub fn set_content_as_text(mut self, content: impl Into<String>) -> Self {
+        let content = content.into();
+        self.content = content.into_bytes();
+        self.content_type = Some(WebContentType::Text);
+
+        self
+    }
+
+    pub fn set_status_code(mut self, status_code: u16) -> Self {
+        self.status_code = status_code;
+        self
+    }
+
+    pub fn set_content(mut self, content: Vec<u8>) -> Self {
+        self.content = content;
+        self
+    }
+
     pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
+        let output = self.build();
         Ok(HttpOkResult {
             write_telemetry,
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-            output: HttpOutput::Content {
-                headers: self.headers,
-                content_type: self.content_type,
-                set_cookies: self.cookies,
-                content: self.body,
-            },
+            output,
         })
     }
 
-    pub fn build(self, content: Vec<u8>) -> HttpOutput {
+    pub fn build(self) -> HttpOutput {
         HttpOutput::Content {
+            status_code: self.status_code,
             headers: self.headers,
             content_type: self.content_type,
             set_cookies: self.cookies,
-            content,
+            content: self.content,
         }
     }
 
     pub fn into_fail_result(
         self,
-        status_code: u16,
+        write_log: bool,
         write_telemetry: bool,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        HttpFailResult {
-            content_type: self.content_type.unwrap_or(WebContentType::Text),
-            status_code,
-            content: self.body,
-            write_telemetry,
-            write_to_log: true,
-            headers: Default::default(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
-        .into()
+        let output = self.build();
+
+        Err(HttpFailResult::new(output, write_log, write_telemetry))
     }
 }
 

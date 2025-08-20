@@ -161,7 +161,7 @@ impl HttpActions {
                             return Some(Err(result.get_not_authenticated()));
                         } else {
                             return Some(Err(HttpFailResult::as_unauthorized(Some(
-                                "No session credentials are found".to_string(),
+                                "No session credentials are found",
                             ))));
                         }
                     }

@@ -20,26 +20,26 @@ pub struct HttpRequestData {
 
 pub struct ResponseData {
     pub status_code: u16,
-    pub content_type: String,
+    pub content_type: Option<String>,
     pub content_length: usize,
     pub has_error: bool,
 }
 
 impl ResponseData {
     pub fn from(result: &Result<HttpOkResult, HttpFailResult>) -> Self {
-        match result {
-            Ok(ok) => Self {
-                status_code: ok.output.get_status_code(),
-                content_type: ok.output.get_content_type().to_string(),
-                content_length: ok.output.get_content_size(),
-                has_error: false,
-            },
-            Err(fail) => Self {
-                status_code: 500,
-                content_type: fail.content_type.as_str().to_string(),
-                content_length: 0,
-                has_error: true,
-            },
+        let output = match result {
+            Ok(ok) => &ok.output,
+            Err(err) => &err.output,
+        };
+
+        Self {
+            status_code: output.get_status_code(),
+            content_type: output
+                .get_content_type_as_str()
+                .map(|itm| itm.to_string().into()),
+
+            content_length: output.get_content_size(),
+            has_error: false,
         }
     }
 }

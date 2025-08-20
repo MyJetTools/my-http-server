@@ -30,7 +30,10 @@ impl<'s> JsonEncodedData<'s> {
         Ok(result)
     }
 
-    pub fn get_required(&self, name: &str) -> Result<&JsonEncodedValueAsString, HttpFailResult> {
+    pub fn get_required(
+        &'s self,
+        name: &str,
+    ) -> Result<&'s JsonEncodedValueAsString<'s>, HttpFailResult> {
         let result = self.values.get(name);
 
         match result {
@@ -39,7 +42,7 @@ impl<'s> JsonEncodedData<'s> {
         }
     }
 
-    pub fn get_optional(&self, name: &str) -> Option<&JsonEncodedValueAsString> {
+    pub fn get_optional(&'s self, name: &str) -> Option<&'s JsonEncodedValueAsString<'s>> {
         self.values.get(name)
     }
 }

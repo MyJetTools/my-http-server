@@ -83,7 +83,7 @@ impl HttpPath {
         Some(std::str::from_utf8(result).unwrap())
     }
 
-    pub fn get_segment_value(&self, index: usize) -> Option<EncodedParamValue> {
+    pub fn get_segment_value<'s>(&'s self, index: usize) -> Option<EncodedParamValue<'s>> {
         let value = self.get_segment_value_as_str(index)?;
         Some(EncodedParamValue::UrlEncodedValue {
             value: UrlEncodedValue::new(index.to_string().into(), value),

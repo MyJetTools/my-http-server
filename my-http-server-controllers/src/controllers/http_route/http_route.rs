@@ -91,13 +91,11 @@ impl HttpRoute {
         key: &'static str,
     ) -> Result<PathValue<'s>, HttpFailResult> {
         if self.keys_amount == 0 {
-            return Err(HttpFailResult::new(
-                my_http_server_core::WebContentType::Text,
+            return Err((
                 400,
-                format!("Route {} does not contain any keys", self.route).into_bytes(),
-                false,
-                true,
-            ));
+                format!("Route {} does not contain any keys", self.route),
+            )
+                .into());
         }
 
         let mut index = 0;
@@ -119,13 +117,11 @@ impl HttpRoute {
             index += 1;
         }
 
-        return Err(HttpFailResult::new(
-            my_http_server_core::WebContentType::Text,
+        return Err((
             400,
-            format!("Route {} does not have key {}", self.route, key).into_bytes(),
-            false,
-            true,
-        ));
+            format!("Route {} does not have key {}", self.route, key),
+        )
+            .into());
     }
 
     pub fn has_route_key(&self, key: &str) -> bool {

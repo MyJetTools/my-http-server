@@ -117,7 +117,7 @@ impl<'s> EncodedParamValue<'s> {
         }
     }
 
-    pub fn as_str(&self) -> Result<StrOrString, HttpFailResult> {
+    pub fn as_str(&'s self) -> Result<StrOrString<'s>, HttpFailResult> {
         match self {
             Self::UrlEncodedValue { value, src: _ } => {
                 Ok(StrOrString::create_as_string(value.as_string()?))

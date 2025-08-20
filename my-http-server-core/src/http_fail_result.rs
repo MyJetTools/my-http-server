@@ -1,30 +1,39 @@
-use std::collections::HashMap;
-
 use rust_extensions::StrOrString;
 
-use crate::{http_headers::*, HttpOkResult, WebContentType};
-use my_hyper_utils::*;
-#[derive(Debug, Clone)]
+use crate::{HttpOkResult, HttpOutput, WebContentType};
+
+#[derive(Debug)]
 pub struct HttpFailResult {
-    pub content_type: WebContentType,
-    pub status_code: u16,
-    pub content: Vec<u8>,
-    pub write_telemetry: bool,
     pub write_to_log: bool,
-    pub headers: HashMap<String, String>,
+    pub write_telemetry: bool,
     #[cfg(feature = "with-telemetry")]
     pub add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder,
+    pub output: HttpOutput,
+}
+
+impl HttpFailResult {
+    pub fn new(output: HttpOutput, write_to_log: bool, write_telemetry: bool) -> Self {
+        Self {
+            write_to_log,
+            write_telemetry,
+            output,
+            #[cfg(feature = "with-telemetry")]
+            add_telemetry_tags: Default::default(),
+        }
+    }
 }
 
 impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
     fn from(src: url_utils::url_encoded_data_reader::ReadingEncodedDataError) -> Self {
-        Self::new(
-            WebContentType::Text,
-            400,
-            format!("Reading encoded parameter failed. Err: '{:?}'", src).into_bytes(),
-            true,
-            false,
-        )
+        let output = HttpOutput::Content {
+            status_code: 400,
+            headers: Default::default(),
+            content_type: Some(WebContentType::Text),
+            set_cookies: Default::default(),
+            content: format!("Reading encoded parameter failed. Err: '{:?}'", src).into_bytes(),
+        };
+
+        HttpFailResult::new(output, true, false)
     }
 }
 
@@ -35,165 +44,178 @@ impl Into<Result<HttpOkResult, HttpFailResult>> for HttpFailResult {
 }
 
 impl HttpFailResult {
-    pub fn new(
-        content_type: WebContentType,
-        status_code: u16,
-        content: Vec<u8>,
-        write_telemetry: bool,
-        write_to_log: bool,
-    ) -> Self {
-        Self {
-            content_type,
-            status_code,
-            content,
-            write_telemetry,
-            write_to_log,
-            headers: HashMap::new(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
-    }
     pub fn into_err<T>(self) -> Result<T, HttpFailResult> {
         Result::Err(self)
     }
 
     pub fn as_path_parameter_required(param_name: &str) -> Self {
-        Self::new(
-            WebContentType::Text,
-            400,
-            format!("Path parameter '{}' is required", param_name).into_bytes(),
-            true,
-            false,
-        )
+        let output = HttpOutput::Content {
+            status_code: 400,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
+            content: format!("Path parameter '{}' is required", param_name).into_bytes(),
+        };
+
+        Self::new(output, false, true)
     }
 
-    pub fn as_not_found(text: String, write_telemetry: bool) -> Self {
-        Self::new(
-            WebContentType::Text,
-            404,
-            text.into_bytes(),
-            write_telemetry,
-            false,
-        )
+    pub fn as_not_found(text: impl Into<String>, write_telemetry: bool) -> Self {
+        let output = HttpOutput::Content {
+            status_code: 404,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
+            content: text.into().into_bytes(),
+        };
+
+        Self::new(output, false, write_telemetry)
     }
 
-    pub fn as_unauthorized(text: Option<String>) -> Self {
-        Self::new(
-            WebContentType::Text,
-            401,
-            if let Some(text) = text {
+    pub fn as_unauthorized(text: Option<&str>) -> Self {
+        let output = HttpOutput::Content {
+            status_code: 401,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
+            content: if let Some(text) = text {
                 format!("Unauthorized request: {}", text).into_bytes()
             } else {
                 format!("Unauthorized request").into_bytes()
             },
-            true,
-            false,
-        )
+        };
+
+        Self::new(output, false, false)
     }
 
     pub fn as_validation_error(text: impl Into<StrOrString<'static>>) -> Self {
-        let text: StrOrString<'static> = text.into();
-        Self {
-            content_type: WebContentType::Text,
-            content: format!("Validation error: {}", text.as_str()).into_bytes(),
+        let output = HttpOutput::Content {
             status_code: 400,
-            write_telemetry: true,
-            write_to_log: false,
-            headers: HashMap::new(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
+            content: format!("Validation error: {}", text.into().as_str()).into_bytes(),
+        };
+
+        Self::new(output, false, true)
     }
 
-    pub fn as_forbidden(text: Option<String>) -> Self {
-        Self {
-            content_type: WebContentType::Text,
+    pub fn as_forbidden(text: Option<impl Into<String>>) -> Self {
+        let output = HttpOutput::Content {
+            status_code: 403,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
             content: if let Some(text) = text {
-                text.into_bytes()
+                text.into().into_bytes()
             } else {
                 format!("Forbidden").into_bytes()
             },
-            status_code: 403,
-            write_telemetry: true,
-            write_to_log: false,
-            headers: HashMap::new(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+        };
+
+        Self::new(output, false, true)
     }
 
-    pub fn invalid_value_to_parse(reason: String) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: reason.into_bytes(),
+    pub fn invalid_value_to_parse(reason: impl Into<String>) -> Self {
+        let output = HttpOutput::Content {
             status_code: 400,
-            write_telemetry: true,
-            write_to_log: true,
-            headers: HashMap::new(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
+            content: reason.into().into_bytes(),
+        };
+
+        Self::new(output, true, true)
     }
 
     pub fn required_parameter_is_missing(param_name: &str, where_is_parameter: &str) -> Self {
-        Self {
-            content_type: WebContentType::Text,
+        let output = HttpOutput::Content {
+            status_code: 400,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
             content: format!(
                 "Required parameter [{param_name}] is missing in {where_is_parameter}"
             )
             .into_bytes(),
-            status_code: 400,
-            write_telemetry: true,
-            write_to_log: false,
-            headers: HashMap::new(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+        };
+
+        Self::new(output, false, true)
     }
 
-    pub fn as_fatal_error(text: String) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: text.into_bytes(),
+    pub fn as_fatal_error(text: impl Into<String>) -> Self {
+        let output = HttpOutput::Content {
             status_code: 500,
-            write_telemetry: true,
-            write_to_log: true,
-            headers: HashMap::new(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
+            content: text.into().into_bytes(),
+        };
+
+        Self::new(output, true, true)
     }
 
-    pub fn as_not_supported_content_type(text: String) -> Self {
-        Self {
-            content_type: WebContentType::Text,
-            content: text.into_bytes(),
+    pub fn as_not_supported_content_type(text: impl Into<String>) -> Self {
+        let output = HttpOutput::Content {
             status_code: 415,
-            write_telemetry: true,
+            headers: None,
+            content_type: WebContentType::Text.into(),
+            set_cookies: None,
+            content: text.into().into_bytes(),
+        };
+
+        Self::new(output, true, true)
+    }
+}
+
+impl Into<HttpFailResult> for HttpOutput {
+    fn into(self) -> HttpFailResult {
+        HttpFailResult {
+            write_telemetry: false,
             write_to_log: true,
-            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
+            output: self,
         }
     }
 }
 
-impl Into<MyHttpResponse> for HttpFailResult {
-    fn into(self) -> MyHttpResponse {
-        let mut builder = hyper::Response::builder()
-            .status(self.status_code)
-            .header(CONTENT_TYPE_HEADER, self.content_type.as_str());
-
-        for (key, value) in self.headers {
-            builder = builder.header(key, value);
+impl From<(HttpOutput, bool)> for HttpFailResult {
+    fn from((output, write_to_log_and_telemetry): (HttpOutput, bool)) -> Self {
+        HttpFailResult {
+            write_to_log: write_to_log_and_telemetry,
+            write_telemetry: write_to_log_and_telemetry,
+            #[cfg(feature = "with-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
+            output,
         }
-
-        (builder, self.content).to_my_http_response()
     }
 }
 
-impl AddHttpHeaders for HttpFailResult {
-    fn add_header(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        self.headers.insert(key.into(), value.into());
+impl From<(u16, String)> for HttpFailResult {
+    fn from(value: (u16, String)) -> Self {
+        let output = HttpOutput::Content {
+            status_code: value.0,
+            headers: Default::default(),
+            content_type: WebContentType::Text.into(),
+            set_cookies: Default::default(),
+            content: value.1.into_bytes(),
+        };
+
+        Self::new(output, false, true)
+    }
+}
+
+impl From<(u16, &'static str)> for HttpFailResult {
+    fn from(value: (u16, &'static str)) -> Self {
+        let output = HttpOutput::Content {
+            status_code: value.0,
+            headers: Default::default(),
+            content_type: WebContentType::Text.into(),
+            set_cookies: Default::default(),
+            content: value.1.as_bytes().to_vec(),
+        };
+
+        Self::new(output, false, true)
     }
 }

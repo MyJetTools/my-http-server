@@ -55,7 +55,7 @@ impl HttpRequest {
         }
     }
 
-    pub fn get_query_string(&self) -> Result<UrlEncodedData, UrlDecodeError> {
+    pub fn get_query_string<'s>(&'s self) -> Result<UrlEncodedData<'s>, UrlDecodeError> {
         if let Some(query) = self.data.uri().query() {
             let result = UrlEncodedData::from_query_string(query)?;
             Ok(result)
@@ -91,11 +91,11 @@ impl HttpRequest {
         self.data.take_incoming_body()
     }
 
-    pub fn get_path(&self) -> HttpPathReader {
+    pub fn get_path<'s>(&'s self) -> HttpPathReader<'s> {
         HttpPathReader::new(self.data.uri().path())
     }
 
-    pub fn get_ip(&self) -> RequestIp {
+    pub fn get_ip<'s>(&'s self) -> RequestIp<'s> {
         let x_forwarded_for = self
             .data
             .headers()
@@ -161,7 +161,7 @@ impl HttpRequest {
         }
     }
 
-    pub fn get_cookies(&self) -> CookiesReader {
+    pub fn get_cookies<'s>(&'s self) -> CookiesReader<'s> {
         let cookie_header = self.data.headers().try_get_case_insensitive("cookie");
 
         if cookie_header.is_none() {

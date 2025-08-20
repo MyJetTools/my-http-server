@@ -59,13 +59,12 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             .http_path
             .has_value_at_index_case_insensitive(1, "index.html")
         {
-            let output = HttpOutput::Content {
-                headers: None,
-                content_type: Some(WebContentType::Html),
-                content: super::resources::INDEX_PAGE.to_vec(),
-                set_cookies: None,
-            };
-            return Some(output.into_ok_result(false));
+            let content = HttpOutput::from_builder()
+                .set_content_type(WebContentType::Html)
+                .set_content(super::resources::INDEX_PAGE.to_vec())
+                .into_ok_result(false);
+
+            return Some(content);
         }
 
         if ctx
@@ -74,6 +73,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             .has_value_at_index_case_insensitive(1, "swagger-ui.css")
         {
             let output = HttpOutput::Content {
+                status_code: 200,
                 headers: None,
                 content_type: Some(WebContentType::Css),
                 content: super::resources::SWAGGER_UI_CSS.to_vec(),
@@ -88,6 +88,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             .has_value_at_index_case_insensitive(1, "swagger-ui-bundle.js")
         {
             let output = HttpOutput::Content {
+                status_code: 200,
                 headers: None,
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_BUNDLE_JS.to_vec(),
@@ -102,6 +103,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             .has_value_at_index_case_insensitive(1, "swagger-ui-standalone-preset.js")
         {
             let output = HttpOutput::Content {
+                status_code: 200,
                 headers: None,
                 content_type: Some(WebContentType::JavaScript),
                 content: super::resources::SWAGGER_UI_STANDALONE_PRESET_JS.to_vec(),
@@ -116,6 +118,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             .has_value_at_index_case_insensitive(1, "favicon-32x32.png")
         {
             let output = HttpOutput::Content {
+                status_code: 200,
                 headers: None,
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_32.to_vec(),
@@ -130,6 +133,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             .has_value_at_index_case_insensitive(1, "favicon-16x16.png")
         {
             let output = HttpOutput::Content {
+                status_code: 200,
                 headers: None,
                 content_type: Some(WebContentType::Png),
                 content: super::resources::FAVICON_16.to_vec(),
@@ -153,6 +157,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             };
 
             let output = HttpOutput::Content {
+                status_code: 200,
                 headers: None,
                 content_type: Some(WebContentType::Json),
                 content: super::swagger_yaml::builder::build(

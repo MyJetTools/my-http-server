@@ -1,28 +1,16 @@
-use crate::{HttpFailResult, WebContentType};
-use hyper::{body::Bytes, Response};
+use crate::{HttpFailResult, HttpOutput, WebContentType};
 
 impl From<hyper::Error> for HttpFailResult {
     fn from(src: hyper::Error) -> Self {
-        HttpFailResult {
-            content_type: WebContentType::Text,
+        let output = HttpOutput::Content {
             status_code: 501,
-            content: format!("{:?}", src).into_bytes(),
-            write_telemetry: true,
-            write_to_log: true,
             headers: Default::default(),
-            #[cfg(feature = "with-telemetry")]
-            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
-        }
-    }
-}
+            content_type: WebContentType::Text.into(),
+            set_cookies: Default::default(),
+            content: format!("{:?}", src).into_bytes(),
+        };
 
-impl Into<Response<Bytes>> for HttpFailResult {
-    fn into(self) -> Response<Bytes> {
-        Response::builder()
-            .header("Content-Type", self.content_type.as_str())
-            .status(self.status_code)
-            .body(Bytes::from(self.content))
-            .unwrap()
+        HttpFailResult::new(output, true, true)
     }
 }
 
