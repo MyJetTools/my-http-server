@@ -107,11 +107,11 @@ impl HttpOutput {
         }
     }
 
-    pub fn into_err(
+    pub fn into_err<TResult>(
         self,
         write_log: bool,
         write_telemetry: bool,
-    ) -> Result<HttpOkResult, HttpFailResult> {
+    ) -> Result<TResult, HttpFailResult> {
         Err(self.into_http_fail_result(write_log, write_telemetry))
     }
 

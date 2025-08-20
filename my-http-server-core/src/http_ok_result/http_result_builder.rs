@@ -151,13 +151,12 @@ impl HttpResultBuilder {
         }
     }
 
-    pub fn into_err(
+    pub fn into_err<TResult>(
         self,
         write_log: bool,
         write_telemetry: bool,
-    ) -> Result<HttpOkResult, HttpFailResult> {
+    ) -> Result<TResult, HttpFailResult> {
         let output = self.build();
-
         Err(HttpFailResult::new(output, write_log, write_telemetry))
     }
 
