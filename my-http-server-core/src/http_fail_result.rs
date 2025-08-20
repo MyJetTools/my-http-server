@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use rust_extensions::StrOrString;
 
 use crate::{http_headers::*, HttpOkResult, WebContentType};
@@ -9,6 +11,7 @@ pub struct HttpFailResult {
     pub content: Vec<u8>,
     pub write_telemetry: bool,
     pub write_to_log: bool,
+    pub headers: HashMap<String, String>,
     #[cfg(feature = "with-telemetry")]
     pub add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder,
 }
@@ -45,6 +48,7 @@ impl HttpFailResult {
             content,
             write_telemetry,
             write_to_log,
+            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
@@ -95,6 +99,7 @@ impl HttpFailResult {
             status_code: 400,
             write_telemetry: true,
             write_to_log: false,
+            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
@@ -111,6 +116,7 @@ impl HttpFailResult {
             status_code: 403,
             write_telemetry: true,
             write_to_log: false,
+            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
@@ -123,6 +129,7 @@ impl HttpFailResult {
             status_code: 400,
             write_telemetry: true,
             write_to_log: true,
+            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
@@ -138,6 +145,7 @@ impl HttpFailResult {
             status_code: 400,
             write_telemetry: true,
             write_to_log: false,
+            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
@@ -150,6 +158,7 @@ impl HttpFailResult {
             status_code: 500,
             write_telemetry: true,
             write_to_log: true,
+            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
@@ -162,6 +171,7 @@ impl HttpFailResult {
             status_code: 415,
             write_telemetry: true,
             write_to_log: true,
+            headers: HashMap::new(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }
@@ -170,10 +180,20 @@ impl HttpFailResult {
 
 impl Into<MyHttpResponse> for HttpFailResult {
     fn into(self) -> MyHttpResponse {
-        let builder = hyper::Response::builder()
+        let mut builder = hyper::Response::builder()
             .status(self.status_code)
             .header(CONTENT_TYPE_HEADER, self.content_type.as_str());
 
+        for (key, value) in self.headers {
+            builder = builder.header(key, value);
+        }
+
         (builder, self.content).to_my_http_response()
+    }
+}
+
+impl AddHttpHeaders for HttpFailResult {
+    fn add_header(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.headers.insert(key.into(), value.into());
     }
 }

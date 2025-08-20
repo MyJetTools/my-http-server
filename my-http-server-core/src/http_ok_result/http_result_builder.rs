@@ -123,6 +123,7 @@ impl HttpResultBuilder {
             content: self.body,
             write_telemetry,
             write_to_log: true,
+            headers: Default::default(),
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
         }

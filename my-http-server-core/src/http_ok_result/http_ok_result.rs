@@ -104,6 +104,7 @@ impl HttpOutput {
                 content: Vec::new(),
                 write_telemetry,
                 write_to_log: false,
+                headers: Default::default(),
                 #[cfg(feature = "with-telemetry")]
                 add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             },
@@ -118,6 +119,7 @@ impl HttpOutput {
                 content,
                 write_telemetry,
                 write_to_log: false,
+                headers: Default::default(),
                 #[cfg(feature = "with-telemetry")]
                 add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             },
@@ -143,6 +145,7 @@ impl HttpOutput {
                 content,
                 write_telemetry,
                 write_to_log: false,
+                headers: Default::default(),
                 #[cfg(feature = "with-telemetry")]
                 add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             },
