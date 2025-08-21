@@ -131,6 +131,18 @@ impl HttpOutput {
         }
     }
 
+    pub fn as_html<'s>(text: impl Into<StrOrString<'s>>) -> HttpResultBuilder {
+        let text = text.into().to_string();
+
+        HttpResultBuilder {
+            status_code: 200,
+            headers: None,
+            content_type: Some(WebContentType::Html),
+            cookies: Default::default(),
+            content: text.into_bytes(),
+        }
+    }
+
     pub fn as_json<T: Serialize>(model: T) -> HttpResultBuilder {
         let json = serde_json::to_vec(&model).unwrap();
 
