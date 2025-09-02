@@ -23,7 +23,7 @@ pub async fn handle_web_socket_upgrade<
 
     let addr = req.addr.clone();
 
-    let req = req.take_incoming_body();
+    let req = req.take_my_hyper_http_request();
 
     let upgrade_result = crate::web_sockets_upgrade::upgrade(
         id,

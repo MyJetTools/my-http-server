@@ -1,5 +1,6 @@
 use hyper::{header::*, *};
 use hyper_tungstenite::tungstenite::http::Extensions;
+use my_http_server_core::MyHyperHttpRequest;
 
 pub struct MyWebSocketHttpRequest {
     uri: Uri,
@@ -9,7 +10,7 @@ pub struct MyWebSocketHttpRequest {
 }
 
 impl<'s> MyWebSocketHttpRequest {
-    pub fn new(req: &Request<hyper::body::Incoming>) -> Self {
+    pub fn new(req: &MyHyperHttpRequest) -> Self {
         Self {
             uri: req.uri().clone(),
             headers: req.headers().clone(),

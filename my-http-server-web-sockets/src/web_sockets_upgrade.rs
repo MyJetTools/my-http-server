@@ -4,7 +4,6 @@ use std::time::Duration;
 use futures::StreamExt;
 use futures_util::stream::SplitStream;
 
-use hyper::Request;
 use hyper_tungstenite::tungstenite::Message;
 use hyper_tungstenite::HyperWebsocketStream;
 use rust_extensions::Logger;
@@ -13,19 +12,22 @@ use crate::{MyWebSocket, MyWebSocketCallback, MyWebSocketHttpRequest};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-use my_http_server_core::{my_hyper_utils::*, SocketAddress};
+use my_http_server_core::{my_hyper_utils::*, MyHyperHttpRequest, SocketAddress};
 
 pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
     id: i64,
     addr: SocketAddress,
     query_string: Option<String>,
-    req: Request<hyper::body::Incoming>,
+    req: MyHyperHttpRequest,
     callback: Arc<TMyWebSocketCallback>,
     disconnect_timeout: Duration,
     logs: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> Result<MyHttpResponse, Error> {
     let http_request = MyWebSocketHttpRequest::new(&req);
-    let (response, websocket) = hyper_tungstenite::upgrade(req, None)?;
+    let (response, websocket) = match req {
+        MyHyperHttpRequest::Incoming(req) => hyper_tungstenite::upgrade(req, None)?,
+        MyHyperHttpRequest::Full(req) => hyper_tungstenite::upgrade(req, None)?,
+    };
 
     tokio::spawn(async move {
         let ws_stream = websocket.await;

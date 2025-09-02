@@ -2,7 +2,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
     http_headers::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader, HttpRequestBody,
-    HttpRequestHeaders, RequestData, RequestIp, UrlEncodedData,
+    HttpRequestHeaders, MyHyperHttpRequest, RequestData, RequestIp, UrlEncodedData,
 };
 
 use hyper::{Method, Uri};
@@ -46,7 +46,7 @@ impl HttpRequest {
         let http_path = HttpPath::from_str(req.uri().path());
 
         Self {
-            data: RequestData::Incoming(Some(req)),
+            data: RequestData::new(req),
             addr,
             key_values: None,
             content_type_header: None,
@@ -79,16 +79,15 @@ impl HttpRequest {
     }
 
     pub async fn get_body(&mut self) -> Result<&HttpRequestBody, HttpFailResult> {
-        let result = self.data.convert_to_body_if_requires().await?;
-        Ok(result.unwrap())
+        self.data.get_body().await
     }
 
     pub async fn receive_body(&mut self) -> Result<HttpRequestBody, HttpFailResult> {
         self.data.receive_body().await
     }
 
-    pub fn take_incoming_body(&mut self) -> hyper::Request<hyper::body::Incoming> {
-        self.data.take_incoming_body()
+    pub fn take_my_hyper_http_request(&mut self) -> MyHyperHttpRequest {
+        self.data.take_my_hyper_http_request()
     }
 
     pub fn get_path<'s>(&'s self) -> HttpPathReader<'s> {
