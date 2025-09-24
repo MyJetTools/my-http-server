@@ -59,9 +59,9 @@ impl MyHttpServer {
     }
 
     #[cfg(unix)]
-    pub fn new_as_unix_socket(unix_socket_addr: String) -> Self {
+    pub fn new_as_unix_socket(unix_socket_addr: impl Into<String>) -> Self {
         Self {
-            addr: ListenAddr::Unix(Arc::new(unix_socket_addr)),
+            addr: ListenAddr::Unix(Arc::new(unix_socket_addr.into())),
             middlewares: Some(Vec::new()),
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
