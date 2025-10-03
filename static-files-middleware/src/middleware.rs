@@ -34,6 +34,7 @@ pub struct StaticFilesMiddleware {
 }
 
 impl StaticFilesMiddleware {
+    pub const DEFAULT_FOLDER: &'static str = "./wwwroot";
     pub fn new(mappings: Option<Vec<FilesMapping>>, index_files: Option<Vec<String>>) -> Self {
         let index_files = if let Some(index_file_to_check) = index_files {
             let mut index_files_result = Vec::with_capacity(index_file_to_check.len());
@@ -191,7 +192,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
 
         if let Some(result) = self
             .handle_folder(
-                super::DEFAULT_FOLDER,
+                Self::DEFAULT_FOLDER,
                 ctx.request.http_path.as_str_from_segment(0),
             )
             .await
