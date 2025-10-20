@@ -49,6 +49,8 @@ impl HttpOutputAsStream {
 
         Ok(HttpOkResult {
             write_telemetry: false,
+            #[cfg(feature = "with-telemetry")]
+            add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             output: super::HttpOutput::Raw(response),
         })
     }
