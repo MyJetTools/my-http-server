@@ -21,6 +21,9 @@ my-telemetry = { tag = "1.2.2", git = "https://github.com/MyJetTools/my-telemetr
 
 url-utils = { tag = "0.1.4", git = "https://github.com/MyJetTools/url-utils.git" }
 
+
+futures = "*"
+
 tokio = { version = "*" }
 
 lazy_static = "*"

@@ -7,6 +7,8 @@ use my_hyper_utils::*;
 use rust_extensions::StrOrString;
 use serde::Serialize;
 
+use super::*;
+
 const EMPTY_STATUS_CODE: u16 = 204;
 const PERMANENT_REDIRECT_STATUS_CODE: u16 = 301;
 const TEMPORARY_REDIRECT_STATUS_CODE: u16 = 302;
@@ -165,6 +167,15 @@ impl HttpOutput {
             cookies: Default::default(),
             content: yaml.into_bytes(),
         }
+    }
+
+    pub fn as_stream(queue_size: usize) -> (HttpOutputAsStream, HttpOutputProducer) {
+        let (tx, rx) = futures::channel::mpsc::channel(queue_size);
+
+        let output = HttpOutputAsStream::new(rx);
+        let producer = HttpOutputProducer::new(tx);
+
+        (output, producer)
     }
 
     pub fn as_redirect(url: String, permanent: bool) -> Self {
