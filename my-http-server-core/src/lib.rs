@@ -49,10 +49,11 @@ pub use http_request::*;
 pub mod convert_from_str;
 mod http_headers;
 pub use http_headers::*;
-
-pub mod data_src;
-pub extern crate hyper;
-pub extern crate my_hyper_utils;
 pub mod cookies;
+pub mod data_src;
 mod http_output;
 pub use http_output::*;
+
+pub extern crate async_trait;
+pub extern crate hyper;
+pub extern crate my_hyper_utils;
