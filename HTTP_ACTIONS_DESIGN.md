@@ -162,6 +162,49 @@ pub struct UploadFileInputModel {
 }
 ```
 
+**File Uploads with FileContent:**
+
+For file uploads, you can use `FileContent` to access file metadata (filename, content type) along with the content:
+
+```rust
+use my_http_server::FileContent;
+
+#[derive(MyHttpInput)]
+pub struct UploadFileWithMetadataInputModel {
+    #[http_form_data(name = "file", description = "File to upload")]
+    pub file: FileContent,  // Contains file_name, content_type, and content
+    
+    #[http_form_data(name = "description", description = "File description")]
+    pub description: String,
+}
+
+async fn handle_request(
+    _action: &ActionName,
+    input_data: UploadFileWithMetadataInputModel,
+    _ctx: &HttpContext,
+) -> Result<HttpOkResult, HttpFailResult> {
+    // Access file metadata
+    let file_name = input_data.file.file_name;
+    let content_type = input_data.file.content_type;
+    let content = input_data.file.content;
+    
+    // Process the file...
+    
+    HttpOutput::as_json(result).into_ok_result(true).into()
+}
+```
+
+**FileContent Structure:**
+```rust
+pub struct FileContent {
+    pub content_type: String,  // MIME type (e.g., "image/png", "application/pdf")
+    pub file_name: String,     // Original filename
+    pub content: Vec<u8>,      // File content as bytes
+}
+```
+
+**Note:** `FileContent` can only be used with `#[http_form_data]` attributes and only works with actual file uploads in multipart/form-data requests. It cannot be used with query parameters, headers, or JSON body data.
+
 **Raw Body:**
 ```rust
 #[derive(MyHttpInput)]
