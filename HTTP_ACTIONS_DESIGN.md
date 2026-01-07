@@ -92,6 +92,10 @@ async fn handle_request(
 }
 ```
 
+**Important Notes:**
+- All fields in the `http_route` macro must be separated by commas (including the last field before `summary`, `description`, etc.)
+- When using `model:` in the `result:` field, the model **MUST** derive `MyHttpObjectStructure` (see Section 4 for details)
+
 ### 3. Input Models
 
 Input models use the `MyHttpInput` derive macro and specify where data comes from. You can mix different input sources in a single model.
@@ -246,17 +250,99 @@ pub struct SearchInputModel {
 
 ### 4. Output Models
 
-Output models use `Serialize`, `Deserialize`, and `MyHttpObjectStructure`:
+**⚠️ CRITICAL: When Using `model:` in Result Field**
+
+When you specify `model: YourResponseModel` in the `result:` field of the `http_route` macro, the response model **MUST** derive `MyHttpObjectStructure` in addition to `Serialize` and `Deserialize`.
+
+**Required Pattern:**
+```rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, MyHttpObjectStructure)]
+pub struct YourResponseModel {
+    pub field1: String,
+    pub field2: i32,
+}
+```
+
+**In the http_route macro:**
+```rust
+#[http_route(
+    // ... other fields ...
+    result: [
+        {status_code: 200, description: "Ok response", model: YourResponseModel},
+    ]
+)]
+```
+
+**Why This Is Required:**
+
+The `model:` field in the result tells the framework to generate Swagger/OpenAPI documentation for your response model. The framework needs `MyHttpObjectStructure` to introspect the model structure and generate the proper schema documentation.
+
+**What Happens If You Forget:**
+
+If you use `model:` without deriving `MyHttpObjectStructure`, you will get a compilation error:
+
+```
+error[E0599]: no function or associated item named `get_http_data_structure` found for struct `YourResponseModel` in the current scope
+```
+
+**Solution:** Add `MyHttpObjectStructure` to your derive macro.
+
+**When You DON'T Need `MyHttpObjectStructure`:**
+
+If you don't use `model:` in the result field, you can omit `MyHttpObjectStructure`:
+
+```rust
+// Simple response without model specification
+#[derive(Serialize)]
+struct SimpleResponse {
+    message: String,
+}
+
+// In http_route macro - no model: field
+result: [
+    {status_code: 200, description: "Ok response"},
+]
+
+// In handler - still works fine
+HttpOutput::as_json(response).into_ok_result(false)
+```
+
+**Complete Example:**
 
 ```rust
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, MyHttpObjectStructure)]
+// Response model with MyHttpObjectStructure (required when using model:)
+#[derive(Serialize, Deserialize, MyHttpObjectStructure)]
 pub struct CertificateInfoHttpModel {
     pub cn: String,
     pub expires: String,
 }
+
+#[http_route(
+    method: "GET",
+    route: "/api/certificates/info",
+    input_data: GetCertInfoInput,
+    controller: "Certificates",
+    summary: "Get certificate information",
+    description: "Returns certificate details",
+    result: [
+        {status_code: 200, description: "Certificate info", model: CertificateInfoHttpModel},
+    ]
+)]
+pub struct GetCertInfoAction {
+    // ...
+}
 ```
+
+**Summary:**
+
+| Scenario | Required Derives |
+|----------|-----------------|
+| Using `model:` in result | `Serialize`, `Deserialize`, `MyHttpObjectStructure` |
+| Not using `model:` in result | `Serialize` (or `Serialize, Deserialize` if needed) |
 
 ### 5. Response Types
 
@@ -508,10 +594,67 @@ pub fn start(app: &Arc<AppContext>) {
 1. **Create the action file**: `src/http/controllers/{group}/{action_name}_action.rs`
 2. **Define the action struct** with `#[http_route]` macro
 3. **Create input model** with `#[derive(MyHttpInput)]`
-4. **Create output model** (if returning JSON) with `Serialize`, `Deserialize`, `MyHttpObjectStructure`
+4. **Create output model** (if returning JSON):
+   - If using `model:` in result: `Serialize`, `Deserialize`, `MyHttpObjectStructure`
+   - If NOT using `model:` in result: `Serialize` (or `Serialize, Deserialize` if needed)
 5. **Implement `handle_request`** function that calls business logic
 6. **Export in module**: Add to `{group}/mod.rs`
 7. **Register in builder**: Add registration call in `builder.rs`
+
+## Troubleshooting
+
+### Common Compilation Errors
+
+#### Error: `no function or associated item named 'get_http_data_structure' found for struct`
+
+**Cause:** You're using `model: YourModel` in the `result:` field of `http_route` macro, but `YourModel` doesn't derive `MyHttpObjectStructure`.
+
+**Solution:** Add `MyHttpObjectStructure` to your response model's derive macro:
+
+```rust
+// Before (incorrect)
+#[derive(Serialize, Deserialize)]
+struct MyResponse {
+    field: String,
+}
+
+// After (correct)
+#[derive(Serialize, Deserialize, MyHttpObjectStructure)]
+struct MyResponse {
+    field: String,
+}
+```
+
+**Alternative Solution:** If you don't need Swagger documentation for the response model, remove `model:` from the result field:
+
+```rust
+// In http_route macro
+result: [
+    {status_code: 200, description: "Ok response"},  // No model: field
+]
+```
+
+#### Error: Missing comma in `http_route` macro
+
+**Cause:** Missing comma between fields in the `http_route` macro attributes.
+
+**Solution:** Ensure all fields are separated by commas:
+
+```rust
+// Incorrect
+controller: "ControllerName"
+summary: "Summary",
+
+// Correct
+controller: "ControllerName",
+summary: "Summary",
+```
+
+#### Error: `MyHttpObjectStructure` not found
+
+**Cause:** The `MyHttpObjectStructure` trait is not in scope.
+
+**Solution:** Ensure you have `service_sdk::macros::use_my_http_server!();` at the top of your file, which brings `MyHttpObjectStructure` into scope.
 
 ## Example: Complete Action
 
@@ -756,6 +899,7 @@ async fn handle_request(
 - `to_lowercase` and `to_uppercase` attributes work only with `String` types
 - Enums must have at least one case marked with `default` if used with default values
 - Custom input fields must implement `TryInto` trait for conversion from HTTP parameter types
+- **When using `model:` in result field, always derive `MyHttpObjectStructure`** - this is a common mistake that causes compilation errors
 
 ## References
 
