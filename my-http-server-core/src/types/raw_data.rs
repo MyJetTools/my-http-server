@@ -1,4 +1,4 @@
-use crate::{HttpFailResult, HttpRequestBody};
+use crate::{HttpFailResult, HttpRequestBodyContent};
 
 pub struct RawData(Vec<u8>);
 
@@ -31,7 +31,7 @@ impl AsRef<[u8]> for RawData {
     }
 }
 
-impl TryInto<RawData> for HttpRequestBody {
+impl TryInto<RawData> for HttpRequestBodyContent {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<RawData, Self::Error> {

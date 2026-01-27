@@ -1,8 +1,9 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
-    http_headers::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader, HttpRequestBody,
-    HttpRequestHeaders, MyHyperHttpRequest, RequestData, RequestIp, UrlEncodedData,
+    http_headers::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader,
+    HttpRequestBodyContent, HttpRequestHeaders, MyHyperHttpRequest, RequestData, RequestIp,
+    UrlEncodedData,
 };
 
 use hyper::{Method, Uri};
@@ -40,19 +41,24 @@ pub struct HttpRequest {
 }
 
 impl HttpRequest {
-    pub fn new(req: hyper::Request<hyper::body::Incoming>, addr: SocketAddress) -> Self {
+    pub fn new(
+        req: hyper::Request<hyper::body::Incoming>,
+        addr: SocketAddress,
+    ) -> Result<Self, HttpFailResult> {
         let method = req.method().clone();
 
         let http_path = HttpPath::from_str(req.uri().path());
 
-        Self {
-            data: RequestData::new(req),
+        let result = Self {
+            data: RequestData::new(req)?,
             addr,
             key_values: None,
             content_type_header: None,
             method,
             http_path,
-        }
+        };
+
+        Ok(result)
     }
 
     pub fn get_query_string<'s>(&'s self) -> Result<UrlEncodedData<'s>, UrlDecodeError> {
@@ -78,11 +84,11 @@ impl HttpRequest {
         Some(result)
     }
 
-    pub async fn get_body(&mut self) -> Result<&HttpRequestBody, HttpFailResult> {
+    pub async fn get_body(&mut self) -> Result<&HttpRequestBodyContent, HttpFailResult> {
         self.data.get_body().await
     }
 
-    pub async fn receive_body(&mut self) -> Result<HttpRequestBody, HttpFailResult> {
+    pub async fn receive_body(&mut self) -> Result<HttpRequestBodyContent, HttpFailResult> {
         self.data.receive_body().await
     }
 

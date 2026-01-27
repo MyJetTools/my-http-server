@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use serde::de::DeserializeOwned;
 
-use crate::{HttpFailResult, HttpRequestBody};
+use crate::{HttpFailResult, HttpRequestBodyContent};
 
 pub struct RawDataTyped<T: DeserializeOwned> {
     data: Vec<u8>,
@@ -52,7 +52,7 @@ impl<T: DeserializeOwned> AsRef<[u8]> for RawDataTyped<T> {
     }
 }
 
-impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for HttpRequestBody {
+impl<T: DeserializeOwned> TryInto<RawDataTyped<T>> for HttpRequestBodyContent {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<RawDataTyped<T>, Self::Error> {

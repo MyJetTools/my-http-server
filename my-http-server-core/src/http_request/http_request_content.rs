@@ -7,14 +7,21 @@ use crate::{
     HttpOutput, JsonEncodedData, UrlEncodedData, WebContentType,
 };
 
-pub struct HttpRequestBody {
+pub struct HttpRequestBodyContent {
     raw_body: Vec<u8>,
     body_content_type: BodyContentType,
 }
 
-impl HttpRequestBody {
-    pub fn new(body: Vec<u8>, content_type: Option<String>) -> Result<Self, HttpFailResult> {
-        let body_content_type = BodyContentType::detect(body.as_slice(), content_type.as_ref())?;
+impl HttpRequestBodyContent {
+    pub fn new(body: Vec<u8>, body_content_type: BodyContentType) -> Result<Self, HttpFailResult> {
+        let body_content_type = if body_content_type.is_unknown_or_empty() {
+            match BodyContentType::detect_from_body(body.as_slice()) {
+                Some(body_type) => body_type,
+                None => body_content_type,
+            }
+        } else {
+            body_content_type
+        };
 
         Ok(Self {
             raw_body: body,
@@ -90,7 +97,7 @@ fn get_body_data_reader_as_url_encoded<'s>(
     }
 }
 
-impl<T: DeserializeOwned> TryInto<Vec<T>> for HttpRequestBody {
+impl<T: DeserializeOwned> TryInto<Vec<T>> for HttpRequestBodyContent {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<Vec<T>, Self::Error> {
@@ -98,7 +105,7 @@ impl<T: DeserializeOwned> TryInto<Vec<T>> for HttpRequestBody {
     }
 }
 
-impl<T: DeserializeOwned> TryInto<HashMap<String, T>> for HttpRequestBody {
+impl<T: DeserializeOwned> TryInto<HashMap<String, T>> for HttpRequestBodyContent {
     type Error = HttpFailResult;
 
     fn try_into(self) -> Result<HashMap<String, T>, Self::Error> {
@@ -125,7 +132,7 @@ fn get_body_data_reader_as_json_encoded<'s>(
     }
 }
 
-impl TryInto<u8> for HttpRequestBody {
+impl TryInto<u8> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u8, Self::Error> {
         let str = self.as_str()?;
@@ -134,7 +141,7 @@ impl TryInto<u8> for HttpRequestBody {
     }
 }
 
-impl TryInto<i8> for HttpRequestBody {
+impl TryInto<i8> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i8, Self::Error> {
         let str = self.as_str()?;
@@ -142,7 +149,7 @@ impl TryInto<i8> for HttpRequestBody {
     }
 }
 
-impl TryInto<u16> for HttpRequestBody {
+impl TryInto<u16> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u16, Self::Error> {
         let str = self.as_str()?;
@@ -150,7 +157,7 @@ impl TryInto<u16> for HttpRequestBody {
     }
 }
 
-impl TryInto<i16> for HttpRequestBody {
+impl TryInto<i16> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i16, Self::Error> {
         let str = self.as_str()?;
@@ -158,7 +165,7 @@ impl TryInto<i16> for HttpRequestBody {
     }
 }
 
-impl TryInto<u32> for HttpRequestBody {
+impl TryInto<u32> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u32, Self::Error> {
         let str = self.as_str()?;
@@ -166,7 +173,7 @@ impl TryInto<u32> for HttpRequestBody {
     }
 }
 
-impl TryInto<i32> for HttpRequestBody {
+impl TryInto<i32> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i32, Self::Error> {
         let str = self.as_str()?;
@@ -174,7 +181,7 @@ impl TryInto<i32> for HttpRequestBody {
     }
 }
 
-impl TryInto<u64> for HttpRequestBody {
+impl TryInto<u64> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<u64, Self::Error> {
         let str = self.as_str()?;
@@ -182,7 +189,7 @@ impl TryInto<u64> for HttpRequestBody {
     }
 }
 
-impl TryInto<i64> for HttpRequestBody {
+impl TryInto<i64> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<i64, Self::Error> {
         let str = self.as_str()?;
@@ -190,7 +197,7 @@ impl TryInto<i64> for HttpRequestBody {
     }
 }
 
-impl TryInto<usize> for HttpRequestBody {
+impl TryInto<usize> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<usize, Self::Error> {
         let str = self.as_str()?;
@@ -198,7 +205,7 @@ impl TryInto<usize> for HttpRequestBody {
     }
 }
 
-impl TryInto<isize> for HttpRequestBody {
+impl TryInto<isize> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<isize, Self::Error> {
         let str = self.as_str()?;
@@ -206,7 +213,7 @@ impl TryInto<isize> for HttpRequestBody {
     }
 }
 
-impl TryInto<f32> for HttpRequestBody {
+impl TryInto<f32> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f32, Self::Error> {
         let str = self.as_str()?;
@@ -214,7 +221,7 @@ impl TryInto<f32> for HttpRequestBody {
     }
 }
 
-impl TryInto<f64> for HttpRequestBody {
+impl TryInto<f64> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<f64, Self::Error> {
         let str = self.as_str()?;
@@ -222,14 +229,14 @@ impl TryInto<f64> for HttpRequestBody {
     }
 }
 
-impl<'s> TryInto<&'s str> for &'s HttpRequestBody {
+impl<'s> TryInto<&'s str> for &'s HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<&'s str, Self::Error> {
         Ok(self.as_str()?)
     }
 }
 
-impl TryInto<String> for HttpRequestBody {
+impl TryInto<String> for HttpRequestBodyContent {
     type Error = HttpFailResult;
     fn try_into(self) -> Result<String, Self::Error> {
         Ok(self.as_str()?.to_string())
@@ -242,10 +249,11 @@ mod test {
     use super::*;
 
     #[test]
-    fn test() {
+    fn test_json_encoded() {
         let body = r#"{"processId":"8269e2ac-fa3b-419a-8e65-1a606ba07942","sellAmount":0.4,"buyAmount":null,"sellAsset":"ETH","buyAsset":"USDT"}"#;
 
-        let body = HttpRequestBody::new(body.as_bytes().to_vec(), None).unwrap();
+        let body =
+            HttpRequestBodyContent::new(body.as_bytes().to_vec(), BodyContentType::Json).unwrap();
 
         let form_data = body.get_body_data_reader().unwrap();
 
@@ -269,5 +277,85 @@ mod test {
 
         let result = form_data.get_optional("buyAmount");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_json_encoded_with_unknown_content_type() {
+        let body = r#"{"processId":"8269e2ac-fa3b-419a-8e65-1a606ba07942","sellAmount":0.4,"buyAmount":null,"sellAsset":"ETH","buyAsset":"USDT"}"#;
+
+        let body = HttpRequestBodyContent::new(body.as_bytes().to_vec(), BodyContentType::Unknown)
+            .unwrap();
+
+        let form_data = body.get_body_data_reader().unwrap();
+
+        assert_eq!(
+            "8269e2ac-fa3b-419a-8e65-1a606ba07942",
+            form_data
+                .get_required("processId")
+                .unwrap()
+                .as_string()
+                .unwrap()
+        );
+
+        assert_eq!(
+            "0.4",
+            form_data
+                .get_required("sellAmount")
+                .unwrap()
+                .as_string()
+                .unwrap()
+        );
+
+        let result = form_data.get_optional("buyAmount");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_url_encoded() {
+        let body = r#"product=test&name=test2&yaml=test"#;
+
+        let body =
+            HttpRequestBodyContent::new(body.as_bytes().to_vec(), BodyContentType::UrlEncoded)
+                .unwrap();
+
+        let form_data = body.get_body_data_reader().unwrap();
+
+        assert_eq!(
+            "test",
+            form_data
+                .get_required("product")
+                .unwrap()
+                .as_string()
+                .unwrap()
+        );
+
+        assert_eq!(
+            "test2",
+            form_data.get_required("name").unwrap().as_string().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_url_encoded_with_unknown_content_type() {
+        let body = r#"product=test&name=test2&yaml=test"#;
+
+        let body = HttpRequestBodyContent::new(body.as_bytes().to_vec(), BodyContentType::Unknown)
+            .unwrap();
+
+        let form_data = body.get_body_data_reader().unwrap();
+
+        assert_eq!(
+            "test",
+            form_data
+                .get_required("product")
+                .unwrap()
+                .as_string()
+                .unwrap()
+        );
+
+        assert_eq!(
+            "test2",
+            form_data.get_required("name").unwrap().as_string().unwrap()
+        );
     }
 }

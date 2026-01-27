@@ -1,67 +1,78 @@
-use rust_extensions::MaybeShortString;
+use crate::{HttpFailResult, UrlEncodedData};
 
-use crate::HttpFailResult;
-
+#[derive(Clone)]
 pub enum BodyContentType {
     Json,
     UrlEncoded,
-    FormData(MaybeShortString),
+    FormData(String),
     Unknown,
     Empty,
 }
 
 impl BodyContentType {
-    pub fn detect(raw_body: &[u8], content_type: Option<&String>) -> Result<Self, HttpFailResult> {
-        if raw_body.is_empty() {
-            return Ok(Self::Empty);
+    pub fn is_unknown_or_empty(&self) -> bool {
+        match self {
+            BodyContentType::Json => false,
+            BodyContentType::UrlEncoded => false,
+            BodyContentType::FormData(_) => false,
+            BodyContentType::Unknown => true,
+            BodyContentType::Empty => true,
+        }
+    }
+
+    pub fn from_content_type(content_type: &str) -> Result<Self, HttpFailResult> {
+        if content_type.len() == 0 {
+            return Ok(Self::Unknown);
         }
 
-        if let Some(content_type) = content_type {
-            let lower_case = MaybeShortString::from_str(content_type);
-            let lower_case = lower_case.as_str();
-            if lower_case.contains("multipart/form-data") {
-                let boundary = extract_web_form_boundary(content_type);
+        let content_type_lower_case = content_type.to_lowercase();
+        if content_type_lower_case.contains("json") {
+            return Ok(Self::Json);
+        }
 
-                match boundary {
-                    Some(boundary_src) => {
-                        return Ok(Self::FormData(MaybeShortString::from_str(boundary_src)));
-                    }
-                    None => {
-                        return Err(HttpFailResult::as_fatal_error(format!(
-                            "Can not extract FromData boundary from content type '{}'",
-                            content_type
-                        )));
-                    }
+        if content_type_lower_case.contains("x-www-form-urlencoded") {
+            return Ok(Self::UrlEncoded);
+        }
+
+        if content_type_lower_case.contains("multipart/form-data") {
+            let boundary = extract_web_form_boundary(content_type);
+
+            match boundary {
+                Some(boundary_src) => {
+                    return Ok(Self::FormData(boundary_src.to_string()));
+                }
+                None => {
+                    return Err(HttpFailResult::as_fatal_error(format!(
+                        "Can not extract FromData boundary from content type '{}'",
+                        content_type
+                    )));
                 }
             }
-
-            if lower_case.contains("json") {
-                return Ok(Self::Json);
-            }
-
-            if lower_case.contains("x-www-form-urlencoded") {
-                return Ok(Self::UrlEncoded);
-            }
-
-            return Err(HttpFailResult::as_fatal_error(format!(
-                "Content type '{}' is not supported",
-                content_type
-            )));
         }
 
+        Ok(Self::Unknown)
+    }
+
+    pub fn detect_from_body(raw_body: &[u8]) -> Option<Self> {
         for b in raw_body {
             if *b <= 32 {
                 continue;
             }
 
             if *b == '{' as u8 || *b == '[' as u8 {
-                return Ok(Self::Json);
+                return Some(Self::Json);
             } else {
                 break;
             }
         }
 
-        return Ok(Self::Unknown);
+        if let Ok(body_as_str) = std::str::from_utf8(raw_body) {
+            if body_as_str.contains('=') && UrlEncodedData::from_body(body_as_str).is_ok() {
+                return Some(Self::UrlEncoded);
+            }
+        }
+
+        None
     }
 }
 

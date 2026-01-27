@@ -408,7 +408,7 @@ pub async fn handle_requests(
         return compile_app_is_shutting_down_http_response();
     }
 
-    let req = HttpRequest::new(req, addr);
+    let req = HttpRequest::new(req, addr).unwrap();
 
     let method = req.method.clone();
     let mut request_ctx = HttpContext::new(req);

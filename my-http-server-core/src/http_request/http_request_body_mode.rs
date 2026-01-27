@@ -1,39 +1,51 @@
-use crate::{ContentEncoding, HttpFailResult, HttpRequestBody};
+use crate::{BodyContentType, ContentEncoding, HttpFailResult, HttpRequestBodyContent};
 
-pub enum HttpRequestBodyMode {
-    Incoming(Option<hyper::body::Incoming>),
-    Full(HttpRequestBody),
+pub enum HttpRequestBody {
+    Incoming {
+        incoming: Option<hyper::body::Incoming>,
+        content_type: BodyContentType,
+    },
+    Full(HttpRequestBodyContent),
 }
 
-impl HttpRequestBodyMode {
-    pub async fn get_http_request_body(&mut self) -> Result<&HttpRequestBody, HttpFailResult> {
+impl HttpRequestBody {
+    pub async fn get_http_request_body(
+        &mut self,
+    ) -> Result<&HttpRequestBodyContent, HttpFailResult> {
         match self {
-            HttpRequestBodyMode::Incoming(incoming) => {
+            HttpRequestBody::Incoming {
+                incoming,
+                content_type,
+            } => {
                 let take = incoming.take().unwrap();
+
                 let bytes = read_bytes(ContentEncoding::None, take).await?;
-                let body = HttpRequestBody::new(bytes, None)?;
-                *self = HttpRequestBodyMode::Full(body);
+                let body = HttpRequestBodyContent::new(bytes, content_type.clone())?;
+                *self = HttpRequestBody::Full(body);
             }
-            HttpRequestBodyMode::Full(http_request_body) => return Ok(http_request_body),
+            HttpRequestBody::Full(http_request_body) => return Ok(http_request_body),
         }
 
         match self {
-            HttpRequestBodyMode::Incoming(_) => {
+            HttpRequestBody::Incoming { .. } => {
                 panic!("We should never be here")
             }
-            HttpRequestBodyMode::Full(http_request_body) => Ok(http_request_body),
+            HttpRequestBody::Full(http_request_body) => Ok(http_request_body),
         }
     }
 
-    pub async fn into_http_request_body(self) -> Result<HttpRequestBody, HttpFailResult> {
+    pub async fn into_http_request_body(self) -> Result<HttpRequestBodyContent, HttpFailResult> {
         match self {
-            HttpRequestBodyMode::Incoming(mut incoming) => {
+            HttpRequestBody::Incoming {
+                mut incoming,
+                content_type,
+            } => {
                 let take = incoming.take().unwrap();
                 let bytes = read_bytes(ContentEncoding::None, take).await?;
-                let body = HttpRequestBody::new(bytes, None)?;
+                let body = HttpRequestBodyContent::new(bytes, content_type)?;
                 return Ok(body);
             }
-            HttpRequestBodyMode::Full(http_request_body) => return Ok(http_request_body),
+            HttpRequestBody::Full(http_request_body) => return Ok(http_request_body),
         }
     }
 }
