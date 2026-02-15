@@ -181,9 +181,6 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
     let tokens_object: TokensObject = attr.try_into()?;
     let action_parameters:ActionParameters = (&tokens_object).try_into()?;
 
-
-    panic!("action_parameters: {:?}", action_parameters);
-
     let struct_name = &ast.ident;
 
     let trait_name = action_parameters.method.get_trait_name();
