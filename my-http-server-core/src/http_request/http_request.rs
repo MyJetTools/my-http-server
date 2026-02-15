@@ -157,11 +157,11 @@ impl HttpRequest {
     pub fn get_cookies<'s>(&'s self) -> CookiesReader<'s> {
         let cookie_header = self.data.headers().try_get_case_insensitive("cookie");
 
-        if cookie_header.is_none() {
+        let Some(cookie_header) = cookie_header else {
             return CookiesReader::new(None);
-        }
+        };
 
-        match cookie_header.unwrap().as_str() {
+        match cookie_header.as_str() {
             Ok(cookie) => CookiesReader::new(Some(cookie)),
             Err(_) => {
                 return CookiesReader::new(None);

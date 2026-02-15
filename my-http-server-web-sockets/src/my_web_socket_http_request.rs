@@ -1,6 +1,6 @@
 use hyper::{header::*, *};
 use hyper_tungstenite::tungstenite::http::Extensions;
-use my_http_server_core::{MyHyperHttpRequest, RequestIp, SocketAddress};
+use my_http_server_core::{CookiesReader, MyHyperHttpRequest, RequestIp, SocketAddress};
 
 pub struct MyWebSocketHttpRequest {
     uri: Uri,
@@ -39,5 +39,16 @@ impl<'s> MyWebSocketHttpRequest {
 
     pub fn get_ip(&'s self) -> RequestIp<'s> {
         RequestIp::new(&self.addr, self.get_headers())
+    }
+
+    pub fn get_cookies(&'s self) -> CookiesReader<'s> {
+        let Some(header) = self.get_headers().get("cookie") else {
+            return CookiesReader::new(None);
+        };
+
+        match header.to_str() {
+            Ok(cookie) => CookiesReader::new(Some(cookie)),
+            Err(_) => CookiesReader::new(None),
+        }
     }
 }
