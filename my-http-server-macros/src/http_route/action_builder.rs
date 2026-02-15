@@ -152,7 +152,6 @@ impl<'s> ActionParameters<'s>{
                     status_code: item.status_code,
                     description: item.description.to_string(),
                     result_type: if let Some(result_type) = item.model{
-                        panic!("result_type: '{}'", result_type);
                         Some(HttpResultModel::create(result_type))
                     }else{
                         None
