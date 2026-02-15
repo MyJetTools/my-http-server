@@ -32,6 +32,8 @@ pub fn generate(results: &Option<Vec<HttpResult>>) -> TokenStream {
 }
 
 fn generate_as_object(object_name: &str, into_structure: TokenStream) -> TokenStream {
+    panic!("generate_as_object: {}", object_name);
+
     if let Some(index) = object_name.find('<') {
         let mut result_obj_name = String::new();
 
