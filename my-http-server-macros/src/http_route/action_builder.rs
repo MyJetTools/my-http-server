@@ -6,7 +6,7 @@ use types_reader::{macros::{MacrosParameters, MacrosEnum}, TokensObject};
 use super::attributes::{ApiData, HttpResult, HttpResultModel};
 
 
-#[derive(MacrosEnum)]
+#[derive(MacrosEnum, Debug)]
 pub enum ActionMethod{
     #[value("GET")]
     Get,
@@ -43,7 +43,7 @@ impl ActionMethod{
 }
 
 
-#[derive(MacrosParameters)]
+#[derive(MacrosParameters, Debug)]
 pub struct HttpActionResult<'s>{
     pub status_code: u16,
     pub description: &'s str,
@@ -53,14 +53,14 @@ pub struct HttpActionResult<'s>{
 
 
 
-#[derive(MacrosEnum)]
+#[derive(MacrosEnum, Debug)]
 pub enum ShouldBeAuthorized{
     Yes,
     No,
     YesWithClaims(Vec<String>),
 }
 
-#[derive(MacrosParameters)]
+#[derive(MacrosParameters, Debug)]
 pub struct ActionParameters<'s>{
     #[allow_ident]
     pub method: ActionMethod,
@@ -180,6 +180,9 @@ pub fn build_action(attr: TokenStream, input: TokenStream) -> Result<TokenStream
     let attr: proc_macro2::TokenStream = attr.into();
     let tokens_object: TokensObject = attr.try_into()?;
     let action_parameters:ActionParameters = (&tokens_object).try_into()?;
+
+
+    panic!("action_parameters: {:?}", action_parameters);
 
     let struct_name = &ast.ident;
 
