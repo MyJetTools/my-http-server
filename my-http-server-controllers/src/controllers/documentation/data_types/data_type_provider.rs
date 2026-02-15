@@ -4,10 +4,15 @@ use my_http_server_core::types::*;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
 use serde::de::DeserializeOwned;
 
-use super::{ArrayElement, HttpDataType, HttpSimpleType};
+use super::{ArrayElement, HttpDataType, HttpObjectStructure, HttpSimpleType};
 
 pub trait DataTypeProvider {
     fn get_data_type() -> HttpDataType;
+
+    fn get_http_data_structure() -> HttpObjectStructure {
+        panic!("Type does not provide HttpObjectStructure")
+    }
+
     fn get_generic_type() -> Option<String> {
         None
     }
@@ -125,6 +130,10 @@ impl<T: DataTypeProvider> DataTypeProvider for Vec<T> {
             Some(generic_type) => Some(format!("array_of_{}", generic_type.as_str()).into()),
             None => None,
         }
+    }
+
+    fn get_http_data_structure() -> HttpObjectStructure {
+        T::get_http_data_structure()
     }
 }
 

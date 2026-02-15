@@ -3,6 +3,7 @@ use crate::generic_utils::GenericData;
 pub fn generate_data_provider(
     struct_name: &syn::Ident,
     generic_data: Option<&GenericData>,
+    get_http_data_structure: proc_macro2::TokenStream,
 ) -> Result<proc_macro2::TokenStream, syn::Error> {
     let (generic, generic_ident, get_generic_type) = if let Some(generic) = generic_data {
         let generic_token_stream = generic.generic.clone();
@@ -30,6 +31,8 @@ pub fn generate_data_provider(
             fn get_data_type() -> my_http_server::controllers::documentation::data_types::HttpDataType {
                 Self::get_http_data_structure().into_http_data_type_object()
             }
+
+            #get_http_data_structure
 
             fn get_generic_type() -> Option<String> {
                #get_generic_type

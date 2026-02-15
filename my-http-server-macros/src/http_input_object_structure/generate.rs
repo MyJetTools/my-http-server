@@ -21,14 +21,6 @@ pub fn generate(ast: &syn::DeriveInput) -> (proc_macro::TokenStream, bool) {
 
     let generic_data = GenericData::new(ast);
 
-    let data_structure_provider = match crate::http_object_structure::generate_data_provider(
-        struct_name,
-        generic_data.as_ref(),
-    ) {
-        Ok(result) => result,
-        Err(err) => return (err.into_compile_error().into(), debug),
-    };
-
     let get_http_data_structure =
         match crate::http_object_structure::generate_get_http_data_structure(
             struct_name,
@@ -38,6 +30,15 @@ pub fn generate(ast: &syn::DeriveInput) -> (proc_macro::TokenStream, bool) {
             Ok(result) => result,
             Err(err) => return (err.into_compile_error().into(), debug),
         };
+
+    let data_structure_provider = match crate::http_object_structure::generate_data_provider(
+        struct_name,
+        generic_data.as_ref(),
+        get_http_data_structure,
+    ) {
+        Ok(result) => result,
+        Err(err) => return (err.into_compile_error().into(), debug),
+    };
 
     let from_encoded_param_value_content = generate_from_encoded_param_value_content();
 
@@ -58,10 +59,6 @@ pub fn generate(ast: &syn::DeriveInput) -> (proc_macro::TokenStream, bool) {
 
             impl #generic_token_stream TryFrom<my_http_server::HttpRequestBody> for #struct_name #generic_ident {
                 #from_http_request_body
-            }
-
-            impl #generic_token_stream #struct_name #generic_ident {
-                #get_http_data_structure
             }
 
             impl #generic_ident TryInto<#struct_name> for &'s my_http_server::FormDataItem #generic_ident {
@@ -85,12 +82,6 @@ pub fn generate(ast: &syn::DeriveInput) -> (proc_macro::TokenStream, bool) {
             impl<'s> TryInto<#struct_name> for &'s my_http_server::FormDataItem<'s>  {
                 #from_form_data
             }
-
-            impl #struct_name {
-                #get_http_data_structure
-            }
-
-
 
         }
     };
