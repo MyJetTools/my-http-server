@@ -1,16 +1,26 @@
-use rust_extensions::StrOrString;
+use crate::{HttpRequestHeaders, SocketAddress};
 
 pub enum RequestIp<'s> {
-    SingleIp(StrOrString<'s>),
+    SingleIp(String),
     Forwarded(Vec<&'s str>),
 }
 
 impl<'s> RequestIp<'s> {
-    pub fn create_as_single_ip(ip: String) -> Self {
-        let mut value = StrOrString::create_as_string(ip);
+    pub fn new(addr: &SocketAddress, headers: &'s impl HttpRequestHeaders) -> Self {
+        let x_forwarded_for = headers.try_get_case_sensitive_as_str(crate::X_FORWARDED_FOR_HEADER);
 
-        extract_ip(&mut value);
-        Self::SingleIp(value)
+        if let Ok(x_forwarded_for) = x_forwarded_for {
+            if let Some(x_forwarded_for) = x_forwarded_for {
+                let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
+                return RequestIp::Forwarded(result);
+            }
+        }
+
+        return RequestIp::SingleIp(addr.ip_as_string());
+    }
+
+    pub fn create_as_single_ip(addr: SocketAddress) -> Self {
+        Self::SingleIp(addr.ip_as_string())
     }
     pub fn get_real_ip(&'s self) -> &'s str {
         match self {
@@ -43,8 +53,12 @@ impl<'s> RequestIp<'s> {
     }
 }
 
-fn extract_ip(src: &mut StrOrString) {
+/*
+fn extract_ip(src: &mut String) {
     if let Some(pos) = src.as_str().find(|itm| itm == ':') {
-        src.slice_it(None, pos.into())
+        for _ in 0..src.len() - pos {
+            src.pop();
+        }
     }
 }
+ */

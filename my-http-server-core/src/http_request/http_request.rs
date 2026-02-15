@@ -101,19 +101,7 @@ impl HttpRequest {
     }
 
     pub fn get_ip<'s>(&'s self) -> RequestIp<'s> {
-        let x_forwarded_for = self
-            .data
-            .headers()
-            .try_get_case_sensitive_as_str(X_FORWARDED_FOR_HEADER);
-
-        if let Ok(x_forwarded_for) = x_forwarded_for {
-            if let Some(x_forwarded_for) = x_forwarded_for {
-                let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
-                return RequestIp::Forwarded(result);
-            }
-        }
-
-        return RequestIp::create_as_single_ip(self.addr.ip_as_string());
+        RequestIp::new(&self.addr, self.get_headers())
     }
 
     pub fn get_host(&self) -> &str {

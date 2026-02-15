@@ -34,7 +34,7 @@ pub use http_server_middleware::*;
 pub use json_encoded_data::JsonEncodedData;
 pub use request_credentials::*;
 //pub use request_flow::HttpServerRequestFlow;
-pub use request_ip::RequestIp;
+pub use request_ip::*;
 pub use url_encoded_data::UrlEncodedData;
 pub use web_content_type::WebContentType;
 

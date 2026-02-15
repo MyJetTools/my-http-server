@@ -23,7 +23,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
     disconnect_timeout: Duration,
     logs: Arc<dyn Logger + Send + Sync + 'static>,
 ) -> Result<MyHttpResponse, Error> {
-    let http_request = MyWebSocketHttpRequest::new(&req);
+    let http_request = MyWebSocketHttpRequest::new(&req, addr.clone());
     let (response, websocket) = match req {
         MyHyperHttpRequest::Incoming(req) => hyper_tungstenite::upgrade(req, None)?,
         MyHyperHttpRequest::Full(req) => hyper_tungstenite::upgrade(req, None)?,

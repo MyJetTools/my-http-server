@@ -1,21 +1,23 @@
 use hyper::{header::*, *};
 use hyper_tungstenite::tungstenite::http::Extensions;
-use my_http_server_core::MyHyperHttpRequest;
+use my_http_server_core::{MyHyperHttpRequest, RequestIp, SocketAddress};
 
 pub struct MyWebSocketHttpRequest {
     uri: Uri,
     headers: HeaderMap<HeaderValue>,
     version: Version,
     extensions: Extensions,
+    addr: SocketAddress,
 }
 
 impl<'s> MyWebSocketHttpRequest {
-    pub fn new(req: &MyHyperHttpRequest) -> Self {
+    pub fn new(req: &MyHyperHttpRequest, addr: SocketAddress) -> Self {
         Self {
             uri: req.uri().clone(),
             headers: req.headers().clone(),
             version: req.version(),
             extensions: req.extensions().clone(),
+            addr,
         }
     }
 
@@ -33,5 +35,9 @@ impl<'s> MyWebSocketHttpRequest {
 
     pub fn get_extensions(&self) -> &Extensions {
         &self.extensions
+    }
+
+    pub fn get_ip(&'s self) -> RequestIp<'s> {
+        RequestIp::new(&self.addr, self.get_headers())
     }
 }
