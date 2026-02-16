@@ -4,8 +4,9 @@ use my_http_server_core::{
     AddHttpHeaders, HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath,
     HttpServerMiddleware, WebContentType,
 };
+use rust_extensions::StrOrString;
 
-use crate::FilesAccess;
+use crate::{FilesAccess, RootPaths};
 
 pub struct FilesMapping {
     pub uri_prefix: HttpPath,
@@ -26,8 +27,9 @@ impl FilesMapping {
 }
 
 pub struct StaticFilesMiddleware {
-    pub file_folders: Option<Vec<FilesMapping>>,
-    pub index_files: Option<Vec<String>>,
+    pub file_folders: Vec<FilesMapping>,
+    pub index_paths: RootPaths,
+    pub index_files: Vec<StrOrString<'static>>,
     pub not_found_file: Option<String>,
     pub files_access: FilesAccess,
     pub headers: HashMap<String, String>,
@@ -35,44 +37,60 @@ pub struct StaticFilesMiddleware {
 
 impl StaticFilesMiddleware {
     pub const DEFAULT_FOLDER: &'static str = "./wwwroot";
-    pub fn new(mappings: Option<Vec<FilesMapping>>, index_files: Option<Vec<String>>) -> Self {
-        let index_files = if let Some(index_file_to_check) = index_files {
-            let mut index_files_result = Vec::with_capacity(index_file_to_check.len());
+    pub fn new() -> Self {
+        /*
+         let index_files = if let Some(index_file_to_check) = index_files {
+             let mut index_files_result = Vec::with_capacity(index_file_to_check.len());
 
-            for index_file in index_file_to_check {
-                if index_file.starts_with('/') {
-                    index_files_result.push(index_file);
-                } else {
-                    index_files_result.push(format!("/{}", index_file));
-                }
-            }
+             for index_file in index_file_to_check {
+                 if index_file.starts_with('/') {
+                     index_files_result.push(index_file);
+                 } else {
+                     index_files_result.push(format!("/{}", index_file));
+                 }
+             }
 
-            Some(index_files_result)
-        } else {
-            None
-        };
+             Some(index_files_result)
+         } else {
+             None
+         };
 
-        let file_folders = if let Some(mut mappings) = mappings {
-            for mapping in &mut mappings {
-                mapping.to_lowercase();
-            }
 
-            Some(mappings)
-        } else {
-            None
-        };
+         let file_folders = if let Some(mut mappings) = mappings {
+             for mapping in &mut mappings {
+                 mapping.to_lowercase();
+             }
 
+             Some(mappings)
+         } else {
+             None
+         };
+        */
         Self {
-            file_folders,
-            index_files,
+            file_folders: Default::default(),
+            index_files: Default::default(),
             not_found_file: None,
             files_access: FilesAccess::new(),
+            index_paths: Default::default(),
             headers: HashMap::new(),
         }
     }
 
+    pub fn add_index_file(&mut self, str: impl Into<StrOrString<'static>>) {
+        self.index_files.push(str.into());
+    }
+
+    pub fn add_file_mapping(&mut self, str: impl Into<StrOrString<'static>>) {
+        self.index_files.push(str.into());
+    }
+
     pub fn add_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.headers.insert(name.into(), value.into());
+        self
+    }
+
+    pub fn add_index_path(mut self, path: &'static str) -> Self {
+        self.index_paths.add(path);
         self
     }
 
@@ -107,20 +125,18 @@ impl StaticFilesMiddleware {
         file_folder: &str,
         path: &str,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
-        if path == "/" {
-            if let Some(index_files) = &self.index_files {
-                for index_file in index_files {
-                    let file_name = get_file_name(file_folder, index_file);
+        if self.index_paths.is_my_path(path) {
+            for index_file in self.index_files.iter() {
+                let file_name = get_file_name(file_folder, index_file.as_str());
 
-                    if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
-                        let result = HttpOutput::from_builder()
-                            .add_headers_opt(self.get_headers())
-                            .set_content_type_opt(WebContentType::detect_by_extension(path))
-                            .set_content(file_content)
-                            .into_ok_result(false);
+                if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
+                    let result = HttpOutput::from_builder()
+                        .add_headers_opt(self.get_headers())
+                        .set_content_type_opt(WebContentType::detect_by_extension(path))
+                        .set_content(file_content)
+                        .into_ok_result(false);
 
-                        return Some(result);
-                    }
+                    return Some(result);
                 }
             }
         }
@@ -173,19 +189,15 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         &self,
         ctx: &mut HttpContext,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
-        if let Some(mappings) = &self.file_folders {
-            for mapping in mappings {
-                if ctx.request.http_path.is_starting_with(&mapping.uri_prefix) {
-                    let path = ctx
-                        .request
-                        .http_path
-                        .as_str_from_segment(mapping.uri_prefix.segments_amount());
+        for mapping in self.file_folders.iter() {
+            if ctx.request.http_path.is_starting_with(&mapping.uri_prefix) {
+                let path = ctx
+                    .request
+                    .http_path
+                    .as_str_from_segment(mapping.uri_prefix.segments_amount());
 
-                    if let Some(result) =
-                        self.handle_folder(mapping.folder_path.as_str(), path).await
-                    {
-                        return Some(result);
-                    }
+                if let Some(result) = self.handle_folder(mapping.folder_path.as_str(), path).await {
+                    return Some(result);
                 }
             }
         }
