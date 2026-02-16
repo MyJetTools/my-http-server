@@ -225,5 +225,18 @@ impl AddHttpHeaders for StaticFilesMiddleware {
 }
 
 fn get_file_name(file_folder: &str, path: &str) -> String {
-    format!("{}{}", file_folder, path)
+    let path_ends = file_folder.ends_with('/');
+    let file_starts = path.starts_with('/');
+
+    if path_ends && file_starts {
+        return format!("{}{}", &file_folder[..file_folder.len() - 1], path);
+    }
+    if path_ends && !file_starts {
+        return format!("{}{}", file_folder, path);
+    }
+    if !path_ends && file_starts {
+        return format!("{}{}", file_folder, path);
+    }
+
+    format!("{}/{}", file_folder, path)
 }
