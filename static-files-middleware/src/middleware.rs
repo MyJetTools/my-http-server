@@ -76,12 +76,14 @@ impl StaticFilesMiddleware {
         }
     }
 
-    pub fn add_index_file(&mut self, str: impl Into<StrOrString<'static>>) {
+    pub fn add_index_file(mut self, str: impl Into<StrOrString<'static>>) -> Self {
         self.index_files.push(str.into());
+        self
     }
 
-    pub fn add_file_mapping(&mut self, str: impl Into<StrOrString<'static>>) {
+    pub fn add_file_mapping(mut self, str: impl Into<StrOrString<'static>>) -> Self {
         self.index_files.push(str.into());
+        self
     }
 
     pub fn add_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
