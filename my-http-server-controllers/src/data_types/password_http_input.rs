@@ -63,16 +63,9 @@ impl<'s> TryInto<PasswordHttpInputField> for my_http_server_core::FormDataItem<'
     type Error = my_http_server_core::HttpFailResult;
     fn try_into(self) -> Result<PasswordHttpInputField, Self::Error> {
         match self {
-            my_http_server_core::FormDataItem::ValueAsString { name, value } => match value {
-                Some(value) => return Ok(PasswordHttpInputField::new(value.to_string())),
-                None => {
-                    return Err(
-                        my_http_server_core::HttpFailResult::required_parameter_is_missing(
-                            name, "FormData",
-                        ),
-                    )
-                }
-            },
+            my_http_server_core::FormDataItem::ValueAsString { value, .. } => {
+                return Ok(PasswordHttpInputField::new(value.to_string()))
+            }
             my_http_server_core::FormDataItem::File { name, .. } => {
                 Err(my_http_server_core::HttpFailResult::as_validation_error(
                     format!("{name} Can not be read from FormData file",),

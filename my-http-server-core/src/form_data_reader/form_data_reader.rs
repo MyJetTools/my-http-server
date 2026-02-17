@@ -37,3 +37,20 @@ impl<'s> FormDataReader<'s> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::FormDataReader;
+
+    #[test]
+    fn test() {
+        let payload = std::include_bytes!("../../../test_form_data_payload.txt");
+
+        let form_data_reader =
+            FormDataReader::new(payload, "DataFormBoundary15c4050a1c8749f2a53abd41b27c9d0f");
+
+        for itm in form_data_reader.data.iter() {
+            println!("{:?}", itm);
+        }
+    }
+}

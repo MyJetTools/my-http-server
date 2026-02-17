@@ -19,7 +19,9 @@ my-json = { tag = "0.3.2", git = "https://github.com/MyJetTools/my-json.git" }
 
 my-telemetry = { tag = "1.2.2", git = "https://github.com/MyJetTools/my-telemetry.git", optional = true }
 
-url-utils = { tag = "0.1.4", git = "https://github.com/MyJetTools/url-utils.git" }
+url-utils = { tag = "0.1.4", git = "https://github.com/MyJetTools/url-utils.git", features = [
+    "server",
+] }
 
 
 futures = "*"

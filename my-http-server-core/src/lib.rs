@@ -21,7 +21,7 @@ mod http_server_data;
 mod web_content_type;
 
 mod form_data_reader;
-pub use form_data_reader::{FormDataItem, FormDataReader};
+pub use url_utils::server::{FormDataItem, FormDataReader};
 
 pub use http_ctx::HttpContext;
 pub use http_fail_result::HttpFailResult;
