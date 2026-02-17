@@ -1,5 +1,3 @@
-use rust_extensions::StrOrString;
-
 pub struct CookiesReader<'s> {
     pub src: Option<&'s str>,
 }
@@ -9,17 +7,17 @@ impl<'s> CookiesReader<'s> {
         Self { src }
     }
 
-    pub fn get(&'s self, name_to_find: &str) -> Option<String> {
+    pub fn get(&'s self, name_to_find: &str) -> Option<&'s str> {
         for (name, value) in self.iterate_all() {
             if name == name_to_find {
-                return Some(value.to_string());
+                return Some(value);
             }
         }
 
         None
     }
 
-    pub fn iterate_all(&'s self) -> Vec<(&'s str, StrOrString<'s>)> {
+    pub fn iterate_all(&'s self) -> Vec<(&'s str, &'s str)> {
         let Some(src) = self.src else {
             return vec![];
         };
@@ -27,18 +25,16 @@ impl<'s> CookiesReader<'s> {
         let mut result = Vec::new();
 
         for kv in src.split(';') {
-            let mut kv = kv.split("=");
+            let index = kv.find('=');
 
-            let key = kv.next().unwrap();
-            let value =
-                url_utils::url_decoder::decode_as_str_or_string(kv.next().unwrap_or_default());
-
-            let value = match value {
-                Ok(value) => value,
-                Err(_) => "".into(),
-            };
-
-            result.push((key, value));
+            match index {
+                Some(index) => {
+                    result.push((&kv[..index], &kv[index + 1..]));
+                }
+                None => {
+                    result.push((kv, ""));
+                }
+            }
         }
 
         result
@@ -55,12 +51,9 @@ mod tests {
 
         let reader = CookiesReader::new(header_value.into());
 
-        assert_eq!(reader.get("_octo"), Some("GH1.1.17".to_string()));
-        assert_eq!(reader.get("_device_id"), Some("7763".to_string()));
-        assert_eq!(
-            reader.get("saved_user_sessions"),
-            Some("527071".to_string())
-        );
+        assert_eq!(reader.get("_octo"), Some("GH1.1.17"));
+        assert_eq!(reader.get("_device_id"), Some("7763"));
+        assert_eq!(reader.get("saved_user_sessions"), Some("527071"));
         assert_eq!(reader.get("not_found"), None);
     }
 }
