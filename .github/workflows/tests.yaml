@@ -2,9 +2,9 @@ name: Test it
 
 on:
   push:
-    branches: [ "*" ]
+    branches: ["*"]
   pull_request:
-    branches: [ "*" ]
+    branches: ["*"]
 
 jobs:
   build-default:
@@ -14,8 +14,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
       - run: cargo build --release
   build-full:
     runs-on: ubuntu-latest
@@ -25,7 +23,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
+        uses: arduino/setup-protoc@v1
       - run: cargo build --all-features
   build-controllers:
     runs-on: ubuntu-latest
@@ -35,7 +33,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
+        uses: arduino/setup-protoc@v1
       - run: cargo build --features controllers
   build-macros:
     runs-on: ubuntu-latest
@@ -45,7 +43,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
+        uses: arduino/setup-protoc@v1
       - run: cargo build --features macros
   build-websocket:
     runs-on: ubuntu-latest
@@ -55,7 +53,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
+        uses: arduino/setup-protoc@v1
       - run: cargo build --features websocket
   build-signal-r:
     runs-on: ubuntu-latest
@@ -65,7 +63,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
+        uses: arduino/setup-protoc@v1
       - run: cargo build --features signal-r
   build-with-telemetry:
     runs-on: ubuntu-latest
@@ -75,7 +73,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
+        uses: arduino/setup-protoc@v1
       - run: cargo build --features with-telemetry
   build-static-files:
     runs-on: ubuntu-latest
@@ -85,5 +83,5 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1     
+        uses: arduino/setup-protoc@v1
       - run: cargo build --features static-files
