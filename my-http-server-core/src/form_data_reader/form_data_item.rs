@@ -129,7 +129,7 @@ impl<'s> FormDataItem<'s> {
                     let content = content.unwrap();
 
                     if content.len() == 0 {
-                        None
+                        Some("")
                     } else {
                         std::str::from_utf8(content).unwrap().into()
                     }
