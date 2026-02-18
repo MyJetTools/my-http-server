@@ -4,3 +4,7 @@ mod files_access;
 pub use files_access::*;
 mod root_paths;
 pub use root_paths::*;
+mod file_mapping;
+pub use file_mapping::*;
+mod etag_caches;
+pub use etag_caches::*;

@@ -1,30 +1,9 @@
 use std::collections::HashMap;
 
-use my_http_server_core::{
-    AddHttpHeaders, HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpPath,
-    HttpServerMiddleware, WebContentType,
-};
+use my_http_server_core::*;
 use rust_extensions::StrOrString;
 
-use crate::{FilesAccess, RootPaths};
-
-pub struct FilesMapping {
-    pub uri_prefix: HttpPath,
-    pub folder_path: String,
-}
-
-impl FilesMapping {
-    pub fn new(uri_prefix: &str, folder_path: &str) -> Self {
-        Self {
-            uri_prefix: HttpPath::from_str(uri_prefix),
-            folder_path: folder_path.to_string(),
-        }
-    }
-
-    pub fn to_lowercase(&mut self) {
-        self.folder_path = self.folder_path.to_lowercase();
-    }
-}
+use crate::{calc_etag, EtagCaches, FilesAccess, FilesMapping, RootPaths};
 
 pub struct StaticFilesMiddleware {
     pub file_folders: Vec<FilesMapping>,
@@ -33,6 +12,7 @@ pub struct StaticFilesMiddleware {
     pub not_found_file: Option<String>,
     pub files_access: FilesAccess,
     pub headers: HashMap<String, String>,
+    pub etag_caches: Option<EtagCaches>,
 }
 
 impl StaticFilesMiddleware {
@@ -73,6 +53,7 @@ impl StaticFilesMiddleware {
             files_access: FilesAccess::new(),
             index_paths: Default::default(),
             headers: HashMap::new(),
+            etag_caches: Default::default(),
         }
     }
 
@@ -83,6 +64,11 @@ impl StaticFilesMiddleware {
 
     pub fn add_file_mapping(mut self, str: impl Into<StrOrString<'static>>) -> Self {
         self.index_files.push(str.into());
+        self
+    }
+
+    pub fn with_etag(mut self) -> Self {
+        self.etag_caches = Some(Default::default());
         self
     }
 
@@ -125,13 +111,20 @@ impl StaticFilesMiddleware {
     async fn handle_folder(
         &self,
         file_folder: &str,
-        path: &str,
+        http_path: &HttpPath,
+        segment: usize,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
+        let path = http_path.as_str_from_segment(segment);
         if self.index_paths.is_my_path(path) {
             for index_file in self.index_files.iter() {
                 let file_name = get_file_name(file_folder, index_file.as_str());
 
                 if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
+                    if let Some(etag_cache) = self.etag_caches.as_ref() {
+                        let etag = calc_etag(file_content.as_slice());
+                        etag_cache.set(http_path, etag).await;
+                    }
+
                     let result = HttpOutput::from_builder()
                         .add_headers_opt(self.get_headers())
                         .set_content_type_opt(WebContentType::detect_by_extension(path))
@@ -147,6 +140,10 @@ impl StaticFilesMiddleware {
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
+                if let Some(etag_cache) = self.etag_caches.as_ref() {
+                    let etag = calc_etag(file_content.as_slice());
+                    etag_cache.set(http_path, etag).await;
+                }
                 let result = HttpOutput::from_builder()
                     .add_headers_opt(self.get_headers())
                     .set_content_type_opt(WebContentType::detect_by_extension(path))
@@ -191,26 +188,42 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         &self,
         ctx: &mut HttpContext,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
+        let path = &ctx.request.http_path;
+
+        if let Some(etag) = ctx
+            .request
+            .get_headers()
+            .try_get_case_insensitive("if-none-match")
+        {
+            if let Ok(etag) = etag.as_str() {
+                if let Some(etag_cache) = self.etag_caches.as_ref() {
+                    if etag_cache.check_etag(path, etag).await {
+                        return Some(HttpOutput::as_not_modified().build().into_ok_result(false));
+                    }
+                }
+            }
+        }
+
         for mapping in self.file_folders.iter() {
             if ctx.request.http_path.is_starting_with(&mapping.uri_prefix) {
-                let path = ctx
-                    .request
-                    .http_path
-                    .as_str_from_segment(mapping.uri_prefix.segments_amount());
+                /*
 
-                if let Some(result) = self.handle_folder(mapping.folder_path.as_str(), path).await {
+                */
+
+                if let Some(result) = self
+                    .handle_folder(
+                        mapping.folder_path.as_str(),
+                        path,
+                        mapping.uri_prefix.segments_amount(),
+                    )
+                    .await
+                {
                     return Some(result);
                 }
             }
         }
 
-        if let Some(result) = self
-            .handle_folder(
-                Self::DEFAULT_FOLDER,
-                ctx.request.http_path.as_str_from_segment(0),
-            )
-            .await
-        {
+        if let Some(result) = self.handle_folder(Self::DEFAULT_FOLDER, path, 0).await {
             return Some(result);
         }
 

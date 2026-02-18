@@ -20,6 +20,10 @@ impl HttpPath {
         std::str::from_utf8(&self.path).unwrap()
     }
 
+    pub fn to_string(&self) -> String {
+        self.as_str().to_string()
+    }
+
     pub fn from_vec(path_as_vec: Vec<u8>) -> Self {
         let mut segments = Vec::new();
 

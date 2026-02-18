@@ -59,13 +59,17 @@ impl HttpOutput {
         HttpResultBuilder::new()
     }
 
-    pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
-        Ok(HttpOkResult {
+    pub fn as_ok(self, write_telemetry: bool) -> HttpOkResult {
+        HttpOkResult {
             write_telemetry,
             #[cfg(feature = "with-telemetry")]
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             output: self,
-        })
+        }
+    }
+
+    pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
+        Ok(self.as_ok(write_telemetry))
     }
 
     #[cfg(feature = "with-telemetry")]
@@ -130,6 +134,16 @@ impl HttpOutput {
             content_type: Some(WebContentType::Text),
             cookies: Default::default(),
             content: text.into_bytes(),
+        }
+    }
+
+    pub fn as_not_modified() -> HttpResultBuilder {
+        HttpResultBuilder {
+            status_code: 304,
+            headers: Default::default(),
+            content_type: Default::default(),
+            cookies: Default::default(),
+            content: Default::default(),
         }
     }
 
