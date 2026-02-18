@@ -177,17 +177,18 @@ impl StaticFilesMiddleware {
         path: &str,
         file_content: Vec<u8>,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let etag = if let Some(etag_cache) = self.etag_caches.as_ref() {
+        let (etag, cache_control) = if let Some(etag_cache) = self.etag_caches.as_ref() {
             let etag = calc_etag(file_content.as_slice());
             etag_cache.set(http_path, etag.clone()).await;
-            Some(etag)
+            (Some(etag), Some("no-cache"))
         } else {
-            None
+            (None, None)
         };
 
         let result = HttpOutput::from_builder()
             .add_headers_opt(self.get_headers())
             .add_header_if_some("ETag", etag)
+            .add_header_if_some("Cache-Control", cache_control)
             .set_content_type_opt(WebContentType::detect_by_extension(path))
             .set_content(file_content)
             .into_ok_result(false);
