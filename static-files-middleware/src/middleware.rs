@@ -150,13 +150,14 @@ impl StaticFilesMiddleware {
                  */
             }
             Err(_) => {
-                return self.handle_not_found(file_folder).await;
+                return self.handle_not_found(http_path, file_folder).await;
             }
         }
     }
 
     async fn handle_not_found(
         &self,
+        http_path: &HttpPath,
         file_folder: &str,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let not_found_file = self.not_found_file.as_ref()?;
@@ -164,11 +165,9 @@ impl StaticFilesMiddleware {
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
-                let result = HttpOutput::from_builder()
-                    .add_headers_opt(self.get_headers())
-                    .set_content_type_opt(WebContentType::detect_by_extension(not_found_file))
-                    .set_content(file_content)
-                    .into_ok_result(false);
+                let result = self
+                    .compile_response(http_path, http_path.as_str(), file_content)
+                    .await;
 
                 return Some(result);
             }
