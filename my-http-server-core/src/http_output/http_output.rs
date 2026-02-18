@@ -43,6 +43,7 @@ pub enum HttpOutput {
     Redirect {
         headers: Option<HashMap<String, String>>,
         url: String,
+        set_cookies: Option<CookieJar>,
         redirect_type: RedirectType,
     },
 
@@ -201,6 +202,7 @@ impl HttpOutput {
                 RedirectType::Temporary
             },
             headers: None,
+            set_cookies: None,
         }
     }
 
@@ -222,11 +224,7 @@ impl HttpOutput {
         match self {
             Self::Empty => 204,
             Self::Content { status_code, .. } => *status_code,
-            Self::Redirect {
-                url: _,
-                redirect_type,
-                headers: _,
-            } => redirect_type.get_status_code(),
+            Self::Redirect { redirect_type, .. } => redirect_type.get_status_code(),
 
             Self::File {
                 file_name: _,
@@ -253,9 +251,7 @@ impl HttpOutput {
                 }
             }
             HttpOutput::Redirect {
-                headers: _,
-                url,
-                redirect_type,
+                url, redirect_type, ..
             } => format!("Redirect to '{}' with type '{:?}'", url, redirect_type).into(),
             HttpOutput::File { file_name, content } => {
                 format!("File '{}' with size {} bytes", file_name, content.len()).into()
@@ -399,6 +395,7 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
                 url,
                 redirect_type,
                 headers,
+                set_cookies,
             } => {
                 let mut builder = Response::builder()
                     .status(redirect_type.get_status_code())
@@ -407,6 +404,12 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
                 if let Some(headers) = headers {
                     for (key, value) in headers {
                         builder = builder.header(key, value);
+                    }
+                }
+
+                if let Some(cookies) = set_cookies {
+                    for itm in cookies.get_cookies() {
+                        builder = builder.header("Set-Cookie", itm.to_string());
                     }
                 }
 
