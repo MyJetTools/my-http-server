@@ -1,5 +1,6 @@
 use my_http_server_core::HttpPath;
 
+use rust_extensions::str_utils::StrUtils;
 use tokio::sync::RwLock;
 
 struct ETagCache {
@@ -17,7 +18,7 @@ impl EtagCaches {
         let read_access = self.data.read().await;
 
         for itm in read_access.iter() {
-            if itm.path.eq_ignore_ascii_case(path.as_str()) {
+            if itm.path.eq_case_insensitive(path.as_str()) {
                 if itm.etag == etag {
                     return true;
                 }
@@ -33,7 +34,7 @@ impl EtagCaches {
         let mut write_access = self.data.write().await;
 
         for itm in write_access.iter_mut() {
-            if itm.path.eq_ignore_ascii_case(path.as_str()) {
+            if itm.path.eq_case_insensitive(path.as_str()) {
                 itm.etag = etag;
                 return;
             }
