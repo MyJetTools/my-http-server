@@ -10,6 +10,8 @@ pub struct Cookie {
     pub path: Option<StrOrString<'static>>,
     pub http_only: bool,
     pub partitioned: bool,
+    pub secure: bool,
+    pub same_site: bool,
 }
 
 impl Cookie {
@@ -23,6 +25,8 @@ impl Cookie {
             http_only: false,
             partitioned: false,
             path: None,
+            secure: false,
+            same_site: false,
         }
     }
     pub fn set_expires_at(mut self, expires_at: DateTimeAsMicroseconds) -> Self {
@@ -37,6 +41,11 @@ impl Cookie {
 
     pub fn set_domain(mut self, domain: impl Into<StrOrString<'static>>) -> Self {
         self.domain = Some(domain.into());
+        self
+    }
+
+    pub fn set_secure(mut self) -> Self {
+        self.secure = true;
         self
     }
 
@@ -78,8 +87,16 @@ impl Cookie {
             add_empty_element(&mut result, "HttpOnly");
         }
 
-        if self.http_only {
+        if self.partitioned {
             add_empty_element(&mut result, "Partitioned");
+        }
+
+        if self.secure {
+            add_empty_element(&mut result, "Secure");
+        }
+
+        if self.same_site {
+            add_element(&mut result, "Samesite", "None");
         }
 
         result
@@ -97,6 +114,8 @@ impl Into<Cookie> for (String, String) {
             http_only: false,
             partitioned: false,
             path: None,
+            same_site: false,
+            secure: false,
         }
     }
 }
@@ -112,6 +131,8 @@ impl Into<Cookie> for (&'static str, String) {
             http_only: false,
             partitioned: false,
             path: None,
+            same_site: false,
+            secure: false,
         }
     }
 }
@@ -127,6 +148,8 @@ impl Into<Cookie> for (String, String, DateTimeAsMicroseconds) {
             http_only: false,
             partitioned: false,
             path: None,
+            same_site: false,
+            secure: false,
         }
     }
 }
@@ -142,6 +165,8 @@ impl Into<Cookie> for (&'static str, String, DateTimeAsMicroseconds) {
             http_only: false,
             partitioned: false,
             path: None,
+            same_site: false,
+            secure: false,
         }
     }
 }
