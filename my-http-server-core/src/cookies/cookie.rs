@@ -49,6 +49,11 @@ impl Cookie {
         self
     }
 
+    pub fn set_same_site(mut self) -> Self {
+        self.same_site = true;
+        self
+    }
+
     pub fn set_path(mut self, path: impl Into<StrOrString<'static>>) -> Self {
         self.path = Some(path.into());
         self
