@@ -56,6 +56,18 @@ impl HttpResultBuilder {
         self
     }
 
+    pub fn add_header_if_some<'s>(
+        self,
+        key: impl Into<StrOrString<'s>>,
+        value: Option<impl Into<StrOrString<'s>>>,
+    ) -> Self {
+        if let Some(value) = value {
+            return self.add_header(key, value);
+        }
+
+        self
+    }
+
     pub fn add_headers(
         mut self,
         headers: impl Iterator<

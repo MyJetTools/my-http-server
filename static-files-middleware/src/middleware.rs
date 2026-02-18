@@ -120,18 +120,7 @@ impl StaticFilesMiddleware {
                 let file_name = get_file_name(file_folder, index_file.as_str());
 
                 if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
-                    if let Some(etag_cache) = self.etag_caches.as_ref() {
-                        let etag = calc_etag(file_content.as_slice());
-                        etag_cache.set(http_path, etag).await;
-                    }
-
-                    let result = HttpOutput::from_builder()
-                        .add_headers_opt(self.get_headers())
-                        .set_content_type_opt(WebContentType::detect_by_extension(path))
-                        .set_content(file_content)
-                        .into_ok_result(false);
-
-                    return Some(result);
+                    return Some(self.compile_response(http_path, path, file_content).await);
                 }
             }
         }
@@ -140,10 +129,10 @@ impl StaticFilesMiddleware {
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
-                if let Some(etag_cache) = self.etag_caches.as_ref() {
-                    let etag = calc_etag(file_content.as_slice());
-                    etag_cache.set(http_path, etag).await;
-                }
+                return Some(self.compile_response(http_path, path, file_content).await);
+
+                /*
+
                 let result = HttpOutput::from_builder()
                     .add_headers_opt(self.get_headers())
                     .set_content_type_opt(WebContentType::detect_by_extension(path))
@@ -151,6 +140,7 @@ impl StaticFilesMiddleware {
                     .into_ok_result(false);
 
                 return Some(result);
+                 */
             }
             Err(_) => {
                 return self.handle_not_found(file_folder).await;
@@ -179,6 +169,30 @@ impl StaticFilesMiddleware {
                 return None;
             }
         }
+    }
+
+    async fn compile_response(
+        &self,
+        http_path: &HttpPath,
+        path: &str,
+        file_content: Vec<u8>,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let etag = if let Some(etag_cache) = self.etag_caches.as_ref() {
+            let etag = calc_etag(file_content.as_slice());
+            etag_cache.set(http_path, etag.clone()).await;
+            Some(etag)
+        } else {
+            None
+        };
+
+        let result = HttpOutput::from_builder()
+            .add_headers_opt(self.get_headers())
+            .add_header_if_some("ETag", etag)
+            .set_content_type_opt(WebContentType::detect_by_extension(path))
+            .set_content(file_content)
+            .into_ok_result(false);
+
+        return result;
     }
 }
 
