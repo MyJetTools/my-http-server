@@ -120,6 +120,7 @@ impl StaticFilesMiddleware {
         file_folder: &str,
         http_path: &HttpPath,
         segment: usize,
+        etag_header: Option<&str>,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let path = http_path.as_str_from_segment(segment);
         if self.index_paths.is_my_path(path) {
@@ -136,38 +137,42 @@ impl StaticFilesMiddleware {
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
-                return Some(self.compile_response(http_path, path, file_content).await);
-
-                /*
-
-                let result = HttpOutput::from_builder()
-                    .add_headers_opt(self.get_headers())
-                    .set_content_type_opt(WebContentType::detect_by_extension(path))
-                    .set_content(file_content)
-                    .into_ok_result(false);
-
+                let result = self.compile_response(http_path, path, file_content).await;
                 return Some(result);
-                 */
             }
             Err(_) => {
-                return self.handle_not_found(http_path, file_folder).await;
+                return self.handle_not_found(file_folder, etag_header).await;
             }
         }
     }
 
     async fn handle_not_found(
         &self,
-        http_path: &HttpPath,
         file_folder: &str,
+        etag_header: Option<&str>,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let not_found_file = self.not_found_file.as_ref()?;
         let file = get_file_name(file_folder, not_found_file);
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
-                let result = self
-                    .compile_response(http_path, http_path.as_str(), file_content)
-                    .await;
+                let etag = calc_etag(&file_content);
+
+                if let Some(etag_header) = etag_header {
+                    if etag == etag_header {
+                        return Some(HttpOutput::as_not_modified().into_ok_result(false));
+                    }
+                }
+
+                let result = HttpOutput::from_builder()
+                    .add_headers_opt(self.get_headers())
+                    .add_header("ETag", etag)
+                    .add_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                    .add_header("Pragma", "no-cache")
+                    .add_header("Expires", "0")
+                    .set_content_type_opt(WebContentType::detect_by_extension(not_found_file))
+                    .set_content(file_content)
+                    .into_ok_result(false);
 
                 return Some(result);
             }
@@ -226,12 +231,14 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let path = &ctx.request.http_path;
 
+        let mut etag_header = None;
         if let Some(etag) = ctx
             .request
             .get_headers()
             .try_get_case_insensitive("if-none-match")
         {
             if let Ok(etag) = etag.as_str() {
+                etag_header = Some(etag);
                 if let Some(etag_cache) = self.etag_caches.as_ref() {
                     if etag_cache.check_etag(path, etag).await {
                         return Some(HttpOutput::as_not_modified().build().into_ok_result(false));
@@ -251,6 +258,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
                         mapping.folder_path.as_str(),
                         path,
                         mapping.uri_prefix.segments_amount(),
+                        etag_header,
                     )
                     .await
                 {
@@ -259,7 +267,10 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
             }
         }
 
-        if let Some(result) = self.handle_folder(Self::DEFAULT_FOLDER, path, 0).await {
+        if let Some(result) = self
+            .handle_folder(Self::DEFAULT_FOLDER, path, 0, etag_header)
+            .await
+        {
             return Some(result);
         }
 
