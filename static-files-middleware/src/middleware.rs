@@ -154,25 +154,33 @@ impl StaticFilesMiddleware {
         let not_found_file = self.not_found_file.as_ref()?;
         let file = get_file_name(file_folder, not_found_file);
 
+        if let Some(etag_header) = etag_header {
+            if let Some(etag_caches) = self.etag_caches.as_ref() {
+                if etag_caches.is_not_found(etag_header).await {
+                    return Some(HttpOutput::as_not_modified().into_ok_result(false));
+                }
+            }
+        }
+
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
                 let etag = calc_etag(&file_content);
 
                 if let Some(etag_header) = etag_header {
-                    if etag == etag_header {
-                        return Some(HttpOutput::as_not_modified().into_ok_result(false));
-                    }
+                    if etag == etag_header {}
                 }
 
                 let result = HttpOutput::from_builder()
                     .add_headers_opt(self.get_headers())
-                    .add_header("ETag", etag)
-                    .add_header("Cache-Control", "no-cache, no-store, must-revalidate")
-                    .add_header("Pragma", "no-cache")
-                    .add_header("Expires", "0")
+                    .add_header("ETag", etag.as_str())
+                    .add_header("Cache-Control", "no-cache")
                     .set_content_type_opt(WebContentType::detect_by_extension(not_found_file))
                     .set_content(file_content)
                     .into_ok_result(false);
+
+                if let Some(etag_caches) = self.etag_caches.as_ref() {
+                    etag_caches.set_not_found(etag).await;
+                }
 
                 return Some(result);
             }
