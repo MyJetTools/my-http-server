@@ -55,5 +55,11 @@ pub fn calc_etag(content: &[u8]) -> String {
 
     sha_256.update(content);
     let result = sha_256.finalize();
-    base64::engine::general_purpose::STANDARD.encode(result)
+    let mut result = base64::engine::general_purpose::STANDARD.encode(result);
+
+    if result.ends_with('=') {
+        result.pop();
+    }
+
+    result
 }

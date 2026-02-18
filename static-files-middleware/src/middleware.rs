@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use my_http_server_core::*;
 use rust_extensions::StrOrString;
 
-use crate::{calc_etag, EtagCaches, FilesAccess, FilesMapping, RootPaths};
+use crate::{calc_etag, EtagCaches, FilesAccess, FilesMapping, NoCache, RootPaths};
 
 pub struct StaticFilesMiddleware {
     pub file_folders: Vec<FilesMapping>,
@@ -12,7 +12,8 @@ pub struct StaticFilesMiddleware {
     pub not_found_file: Option<String>,
     pub files_access: FilesAccess,
     pub headers: HashMap<String, String>,
-    pub etag_caches: Option<EtagCaches>,
+    etag_caches: Option<EtagCaches>,
+    no_cache: NoCache,
 }
 
 impl StaticFilesMiddleware {
@@ -54,6 +55,7 @@ impl StaticFilesMiddleware {
             index_paths: Default::default(),
             headers: HashMap::new(),
             etag_caches: Default::default(),
+            no_cache: Default::default(),
         }
     }
 
@@ -84,6 +86,11 @@ impl StaticFilesMiddleware {
 
     pub fn enable_files_caching(mut self) -> Self {
         self.files_access.enable_caching();
+        self
+    }
+
+    pub fn set_path_not_to_cache(mut self, path: impl Into<String>) -> Self {
+        self.no_cache.add_path(path.into());
         self
     }
 
@@ -177,18 +184,33 @@ impl StaticFilesMiddleware {
         path: &str,
         file_content: Vec<u8>,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let (etag, cache_control) = if let Some(etag_cache) = self.etag_caches.as_ref() {
+        let (etag, cache_control, pragma, expires) = if let Some(etag_cache) =
+            self.etag_caches.as_ref()
+        {
             let etag = calc_etag(file_content.as_slice());
             etag_cache.set(http_path, etag.clone()).await;
-            (Some(etag), Some("no-cache"))
+
+            let (cache_control, pragma, expires) = if self.no_cache.marked_as_no_cache(http_path) {
+                (
+                    "no-cache, no-store, must-revalidate",
+                    Some("no-cache"),
+                    Some("0"),
+                )
+            } else {
+                ("no-cache", None, None)
+            };
+
+            (Some(etag), Some(cache_control), pragma, expires)
         } else {
-            (None, None)
+            (None, None, None, None)
         };
 
         let result = HttpOutput::from_builder()
             .add_headers_opt(self.get_headers())
             .add_header_if_some("ETag", etag)
             .add_header_if_some("Cache-Control", cache_control)
+            .add_header_if_some("Pragma", pragma)
+            .add_header_if_some("Expires", expires)
             .set_content_type_opt(WebContentType::detect_by_extension(path))
             .set_content(file_content)
             .into_ok_result(false);
