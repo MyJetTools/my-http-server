@@ -29,6 +29,27 @@ impl Cookie {
             same_site: false,
         }
     }
+
+    pub fn new_common_case(
+        name: impl Into<String>,
+        value: impl Into<String>,
+        domain: impl Into<StrOrString<'static>>,
+        expiration: DateTimeAsMicroseconds,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            value: value.into(),
+            expires_at: Some(expiration),
+            max_age: None,
+            domain: Some(domain.into()),
+            http_only: true,
+            partitioned: false,
+            path: Some("/".into()),
+            secure: true,
+            same_site: true,
+        }
+    }
+
     pub fn set_expires_at(mut self, expires_at: DateTimeAsMicroseconds) -> Self {
         self.expires_at = Some(expires_at);
         self
