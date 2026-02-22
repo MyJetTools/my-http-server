@@ -127,7 +127,8 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                     if packet_type == "1" {
                         #[cfg(feature = "with-telemetry")]
                         let ctx = MyTelemetryContext::Single(
-                            DateTimeAsMicroseconds::now().unix_microseconds,
+                            rust_extensions::date_time::DateTimeAsMicroseconds::now()
+                                .unix_microseconds,
                         );
 
                         #[cfg(feature = "with-telemetry")]
