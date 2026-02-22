@@ -198,8 +198,13 @@ impl HttpResultBuilder {
                 }
             }
             HttpOutput::Content {
-                headers, content, ..
+                headers,
+                content,
+                status_code,
             } => {
+                if *status_code != 200 {
+                    *status_code = 200;
+                }
                 headers.set_content_type(CONTENT_TYPE_TO_SET);
                 *content = text_content.into_bytes();
             }
@@ -251,7 +256,14 @@ impl HttpResultBuilder {
                     content: content_to_set,
                 }
             }
-            HttpOutput::Content { content, .. } => {
+            HttpOutput::Content {
+                content,
+                status_code,
+                ..
+            } => {
+                if *status_code != 200 {
+                    *status_code = 200;
+                }
                 *content = content_to_set;
             }
             HttpOutput::Redirect { .. } => {
