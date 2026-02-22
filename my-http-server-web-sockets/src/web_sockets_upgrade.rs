@@ -12,7 +12,7 @@ use crate::{MyWebSocket, MyWebSocketCallback, MyWebSocketHttpRequest};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-use my_http_server_core::{my_hyper_utils::*, MyHyperHttpRequest, SocketAddress};
+use my_http_server_core::{my_hyper_utils::*, HttpOutput, MyHyperHttpRequest, SocketAddress};
 
 pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
     id: i64,
@@ -29,61 +29,64 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
         MyHyperHttpRequest::Full(req) => hyper_tungstenite::upgrade(req, None)?,
     };
 
-    tokio::spawn(async move {
-        let ws_stream = websocket.await;
-
-        match ws_stream {
-            Ok(ws_stream) => {
-                let (ws_sender, ws_receiver) = ws_stream.split();
-
-                let my_web_socket = MyWebSocket::new(
-                    id,
-                    addr,
-                    ws_sender,
-                    query_string.clone(),
-                    callback.clone(),
-                    logs.clone(),
-                );
-
-                let my_web_socket = Arc::new(my_web_socket);
-
-                let connected_result = callback
-                    .connected(my_web_socket.clone(), http_request, disconnect_timeout)
-                    .await;
-
-                if let Err(err) = connected_result {
-                    let mut ctx = HashMap::new();
-                    ctx.insert("SocketId".to_string(), id.to_string());
-                    if let Some(query_string) = query_string {
-                        ctx.insert("QueryString".to_string(), query_string);
-                    }
-
-                    logs.write_fatal_error(
-                        "UpgradeWsSocket".to_string(),
-                        format!("{:?}", err),
-                        Some(ctx),
-                    );
-                }
-
-                let my_web_socket_cloned = my_web_socket.clone();
-
-                if let Err(e) = serve_websocket(
-                    my_web_socket_cloned,
-                    ws_receiver,
-                    callback,
-                    disconnect_timeout,
-                )
-                .await
-                {
-                    println!("Error after serving websocket connection: {e}");
-                }
-
-                my_web_socket.disconnect().await;
-            }
-            Err(err) => {
-                println!("Error in websocket connection: {}", err);
-            }
+    let ws_stream = match websocket.await {
+        Ok(ws_stream) => ws_stream,
+        Err(err) => {
+            let response =
+                HttpOutput::as_fatal_error(format!("Can not upgrade ws. Err: {:?}", err))
+                    .build()
+                    .build_response();
+            return Ok(response);
         }
+    };
+
+    let (ws_sender, ws_receiver) = ws_stream.split();
+
+    let my_web_socket = MyWebSocket::new(
+        id,
+        addr,
+        ws_sender,
+        query_string.clone(),
+        callback.clone(),
+        logs.clone(),
+    );
+
+    let my_web_socket = Arc::new(my_web_socket);
+
+    let connected_result = callback
+        .connected(my_web_socket.clone(), http_request, disconnect_timeout)
+        .await;
+
+    if let Err(err) = connected_result {
+        let mut ctx = HashMap::new();
+        ctx.insert("SocketId".to_string(), id.to_string());
+        if let Some(query_string) = query_string {
+            ctx.insert("QueryString".to_string(), query_string);
+        }
+
+        logs.write_fatal_error(
+            "UpgradeWsSocket::OnConnect".to_string(),
+            format!("StatusCode: [{}]", err.output.get_status_code()),
+            Some(ctx),
+        );
+        return Ok(err.output.build_response());
+    }
+
+    tokio::spawn(async move {
+        let my_web_socket_cloned = my_web_socket.clone();
+
+        if let Err(e) = serve_websocket(
+            my_web_socket_cloned,
+            ws_receiver,
+            callback,
+            disconnect_timeout,
+        )
+        .await
+        {
+            println!("Error after serving websocket connection: {e}");
+        }
+
+        my_web_socket.disconnect().await;
     });
 
     Ok(response.to_my_http_response())
