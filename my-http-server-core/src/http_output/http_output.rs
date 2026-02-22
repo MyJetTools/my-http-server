@@ -188,16 +188,18 @@ impl HttpOutput {
         (output, producer)
     }
 
-    pub fn as_redirect(url: String, permanent: bool) -> Self {
-        Self::Redirect {
-            url,
+    pub fn as_redirect(url: impl Into<String>, permanent: bool) -> HttpResultBuilder {
+        let output = Self::Redirect {
+            url: url.into(),
             redirect_type: if permanent {
                 RedirectType::Permanent
             } else {
                 RedirectType::Temporary
             },
             headers: HttpResponseHeaders::default(),
-        }
+        };
+
+        HttpResultBuilder { output }
     }
 
     pub fn as_usize(number: usize) -> Self {
