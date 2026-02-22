@@ -218,6 +218,14 @@ impl HttpOutput {
         }
     }
 
+    pub fn as_content(content: Vec<u8>, content_type: Option<WebContentType>) -> Self {
+        Self::Content {
+            headers: HttpResponseHeaders::new(content_type),
+            content,
+            status_code: 200,
+        }
+    }
+
     pub fn get_status_code(&self) -> u16 {
         match self {
             Self::Empty => 204,
