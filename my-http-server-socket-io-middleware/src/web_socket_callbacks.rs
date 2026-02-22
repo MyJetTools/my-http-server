@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use hyper_tungstenite::tungstenite::Message;
 use my_http_server_core::*;
-use my_http_server_web_sockets::{MyWebSocket, MyWebSocketHttpRequest};
+use my_http_server_web_sockets::{MyWebSocket, MyWebSocketHttpRequest, WebSocketConnectedFail};
 
 use socket_io_utils::{SocketIoContract, SocketIoMessage, SocketIoSettings};
 
@@ -132,7 +132,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
         my_web_socket: Arc<MyWebSocket>,
         _request: MyWebSocketHttpRequest,
         _disconnect_timeout: Duration,
-    ) -> Result<(), String> {
+    ) -> Result<(), WebSocketConnectedFail> {
         #[cfg(feature = "debug-ws")]
         println!("connected web_socket:{}", my_web_socket.id);
 
@@ -170,7 +170,10 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
             let sid = match sid.as_str() {
                 Ok(sid) => sid,
                 Err(_) => {
-                    return Err(format!("Can not convert SID to string"));
+                    return Err(WebSocketConnectedFail {
+                        reason: format!("Can not convert SID to string"),
+                        write_to_logs: true,
+                    });
                 }
             };
 

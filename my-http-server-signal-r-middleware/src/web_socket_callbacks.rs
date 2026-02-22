@@ -3,13 +3,13 @@ use std::{sync::Arc, time::Duration};
 use my_http_server_web_sockets::MyWebSocket;
 
 use my_http_server_web_sockets::MyWebSocketHttpRequest;
+use my_http_server_web_sockets::WebSocketConnectedFail;
 use my_json::json_reader::JsonFirstLineIterator;
 use my_json::json_reader::JsonValueRef;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::MyTelemetryContext;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
-use rust_extensions::date_time::DateTimeAsMicroseconds;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
@@ -30,7 +30,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
         my_web_socket: Arc<MyWebSocket>,
         _request: MyWebSocketHttpRequest,
         disconnect_timeout: Duration,
-    ) -> Result<(), String> {
+    ) -> Result<(), WebSocketConnectedFail> {
         #[cfg(feature = "debug-ws")]
         println!("connected web_socket:{}", my_web_socket.id);
 

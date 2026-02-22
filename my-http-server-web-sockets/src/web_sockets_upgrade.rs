@@ -69,23 +69,25 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
             .await;
 
         if let Err(err) = connected_result {
-            let mut ctx = HashMap::new();
-            ctx.insert("SocketId".to_string(), id.to_string());
-            if let Some(query_string) = query_string {
-                ctx.insert("QueryString".to_string(), query_string);
-            }
+            if err.write_to_logs {
+                let mut ctx = HashMap::new();
+                ctx.insert("SocketId".to_string(), id.to_string());
+                if let Some(query_string) = query_string {
+                    ctx.insert("QueryString".to_string(), query_string);
+                }
 
-            logs.write_fatal_error(
-                "UpgradeWsSocket".to_string(),
-                format!("{:?}", err),
-                Some(ctx),
-            );
+                logs.write_fatal_error(
+                    "UpgradeWsSocket".to_string(),
+                    format!("{:?}", err.reason),
+                    Some(ctx),
+                );
+            }
 
             my_web_socket
                         .send_message(
                             [WsMessage::Close(Some(CloseFrame {
                                 code: hyper_tungstenite::tungstenite::protocol::frame::coding::CloseCode::Error,
-                                reason: err.into(),
+                                reason: err.reason.into(),
                             }))]
                             .into_iter(),
                         )
