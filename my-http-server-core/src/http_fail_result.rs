@@ -1,3 +1,4 @@
+use my_hyper_utils::MyHttpResponse;
 use rust_extensions::StrOrString;
 
 use crate::{HttpOkResult, HttpOutput, HttpResponseHeaders, WebContentType};
@@ -133,5 +134,11 @@ impl From<(u16, &'static str)> for HttpFailResult {
         };
 
         Self::new(output, false, true)
+    }
+}
+
+impl Into<MyHttpResponse> for HttpFailResult {
+    fn into(self) -> MyHttpResponse {
+        todo!()
     }
 }

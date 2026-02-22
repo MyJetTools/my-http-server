@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::time::Duration;
+use std::{collections::HashMap, sync::Arc};
 
 use futures::StreamExt;
 use futures_util::stream::SplitStream;
@@ -36,15 +36,34 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
             Ok(ws_stream) => {
                 let (ws_sender, ws_receiver) = ws_stream.split();
 
-                let my_web_socket =
-                    MyWebSocket::new(id, addr, ws_sender, query_string, callback.clone(), logs);
+                let my_web_socket = MyWebSocket::new(
+                    id,
+                    addr,
+                    ws_sender,
+                    query_string.clone(),
+                    callback.clone(),
+                    logs.clone(),
+                );
 
                 let my_web_socket = Arc::new(my_web_socket);
 
-                callback
+                let connected_result = callback
                     .connected(my_web_socket.clone(), http_request, disconnect_timeout)
-                    .await
-                    .unwrap();
+                    .await;
+
+                if let Err(err) = connected_result {
+                    let mut ctx = HashMap::new();
+                    ctx.insert("SocketId".to_string(), id.to_string());
+                    if let Some(query_string) = query_string {
+                        ctx.insert("QueryString".to_string(), query_string);
+                    }
+
+                    logs.write_fatal_error(
+                        "UpgradeWsSocket".to_string(),
+                        format!("{:?}", err),
+                        Some(ctx),
+                    );
+                }
 
                 let my_web_socket_cloned = my_web_socket.clone();
 
