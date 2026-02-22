@@ -361,10 +361,8 @@ impl HttpOutput {
             },
         }
     }
-}
 
-impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
-    fn into(self) -> MyHttpResponse {
+    pub fn build_response(self) -> my_hyper_utils::MyHttpResponse {
         return match self {
             HttpOutput::Content {
                 status_code,
@@ -413,5 +411,11 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
                 (builder, content).to_my_http_response()
             }
         };
+    }
+}
+
+impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
+    fn into(self) -> MyHttpResponse {
+        self.build_response()
     }
 }

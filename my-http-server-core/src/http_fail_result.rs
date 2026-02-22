@@ -139,6 +139,6 @@ impl From<(u16, &'static str)> for HttpFailResult {
 
 impl Into<MyHttpResponse> for HttpFailResult {
     fn into(self) -> MyHttpResponse {
-        todo!()
+        self.output.build_response()
     }
 }
