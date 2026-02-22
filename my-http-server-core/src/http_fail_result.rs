@@ -1,6 +1,6 @@
 use rust_extensions::StrOrString;
 
-use crate::{HttpOkResult, HttpOutput, WebContentType};
+use crate::{HttpOkResult, HttpOutput, HttpResponseHeaders, WebContentType};
 
 #[derive(Debug)]
 pub struct HttpFailResult {
@@ -25,13 +25,11 @@ impl HttpFailResult {
 
 impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
     fn from(src: url_utils::url_encoded_data_reader::ReadingEncodedDataError) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 400,
-            headers: Default::default(),
-            content_type: Some(WebContentType::Text),
-            set_cookies: Default::default(),
-            content: format!("Reading encoded parameter failed. Err: '{:?}'", src).into_bytes(),
-        };
+        let output = HttpOutput::as_validation_error(format!(
+            "Reading encoded parameter failed. Err: '{:?}'",
+            src
+        ))
+        .build();
 
         HttpFailResult::new(output, true, false)
     }
@@ -49,13 +47,9 @@ impl HttpFailResult {
     }
 
     pub fn as_path_parameter_required(param_name: &str) -> Self {
-        let output = HttpOutput::Content {
-            status_code: 400,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            set_cookies: None,
-            content: format!("Path parameter '{}' is required", param_name).into_bytes(),
-        };
+        let output =
+            HttpOutput::as_validation_error(format!("Path parameter '{}' is required", param_name))
+                .build();
 
         Self::new(output, false, true)
     }
@@ -122,9 +116,7 @@ impl From<(u16, String)> for HttpFailResult {
     fn from(value: (u16, String)) -> Self {
         let output = HttpOutput::Content {
             status_code: value.0,
-            headers: Default::default(),
-            content_type: WebContentType::Text.into(),
-            set_cookies: Default::default(),
+            headers: HttpResponseHeaders::new(WebContentType::Text.into()),
             content: value.1.into_bytes(),
         };
 
@@ -136,9 +128,7 @@ impl From<(u16, &'static str)> for HttpFailResult {
     fn from(value: (u16, &'static str)) -> Self {
         let output = HttpOutput::Content {
             status_code: value.0,
-            headers: Default::default(),
-            content_type: WebContentType::Text.into(),
-            set_cookies: Default::default(),
+            headers: HttpResponseHeaders::new(WebContentType::Text.into()),
             content: value.1.as_bytes().to_vec(),
         };
 

@@ -17,7 +17,7 @@ impl CookieJar {
         self
     }
 
-    pub fn set_cookies(mut self, cookies: impl Iterator<Item = impl Into<Cookie>>) -> Self {
+    pub fn set_cookies(mut self, cookies: impl IntoIterator<Item = impl Into<Cookie>>) -> Self {
         for cookie in cookies {
             self.cookies.push(cookie.into());
         }

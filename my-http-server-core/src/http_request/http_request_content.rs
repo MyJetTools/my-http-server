@@ -3,10 +3,7 @@ use std::collections::HashMap;
 use serde::de::DeserializeOwned;
 use url_utils::server::FormDataReader;
 
-use crate::{
-    data_src::*, BodyContentType, BodyDataReader, HttpFailResult, HttpOutput, JsonEncodedData,
-    UrlEncodedData, WebContentType,
-};
+use crate::{data_src::*, *};
 
 pub struct HttpRequestBodyContent {
     raw_body: Vec<u8>,
@@ -88,8 +85,6 @@ fn get_body_data_reader_as_url_encoded<'s>(
             let output = HttpOutput::Content {
                 status_code: 412,
                 headers: Default::default(),
-                content_type: WebContentType::Text.into(),
-                set_cookies: Default::default(),
                 content: format!("Can not parse Url Encoded Data. {:?}", err).into_bytes(),
             };
 
@@ -123,8 +118,6 @@ fn get_body_data_reader_as_json_encoded<'s>(
             let output = HttpOutput::Content {
                 status_code: 412,
                 headers: Default::default(),
-                content_type: WebContentType::Text.into(),
-                set_cookies: Default::default(),
                 content: format!("Can not parse Json Encoded Data. {:?}", err).into_bytes(),
             };
 

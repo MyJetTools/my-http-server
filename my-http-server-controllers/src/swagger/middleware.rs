@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use my_http_server_core::{
-    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpServerMiddleware, WebContentType,
+    HttpContext, HttpFailResult, HttpOkResult, HttpOutput, HttpResponseHeaders,
+    HttpServerMiddleware, WebContentType,
 };
 use rust_extensions::StrOrString;
 
@@ -74,10 +75,8 @@ impl HttpServerMiddleware for SwaggerMiddleware {
         {
             let output = HttpOutput::Content {
                 status_code: 200,
-                headers: None,
-                content_type: Some(WebContentType::Css),
+                headers: HttpResponseHeaders::new(WebContentType::Css.into()),
                 content: super::resources::SWAGGER_UI_CSS.to_vec(),
-                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -89,10 +88,8 @@ impl HttpServerMiddleware for SwaggerMiddleware {
         {
             let output = HttpOutput::Content {
                 status_code: 200,
-                headers: None,
-                content_type: Some(WebContentType::JavaScript),
+                headers: HttpResponseHeaders::new(WebContentType::JavaScript.into()),
                 content: super::resources::SWAGGER_UI_BUNDLE_JS.to_vec(),
-                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -104,10 +101,8 @@ impl HttpServerMiddleware for SwaggerMiddleware {
         {
             let output = HttpOutput::Content {
                 status_code: 200,
-                headers: None,
-                content_type: Some(WebContentType::JavaScript),
+                headers: HttpResponseHeaders::new(WebContentType::JavaScript.into()),
                 content: super::resources::SWAGGER_UI_STANDALONE_PRESET_JS.to_vec(),
-                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -119,10 +114,8 @@ impl HttpServerMiddleware for SwaggerMiddleware {
         {
             let output = HttpOutput::Content {
                 status_code: 200,
-                headers: None,
-                content_type: Some(WebContentType::Png),
+                headers: HttpResponseHeaders::new(WebContentType::Png.into()),
                 content: super::resources::FAVICON_32.to_vec(),
-                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -134,10 +127,8 @@ impl HttpServerMiddleware for SwaggerMiddleware {
         {
             let output = HttpOutput::Content {
                 status_code: 200,
-                headers: None,
-                content_type: Some(WebContentType::Png),
+                headers: HttpResponseHeaders::new(WebContentType::Png.into()),
                 content: super::resources::FAVICON_16.to_vec(),
-                set_cookies: None,
             };
             return Some(output.into_ok_result(false));
         }
@@ -158,8 +149,7 @@ impl HttpServerMiddleware for SwaggerMiddleware {
 
             let output = HttpOutput::Content {
                 status_code: 200,
-                headers: None,
-                content_type: Some(WebContentType::Json),
+                headers: HttpResponseHeaders::new(WebContentType::Json.into()),
                 content: super::swagger_yaml::builder::build(
                     self.controllers.as_ref(),
                     self.title.as_str(),
@@ -168,7 +158,6 @@ impl HttpServerMiddleware for SwaggerMiddleware {
                     scheme.as_ref(),
                     global_fail_results,
                 ),
-                set_cookies: None,
             };
 
             return Some(output.into_ok_result(false));

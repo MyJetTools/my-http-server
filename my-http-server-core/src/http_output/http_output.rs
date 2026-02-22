@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{cookies::*, HttpFailResult, HttpOkResult, HttpResultBuilder, WebContentType};
+use crate::{HttpFailResult, HttpOkResult, HttpResultBuilder, WebContentType};
 
 use http::{header::CONTENT_TYPE, Response};
 use my_hyper_utils::*;
@@ -34,22 +32,20 @@ pub enum HttpOutput {
 
     Content {
         status_code: u16,
-        headers: Option<HashMap<String, String>>,
-        content_type: Option<WebContentType>,
-        set_cookies: Option<CookieJar>,
+        headers: HttpResponseHeaders,
         content: Vec<u8>,
     },
 
     Redirect {
-        headers: Option<HashMap<String, String>>,
         url: String,
-        set_cookies: Option<CookieJar>,
+        headers: HttpResponseHeaders,
         redirect_type: RedirectType,
     },
 
     File {
         file_name: String,
         content: Vec<u8>,
+        headers: HttpResponseHeaders,
     },
 
     Raw(MyHttpResponse),
@@ -99,13 +95,12 @@ impl HttpOutput {
     pub fn get_content_type_as_str(&self) -> Option<&str> {
         match self {
             HttpOutput::Empty => "text/plain".into(),
-            HttpOutput::Content { content_type, .. } => content_type.as_ref().map(|ct| ct.as_str()),
+            HttpOutput::Content { headers, .. } => {
+                headers.content_type.as_ref().map(|ct| ct.as_str())
+            }
 
             HttpOutput::Redirect { .. } => None,
-            HttpOutput::File {
-                file_name: _,
-                content: _,
-            } => Some("application/octet-stream"),
+            HttpOutput::File { .. } => Some("application/octet-stream"),
 
             HttpOutput::Raw(data) => data
                 .headers()
@@ -130,21 +125,21 @@ impl HttpOutput {
         let text = text.into().to_string();
 
         HttpResultBuilder {
-            status_code: 200,
-            headers: None,
-            content_type: Some(WebContentType::Text),
-            cookies: Default::default(),
-            content: text.into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 200,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: text.into_bytes(),
+            },
         }
     }
 
     pub fn as_not_modified() -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 304,
-            headers: Default::default(),
-            content_type: Default::default(),
-            cookies: Default::default(),
-            content: Default::default(),
+            output: HttpOutput::Content {
+                status_code: 304,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: Default::default(),
+            },
         }
     }
 
@@ -152,11 +147,11 @@ impl HttpOutput {
         let text = text.into().to_string();
 
         HttpResultBuilder {
-            status_code: 200,
-            headers: None,
-            content_type: Some(WebContentType::Html),
-            cookies: Default::default(),
-            content: text.into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 200,
+                headers: HttpResponseHeaders::new(WebContentType::Html.into()),
+                content: text.into_bytes(),
+            },
         }
     }
 
@@ -164,11 +159,11 @@ impl HttpOutput {
         let json = serde_json::to_vec(&model).unwrap();
 
         HttpResultBuilder {
-            status_code: 200,
-            headers: None,
-            content_type: Some(WebContentType::Json),
-            cookies: Default::default(),
-            content: json,
+            output: HttpOutput::Content {
+                status_code: 200,
+                headers: HttpResponseHeaders::new(WebContentType::Json.into()),
+                content: json,
+            },
         }
     }
 
@@ -176,11 +171,11 @@ impl HttpOutput {
         let yaml = serde_yaml::to_string(&model).unwrap();
 
         HttpResultBuilder {
-            status_code: 200,
-            headers: None,
-            content_type: Some(WebContentType::Yaml),
-            cookies: Default::default(),
-            content: yaml.into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 200,
+                headers: HttpResponseHeaders::new(WebContentType::Yaml.into()),
+                content: yaml.into_bytes(),
+            },
         }
     }
 
@@ -201,23 +196,24 @@ impl HttpOutput {
             } else {
                 RedirectType::Temporary
             },
-            headers: None,
-            set_cookies: None,
+            headers: HttpResponseHeaders::default(),
         }
     }
 
     pub fn as_usize(number: usize) -> Self {
         Self::Content {
             status_code: 200,
-            headers: None,
-            content_type: Some(WebContentType::Text),
+            headers: HttpResponseHeaders::new(WebContentType::Text.into()),
             content: number.to_string().into_bytes(),
-            set_cookies: None,
         }
     }
 
     pub fn as_file(file_name: String, content: Vec<u8>) -> Self {
-        Self::File { file_name, content }
+        Self::File {
+            headers: HttpResponseHeaders::new(WebContentType::detect_by_extension(&file_name)),
+            file_name,
+            content,
+        }
     }
 
     pub fn get_status_code(&self) -> u16 {
@@ -226,10 +222,7 @@ impl HttpOutput {
             Self::Content { status_code, .. } => *status_code,
             Self::Redirect { redirect_type, .. } => redirect_type.get_status_code(),
 
-            Self::File {
-                file_name: _,
-                content: _,
-            } => 200,
+            Self::File { .. } => 200,
 
             HttpOutput::Raw(body) => body.status().as_u16(),
         }
@@ -253,9 +246,9 @@ impl HttpOutput {
             HttpOutput::Redirect {
                 url, redirect_type, ..
             } => format!("Redirect to '{}' with type '{:?}'", url, redirect_type).into(),
-            HttpOutput::File { file_name, content } => {
-                format!("File '{}' with size {} bytes", file_name, content.len()).into()
-            }
+            HttpOutput::File {
+                file_name, content, ..
+            } => format!("File '{}' with size {} bytes", file_name, content.len()).into(),
             HttpOutput::Raw(response) => format!(
                 "Raw response with status code {} and headers: {:?}",
                 response.status().as_u16(),
@@ -267,59 +260,59 @@ impl HttpOutput {
 
     pub fn as_not_found(text: impl Into<String>) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 404,
-            headers: Default::default(),
-            content_type: WebContentType::Text.into(),
-            cookies: Default::default(),
-            content: text.into().into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 404,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: text.into().into_bytes(),
+            },
         }
     }
 
     pub fn as_unauthorized(text: Option<&str>) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 401,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            cookies: None,
-            content: if let Some(text) = text {
-                format!("Unauthorized request: {}", text).into_bytes()
-            } else {
-                format!("Unauthorized request").into_bytes()
+            output: HttpOutput::Content {
+                status_code: 401,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: if let Some(text) = text {
+                    format!("Unauthorized request: {}", text).into_bytes()
+                } else {
+                    format!("Unauthorized request").into_bytes()
+                },
             },
         }
     }
 
     pub fn as_validation_error(text: impl Into<StrOrString<'static>>) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 400,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            cookies: None,
-            content: format!("Validation error: {}", text.into().as_str()).into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 400,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: format!("Validation error: {}", text.into().as_str()).into_bytes(),
+            },
         }
     }
 
     pub fn as_forbidden(text: Option<impl Into<String>>) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 403,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            cookies: None,
-            content: if let Some(text) = text {
-                text.into().into_bytes()
-            } else {
-                format!("Forbidden").into_bytes()
+            output: HttpOutput::Content {
+                status_code: 403,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: if let Some(text) = text {
+                    text.into().into_bytes()
+                } else {
+                    format!("Forbidden").into_bytes()
+                },
             },
         }
     }
 
     pub fn invalid_value_to_parse(reason: impl Into<String>) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 400,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            cookies: None,
-            content: reason.into().into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 400,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: reason.into().into_bytes(),
+            },
         }
     }
 
@@ -328,34 +321,34 @@ impl HttpOutput {
         where_is_parameter: &str,
     ) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 400,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            cookies: None,
-            content: format!(
-                "Required parameter [{param_name}] is missing in {where_is_parameter}"
-            )
-            .into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 400,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: format!(
+                    "Required parameter [{param_name}] is missing in {where_is_parameter}"
+                )
+                .into_bytes(),
+            },
         }
     }
 
     pub fn as_fatal_error(text: impl Into<String>) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 500,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            cookies: None,
-            content: text.into().into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 500,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: text.into().into_bytes(),
+            },
         }
     }
 
     pub fn as_not_supported_content_type(text: impl Into<String>) -> HttpResultBuilder {
         HttpResultBuilder {
-            status_code: 415,
-            headers: None,
-            content_type: WebContentType::Text.into(),
-            cookies: None,
-            content: text.into().into_bytes(),
+            output: HttpOutput::Content {
+                status_code: 415,
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                content: text.into().into_bytes(),
+            },
         }
     }
 }
@@ -366,28 +359,10 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
             HttpOutput::Content {
                 status_code,
                 headers,
-                content_type,
                 content,
-                set_cookies,
             } => {
                 let mut builder = Response::builder().status(status_code);
-
-                if let Some(headers) = headers {
-                    for (key, value) in headers {
-                        builder = builder.header(key, value);
-                    }
-                }
-
-                if let Some(content_type) = content_type {
-                    builder = builder.header("content-type", content_type.as_str());
-                }
-
-                if let Some(cookies) = set_cookies {
-                    for itm in cookies.get_cookies() {
-                        builder = builder.header("Set-Cookie", itm.to_string());
-                    }
-                }
-
+                builder = headers.populate_headers(builder);
                 (builder, content).to_my_http_response()
             }
 
@@ -395,23 +370,12 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
                 url,
                 redirect_type,
                 headers,
-                set_cookies,
             } => {
                 let mut builder = Response::builder()
                     .status(redirect_type.get_status_code())
                     .header("Location", url);
 
-                if let Some(headers) = headers {
-                    for (key, value) in headers {
-                        builder = builder.header(key, value);
-                    }
-                }
-
-                if let Some(cookies) = set_cookies {
-                    for itm in cookies.get_cookies() {
-                        builder = builder.header("Set-Cookie", itm.to_string());
-                    }
-                }
+                builder = headers.populate_headers(builder);
 
                 (builder, vec![]).to_my_http_response()
             }
@@ -421,14 +385,20 @@ impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
             }
 
             HttpOutput::Raw(body) => body,
-            HttpOutput::File { file_name, content } => {
-                let builder = Response::builder().header(
+            HttpOutput::File {
+                file_name,
+                content,
+                headers,
+            } => {
+                let mut builder = Response::builder().header(
                     "content-disposition",
                     format!(
                         "attachment; filename=\"{file_name}\"; filename*=UTF-8''{file_name}",
                         file_name = file_name
                     ),
                 );
+
+                builder = headers.populate_headers(builder);
 
                 (builder, content).to_my_http_response()
             }

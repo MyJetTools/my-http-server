@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use my_http_server_core::*;
 use rust_extensions::StrOrString;
 
@@ -11,7 +9,7 @@ pub struct StaticFilesMiddleware {
     pub index_files: Vec<StrOrString<'static>>,
     pub not_found_file: Option<String>,
     pub files_access: FilesAccess,
-    pub headers: HashMap<String, String>,
+    pub headers: Vec<(StrOrString<'static>, String)>,
     etag_caches: Option<EtagCaches>,
     no_cache: NoCache,
 }
@@ -53,7 +51,7 @@ impl StaticFilesMiddleware {
             not_found_file: None,
             files_access: FilesAccess::new(),
             index_paths: Default::default(),
-            headers: HashMap::new(),
+            headers: Default::default(),
             etag_caches: Default::default(),
             no_cache: Default::default(),
         }
@@ -74,8 +72,12 @@ impl StaticFilesMiddleware {
         self
     }
 
-    pub fn add_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.insert(name.into(), value.into());
+    pub fn add_header(
+        mut self,
+        name: impl Into<StrOrString<'static>>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.headers.push((name.into(), value.into()));
         self
     }
 
@@ -103,14 +105,14 @@ impl StaticFilesMiddleware {
         self
     }
 
-    fn get_headers<'s>(&'s self) -> Option<impl Iterator<Item = (&'s str, &'s str)>> {
+    fn get_headers<'s>(&'s self) -> Option<impl Iterator<Item = (StrOrString<'static>, &'s str)>> {
         if self.headers.is_empty() {
             None
         } else {
             Some(
                 self.headers
                     .iter()
-                    .map(|itm| (itm.0.as_str(), itm.1.as_str())),
+                    .map(|itm| (itm.0.clone(), itm.1.as_str())),
             )
         }
     }
@@ -288,7 +290,8 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
 
 impl AddHttpHeaders for StaticFilesMiddleware {
     fn add_header(&mut self, header_name: impl Into<String>, header_value: impl Into<String>) {
-        self.headers.insert(header_name.into(), header_value.into());
+        self.headers
+            .push((header_name.into().into(), header_value.into()));
     }
 }
 

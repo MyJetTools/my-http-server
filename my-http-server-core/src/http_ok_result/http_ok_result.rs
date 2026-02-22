@@ -21,10 +21,8 @@ impl Into<HttpOkResult> for String {
             add_telemetry_tags: my_telemetry::TelemetryEventTagsBuilder::new(),
             output: HttpOutput::Content {
                 status_code: 200,
-                headers: None,
-                content_type: Some(WebContentType::Text),
+                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
                 content: self.into_bytes(),
-                set_cookies: None,
             },
         }
     }

@@ -1,65 +1,104 @@
-use std::collections::HashMap;
-
 use rust_extensions::StrOrString;
 
-use crate::{cookies::*, AddHttpHeaders, HttpFailResult, HttpOutput, WebContentType};
+use crate::{
+    cookies::*, AddHttpHeaders, HttpFailResult, HttpOutput, HttpResponseHeaders, WebContentType,
+};
 
 use super::HttpOkResult;
 
+const EMPTY_STATUS_CODE: u16 = 204;
+
 pub struct HttpResultBuilder {
+    pub(crate) output: HttpOutput,
+    /*
     pub(crate) status_code: u16,
     pub(crate) headers: Option<HashMap<String, String>>,
     pub(crate) content_type: Option<WebContentType>,
     pub(crate) cookies: Option<CookieJar>,
     pub(crate) content: Vec<u8>,
+     */
 }
 
 impl HttpResultBuilder {
     pub fn new() -> Self {
         Self {
-            status_code: 204,
-            headers: None,
-            content_type: None,
-            cookies: Default::default(),
-            content: Default::default(),
+            output: HttpOutput::Empty, /*
+                                       status_code: 204,
+                                       headers: None,
+                                       content_type: None,
+                                       cookies: Default::default(),
+                                       content: Default::default(),
+                                        */
         }
     }
 
-    pub fn set_content_type(mut self, content_type: WebContentType) -> Self {
-        self.content_type = Some(content_type);
+    pub fn set_content_type(mut self, new_content_type: WebContentType) -> Self {
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: EMPTY_STATUS_CODE,
+                    headers: HttpResponseHeaders::new(Some(new_content_type)),
+                    content: Default::default(),
+                }
+            }
+            HttpOutput::Content { headers, .. } => {
+                headers.set_content_type(new_content_type);
+            }
+            HttpOutput::Redirect { .. } => {
+                panic!("Can not set content type at redirect output");
+            }
+            HttpOutput::File { headers, .. } => {
+                headers.set_content_type(new_content_type);
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set content type to raw response");
+            }
+        }
+
         self
     }
 
-    pub fn set_content_type_opt(mut self, content_type: Option<WebContentType>) -> Self {
+    pub fn set_content_type_opt(self, content_type: Option<WebContentType>) -> Self {
         if let Some(content_type) = content_type {
-            self.content_type = Some(content_type);
+            return self.set_content_type(content_type);
         }
         self
     }
 
-    pub fn add_header<'s>(
+    pub fn add_header(
         mut self,
-        key: impl Into<StrOrString<'s>>,
-        value: impl Into<StrOrString<'s>>,
+        key: impl Into<StrOrString<'static>>,
+        value: impl Into<String>,
     ) -> Self {
-        let key = key.into();
-        let value = value.into();
-
-        if self.headers.is_none() {
-            self.headers = Some(HashMap::new());
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: EMPTY_STATUS_CODE,
+                    headers: HttpResponseHeaders::new_with_header(key.into(), value.into()),
+                    content: Default::default(),
+                }
+            }
+            HttpOutput::Content { headers, .. } => {
+                headers.add_header(key.into(), value.into());
+            }
+            HttpOutput::Redirect { headers, .. } => {
+                headers.add_header(key.into(), value.into());
+            }
+            HttpOutput::File { headers, .. } => {
+                headers.add_header(key.into(), value.into());
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set header to raw output")
+            }
         }
-        self.headers
-            .as_mut()
-            .unwrap()
-            .insert(key.to_string(), value.to_string());
 
         self
     }
 
-    pub fn add_header_if_some<'s>(
+    pub fn add_header_if_some(
         self,
-        key: impl Into<StrOrString<'s>>,
-        value: Option<impl Into<StrOrString<'s>>>,
+        key: impl Into<StrOrString<'static>>,
+        value: Option<impl Into<String>>,
     ) -> Self {
         if let Some(value) = value {
             return self.add_header(key, value);
@@ -70,12 +109,7 @@ impl HttpResultBuilder {
 
     pub fn add_headers(
         mut self,
-        headers: impl Iterator<
-            Item = (
-                impl Into<StrOrString<'static>>,
-                impl Into<StrOrString<'static>>,
-            ),
-        >,
+        headers: impl Iterator<Item = (impl Into<StrOrString<'static>>, impl Into<String>)>,
     ) -> Self {
         for header in headers {
             self = self.add_header(header.0, header.1);
@@ -84,11 +118,9 @@ impl HttpResultBuilder {
         self
     }
 
-    pub fn add_headers_opt<'s>(
+    pub fn add_headers_opt(
         mut self,
-        headers: Option<
-            impl Iterator<Item = (impl Into<StrOrString<'s>>, impl Into<StrOrString<'s>>)>,
-        >,
+        headers: Option<impl Iterator<Item = (impl Into<StrOrString<'static>>, impl Into<String>)>>,
     ) -> Self {
         if let Some(headers) = headers {
             for header in headers {
@@ -100,50 +132,138 @@ impl HttpResultBuilder {
     }
 
     pub fn set_cookie(mut self, cookie: impl Into<Cookie>) -> Self {
-        let cookie_jar = match self.cookies.take() {
-            Some(cookie_jar) => cookie_jar,
-            None => CookieJar::new(),
-        };
-
-        self.cookies = Some(cookie_jar.set_cookie(cookie));
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: EMPTY_STATUS_CODE,
+                    headers: HttpResponseHeaders::new_with_cookie(cookie.into()),
+                    content: Default::default(),
+                }
+            }
+            HttpOutput::Content { headers, .. } => {
+                headers.set_cookie(cookie.into());
+            }
+            HttpOutput::Redirect { headers, .. } => {
+                headers.set_cookie(cookie.into());
+            }
+            HttpOutput::File { headers, .. } => {
+                headers.set_cookie(cookie.into());
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set cookie to raw response");
+            }
+        }
 
         self
     }
 
     pub fn set_cookies(mut self, cookies: impl IntoIterator<Item = impl Into<Cookie>>) -> Self {
-        let mut cookie_jar = match self.cookies.take() {
-            Some(cookies) => cookies,
-            None => CookieJar::new(),
-        };
-
-        for cookie in cookies {
-            cookie_jar = cookie_jar.set_cookie(cookie);
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: EMPTY_STATUS_CODE,
+                    headers: HttpResponseHeaders::new_with_cookies(
+                        CookieJar::new().set_cookies(cookies),
+                    ),
+                    content: Default::default(),
+                }
+            }
+            HttpOutput::Content { headers, .. } => {
+                headers.set_cookies(cookies);
+            }
+            HttpOutput::Redirect { headers, .. } => {
+                headers.set_cookies(cookies);
+            }
+            HttpOutput::File { headers, .. } => {
+                headers.set_cookies(cookies);
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set cookies to raw response");
+            }
         }
-
-        self.cookies = Some(cookie_jar);
 
         self
     }
 
     pub fn set_content_as_text(mut self, content: impl Into<String>) -> Self {
-        let content = content.into();
-        self.content = content.into_bytes();
-        self.content_type = Some(WebContentType::Text);
+        const CONTENT_TYPE_TO_SET: WebContentType = WebContentType::Text;
+        let text_content = content.into();
 
-        self
-    }
-
-    pub fn set_status_code(mut self, status_code: u16) -> Self {
-        self.status_code = status_code;
-        self
-    }
-
-    pub fn set_content(mut self, content: Vec<u8>) -> Self {
-        if self.status_code == 204 {
-            self.status_code = 200;
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: 200,
+                    headers: HttpResponseHeaders::new(CONTENT_TYPE_TO_SET.into()),
+                    content: text_content.into_bytes(),
+                }
+            }
+            HttpOutput::Content {
+                headers, content, ..
+            } => {
+                headers.set_content_type(CONTENT_TYPE_TO_SET);
+                *content = text_content.into_bytes();
+            }
+            HttpOutput::Redirect { .. } => {
+                panic!("Can not set content to redirect response");
+            }
+            HttpOutput::File { content, .. } => {
+                *content = text_content.into_bytes();
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set content to raw response");
+            }
         }
 
-        self.content = content;
+        self
+    }
+
+    pub fn set_status_code(mut self, status_code_to_set: u16) -> Self {
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: status_code_to_set,
+                    headers: Default::default(),
+                    content: Default::default(),
+                }
+            }
+            HttpOutput::Content { status_code, .. } => {
+                *status_code = status_code_to_set;
+            }
+            HttpOutput::Redirect { .. } => {
+                panic!("Can not set status_code to redirect response");
+            }
+            HttpOutput::File { .. } => {
+                panic!("Can not set status_code to File output response");
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set content to raw response");
+            }
+        }
+        self
+    }
+
+    pub fn set_content(mut self, content_to_set: Vec<u8>) -> Self {
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: 200,
+                    headers: Default::default(),
+                    content: content_to_set,
+                }
+            }
+            HttpOutput::Content { content, .. } => {
+                *content = content_to_set;
+            }
+            HttpOutput::Redirect { .. } => {
+                panic!("Can not set status_code to redirect response");
+            }
+            HttpOutput::File { content, .. } => {
+                *content = content_to_set;
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set content to raw response");
+            }
+        }
         self
     }
 
@@ -158,13 +278,7 @@ impl HttpResultBuilder {
     }
 
     pub fn build(self) -> HttpOutput {
-        HttpOutput::Content {
-            status_code: self.status_code,
-            headers: self.headers,
-            content_type: self.content_type,
-            set_cookies: self.cookies,
-            content: self.content,
-        }
+        self.output
     }
 
     pub fn into_err<TResult>(
@@ -184,12 +298,26 @@ impl HttpResultBuilder {
 
 impl AddHttpHeaders for HttpResultBuilder {
     fn add_header(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        if self.headers.is_none() {
-            self.headers = Some(HashMap::new());
+        match &mut self.output {
+            HttpOutput::Empty => {
+                self.output = HttpOutput::Content {
+                    status_code: EMPTY_STATUS_CODE,
+                    headers: HttpResponseHeaders::new_with_header(key.into().into(), value.into()),
+                    content: Default::default(),
+                }
+            }
+            HttpOutput::Content { headers, .. } => {
+                headers.add_header(key.into().into(), value.into());
+            }
+            HttpOutput::Redirect { headers, .. } => {
+                headers.add_header(key.into().into(), value.into());
+            }
+            HttpOutput::File { headers, .. } => {
+                headers.add_header(key.into().into(), value.into());
+            }
+            HttpOutput::Raw(_) => {
+                panic!("Can not set header to raw output")
+            }
         }
-        self.headers
-            .as_mut()
-            .unwrap()
-            .insert(key.into(), value.into());
     }
 }
