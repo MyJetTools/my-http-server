@@ -132,7 +132,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
         my_web_socket: Arc<MyWebSocket>,
         _request: MyWebSocketHttpRequest,
         _disconnect_timeout: Duration,
-    ) -> Result<(), HttpFailResult> {
+    ) -> Result<(), String> {
         #[cfg(feature = "debug-ws")]
         println!("connected web_socket:{}", my_web_socket.id);
 
@@ -167,7 +167,12 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
 
             let sid = sid.unwrap();
 
-            let sid = sid.as_str()?;
+            let sid = match sid.as_str() {
+                Ok(sid) => sid,
+                Err(_) => {
+                    return Err(format!("Can not convert SID to string"));
+                }
+            };
 
             match self
                 .socket_io_list

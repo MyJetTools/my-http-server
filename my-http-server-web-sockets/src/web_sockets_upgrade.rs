@@ -4,15 +4,16 @@ use std::{collections::HashMap, sync::Arc};
 use futures::StreamExt;
 use futures_util::stream::SplitStream;
 
+use hyper_tungstenite::tungstenite::protocol::CloseFrame;
 use hyper_tungstenite::tungstenite::Message;
 use hyper_tungstenite::HyperWebsocketStream;
 use rust_extensions::Logger;
 
-use crate::{MyWebSocket, MyWebSocketCallback, MyWebSocketHttpRequest};
+use crate::{MyWebSocket, MyWebSocketCallback, MyWebSocketHttpRequest, WsMessage};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-use my_http_server_core::{my_hyper_utils::*, HttpOutput, MyHyperHttpRequest, SocketAddress};
+use my_http_server_core::{my_hyper_utils::*, MyHyperHttpRequest, SocketAddress};
 
 pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static>(
     id: i64,
@@ -29,50 +30,70 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
         MyHyperHttpRequest::Full(req) => hyper_tungstenite::upgrade(req, None)?,
     };
 
-    let ws_stream = match websocket.await {
-        Ok(ws_stream) => ws_stream,
-        Err(err) => {
-            let response =
-                HttpOutput::as_fatal_error(format!("Can not upgrade ws. Err: {:?}", err))
-                    .build()
-                    .build_response();
-            return Ok(response);
-        }
-    };
-
-    let (ws_sender, ws_receiver) = ws_stream.split();
-
-    let my_web_socket = MyWebSocket::new(
-        id,
-        addr,
-        ws_sender,
-        query_string.clone(),
-        callback.clone(),
-        logs.clone(),
-    );
-
-    let my_web_socket = Arc::new(my_web_socket);
-
-    let connected_result = callback
-        .connected(my_web_socket.clone(), http_request, disconnect_timeout)
-        .await;
-
-    if let Err(err) = connected_result {
-        let mut ctx = HashMap::new();
-        ctx.insert("SocketId".to_string(), id.to_string());
-        if let Some(query_string) = query_string {
-            ctx.insert("QueryString".to_string(), query_string);
-        }
-
-        logs.write_fatal_error(
-            "UpgradeWsSocket::OnConnect".to_string(),
-            format!("StatusCode: [{}]", err.output.get_status_code()),
-            Some(ctx),
-        );
-        return Ok(err.output.build_response());
-    }
-
     tokio::spawn(async move {
+        let ws_stream = websocket.await;
+
+        let ws_stream = match ws_stream {
+            Ok(ws_stream) => ws_stream,
+            Err(err) => {
+                let mut ctx = HashMap::new();
+                ctx.insert("SocketId".to_string(), id.to_string());
+                if let Some(query_string) = query_string {
+                    ctx.insert("QueryString".to_string(), query_string);
+                }
+
+                logs.write_fatal_error(
+                    "WebSocketUpgrade".to_string(),
+                    format!("{:?}", err),
+                    Some(ctx),
+                );
+                return;
+            }
+        };
+
+        let (ws_sender, ws_receiver) = ws_stream.split();
+
+        let my_web_socket = MyWebSocket::new(
+            id,
+            addr,
+            ws_sender,
+            query_string.clone(),
+            callback.clone(),
+            logs.clone(),
+        );
+
+        let my_web_socket = Arc::new(my_web_socket);
+
+        let connected_result = callback
+            .connected(my_web_socket.clone(), http_request, disconnect_timeout)
+            .await;
+
+        if let Err(err) = connected_result {
+            let mut ctx = HashMap::new();
+            ctx.insert("SocketId".to_string(), id.to_string());
+            if let Some(query_string) = query_string {
+                ctx.insert("QueryString".to_string(), query_string);
+            }
+
+            logs.write_fatal_error(
+                "UpgradeWsSocket".to_string(),
+                format!("{:?}", err),
+                Some(ctx),
+            );
+
+            my_web_socket
+                        .send_message(
+                            [WsMessage::Close(Some(CloseFrame {
+                                code: hyper_tungstenite::tungstenite::protocol::frame::coding::CloseCode::Error,
+                                reason: err.into(),
+                            }))]
+                            .into_iter(),
+                        )
+                        .await;
+
+            return;
+        }
+
         let my_web_socket_cloned = my_web_socket.clone();
 
         if let Err(e) = serve_websocket(

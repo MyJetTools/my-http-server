@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use my_http_server_core::HttpFailResult;
 use my_http_server_web_sockets::MyWebSocket;
 
 use my_http_server_web_sockets::MyWebSocketHttpRequest;
@@ -31,7 +30,7 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
         my_web_socket: Arc<MyWebSocket>,
         _request: MyWebSocketHttpRequest,
         disconnect_timeout: Duration,
-    ) -> Result<(), HttpFailResult> {
+    ) -> Result<(), String> {
         #[cfg(feature = "debug-ws")]
         println!("connected web_socket:{}", my_web_socket.id);
 
