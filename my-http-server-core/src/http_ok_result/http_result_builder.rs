@@ -17,7 +17,7 @@ pub struct HttpResultBuilder {
 impl HttpResultBuilder {
     pub fn new() -> Self {
         Self {
-            status_code: 200,
+            status_code: 204,
             headers: None,
             content_type: None,
             cookies: Default::default(),
@@ -139,6 +139,10 @@ impl HttpResultBuilder {
     }
 
     pub fn set_content(mut self, content: Vec<u8>) -> Self {
+        if self.status_code == 204 {
+            self.status_code = 200;
+        }
+
         self.content = content;
         self
     }
