@@ -202,7 +202,7 @@ impl HttpResultBuilder {
                 content,
                 status_code,
             } => {
-                if *status_code != 200 {
+                if *status_code == EMPTY_STATUS_CODE {
                     *status_code = 200;
                 }
                 headers.set_content_type(CONTENT_TYPE_TO_SET);
@@ -261,7 +261,7 @@ impl HttpResultBuilder {
                 status_code,
                 ..
             } => {
-                if *status_code != 200 {
+                if *status_code == EMPTY_STATUS_CODE {
                     *status_code = 200;
                 }
                 *content = content_to_set;
