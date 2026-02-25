@@ -167,6 +167,16 @@ impl HttpOutput {
         }
     }
 
+    pub fn as_json_opt<T: Serialize>(model: Option<T>) -> HttpResultBuilder {
+        if let Some(model) = model {
+            return Self::as_json(model);
+        }
+
+        HttpResultBuilder {
+            output: HttpOutput::Empty,
+        }
+    }
+
     pub fn as_yaml<T: Serialize>(model: T) -> HttpResultBuilder {
         let yaml = serde_yaml::to_string(&model).unwrap();
 
