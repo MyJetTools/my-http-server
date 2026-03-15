@@ -16,20 +16,22 @@ HTTP actions are organized using a controller-based architecture where each acti
 
 ```
 src/
-├── http/
-│   ├── mod.rs                 # HTTP module exports
-│   ├── builder.rs             # Controller registration
-│   ├── start_up.rs            # HTTP server initialization
-│   ├── errors.rs              # HTTP error types (if needed)
+├── http_server/
+│   ├── mod.rs                      # HTTP module exports
+│   ├── build_controllers.rs        # Controller registration (fn build_controllers)
+│   ├── errors.rs                   # HTTP error types + From<DomainError> (if needed)
 │   └── controllers/
-│       ├── mod.rs             # Controller module exports
+│       ├── mod.rs                  # Controller module exports
 │       └── {controller_group}/
-│           ├── mod.rs         # Group module exports
+│           ├── mod.rs              # Group module exports
 │           └── {action_name}_action.rs  # Individual action
-├── scripts/                   # Business logic (called by actions)
+├── scripts/                        # Business logic (called by actions)
 └── app/
-    └── app_ctx.rs             # Application context
+    └── app_ctx.rs                  # Application context
 ```
+
+**No `start_up.rs`** — the SDK handles HTTP server lifecycle via `configure_http_server`.
+**No `app_states` in `AppContext`** — not needed for HTTP services.
 
 ### 2. Action Structure
 
@@ -456,68 +458,39 @@ HttpFailResult::new(
 
 ### 7. Controller Registration
 
-Actions are registered in `src/http/builder.rs`:
+Actions are registered in `src/http_server/build_controllers.rs`. The function receives `&mut HttpServerBuilder` from `service_sdk` — call `register_*_action` directly on it:
 
 ```rust
 use std::sync::Arc;
-use my_http_server::controllers::{
-    ControllersMiddleware, 
-    ControllersAuthorization, 
-    RequiredClaims,
-    AuthErrorFactory
-};
+
+use service_sdk::HttpServerBuilder;
+
 use crate::app::AppContext;
 
-pub fn build_controllers(app: &Arc<AppContext>) -> ControllersMiddleware {
-    // Create middleware with optional authorization
-    let authorization = ControllersAuthorization::BearerAuthentication {
-        global: true,  // Enable global authorization
-        global_claims: RequiredClaims::from_slice_of_str(&["admin", "user"]),
-    };
-    
-    let auth_error_factory: Option<Arc<dyn AuthErrorFactory + Send + Sync>> = 
-        Some(Arc::new(crate::http::MyAuthErrorFactory::new()));
-    
-    let mut result = ControllersMiddleware::new(
-        Some(authorization),  // Global authorization config
-        auth_error_factory    // Custom error factory for auth failures
-    );
+pub fn build_controllers(app: &Arc<AppContext>, http_server_builder: &mut HttpServerBuilder) {
+    // POST actions
+    http_server_builder
+        .register_post_action(super::controllers::controller_group::PostAction::new(app.clone()));
 
-    // Register POST actions
-    result.register_post_action(Arc::new(
-        crate::http::controllers::controller_group::ActionName::new(app.clone()),
-    ));
+    // GET actions
+    http_server_builder
+        .register_get_action(super::controllers::controller_group::GetAction::new(app.clone()));
 
-    // Register GET actions
-    result.register_get_action(Arc::new(
-        crate::http::controllers::controller_group::ActionName::new(app.clone()),
-    ));
+    // PUT actions
+    http_server_builder
+        .register_put_action(super::controllers::controller_group::UpdateAction::new(app.clone()));
 
-    // Register PUT actions
-    result.register_put_action(Arc::new(
-        crate::http::controllers::controller_group::UpdateAction::new(app.clone()),
-    ));
-
-    // Register DELETE actions
-    result.register_delete_action(Arc::new(
-        crate::http::controllers::controller_group::DeleteAction::new(app.clone()),
-    ));
-
-    // Register OPTIONS actions (for CORS preflight)
-    result.register_options_action(Arc::new(
-        crate::http::controllers::controller_group::OptionsAction::new(app.clone()),
-    ));
-
-    result
+    // DELETE actions
+    http_server_builder
+        .register_delete_action(super::controllers::controller_group::DeleteAction::new(app.clone()));
 }
 ```
 
-**Authorization Types:**
-
-The framework supports three authorization types:
-- `BasicAuthentication` - HTTP Basic Auth
-- `ApiKeys` - API key-based authentication
-- `BearerAuthentication` - Bearer token (JWT) authentication
+**Key differences from the old pattern:**
+- No `ControllersMiddleware` — `HttpServerBuilder` is passed in by the SDK
+- No `Arc::new(...)` wrapping around actions — pass the struct directly
+- No return value — register actions in-place on `http_server_builder`
+- Import from `service_sdk::HttpServerBuilder`, not `my_http_server`
 
 **Authorization Levels:**
 
@@ -555,30 +528,26 @@ pub mod controller_group;
 
 ### 9. Server Startup
 
-HTTP server is initialized in `src/http/start_up.rs`:
+HTTP server is started entirely by the SDK. In `main.rs`, call `configure_http_server` **before** `start_application`:
 
 ```rust
-use std::{net::SocketAddr, sync::Arc};
-use my_http_server::controllers::swagger::SwaggerMiddleware;
-use my_http_server::MyHttpServer;
-use crate::app::AppContext;
+service_context.configure_http_server(|cb| {
+    crate::http_server::build_controllers(&app, cb);
+});
 
-pub fn start(app: &Arc<AppContext>) {
-    let mut http_server = MyHttpServer::new(SocketAddr::from(([0, 0, 0, 0], 8000)));
-
-    let controllers = Arc::new(super::builder::build_controllers(&app));
-
-    let swagger_middleware = SwaggerMiddleware::new(
-        controllers.clone(),
-        crate::app::APP_NAME.to_string(),
-        crate::app::APP_VERSION.to_string(),
-    );
-
-    http_server.add_middleware(Arc::new(swagger_middleware));
-    http_server.add_middleware(controllers);
-    http_server.start(app.app_states.clone(), my_logger::LOGGER.clone());
-}
+service_context.start_application().await;
 ```
+
+**No `start_up.rs` file needed.** Do NOT:
+- Instantiate `MyHttpServer` manually
+- Create `SwaggerMiddleware` yourself
+- Add `app_states` to `AppContext`
+- Import from `my_http_server` directly — use `service_sdk::HttpServerBuilder`
+
+The SDK automatically:
+- Starts the HTTP server on the configured port
+- Mounts Swagger UI at `/swagger`
+- Handles graceful shutdown via its own lifecycle management
 
 ## Design Principles
 
@@ -591,7 +560,7 @@ pub fn start(app: &Arc<AppContext>) {
 
 ## Creating a New Action
 
-1. **Create the action file**: `src/http/controllers/{group}/{action_name}_action.rs`
+1. **Create the action file**: `src/http_server/controllers/{group}/{action_name}_action.rs`
 2. **Define the action struct** with `#[http_route]` macro
 3. **Create input model** with `#[derive(MyHttpInput)]`
 4. **Create output model** (if returning JSON):
@@ -599,7 +568,7 @@ pub fn start(app: &Arc<AppContext>) {
    - If NOT using `model:` in result: `Serialize` (or `Serialize, Deserialize` if needed)
 5. **Implement `handle_request`** function that calls business logic
 6. **Export in module**: Add to `{group}/mod.rs`
-7. **Register in builder**: Add registration call in `builder.rs`
+7. **Register in build_controllers**: Add `http_server_builder.register_*_action(...)` call in `build_controllers.rs`
 
 ## Troubleshooting
 
@@ -917,7 +886,7 @@ async fn handle_request(
 
 ## File Layout
 - `src/http_server/errors.rs`: all HTTP error helpers and `From` conversions.
-- `src/http_server/mod.rs`: export `errors`.
+- `src/http_server/mod.rs`: export `errors` — `mod errors; pub use errors::*;`
 - Controllers import helpers from `crate::http_server::errors`.
 
 ## Helpers (pattern)
