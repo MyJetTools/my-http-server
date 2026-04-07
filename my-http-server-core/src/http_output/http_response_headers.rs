@@ -97,3 +97,10 @@ impl HttpResponseHeaders {
         builder
     }
 }
+
+
+impl Into<HttpResponseHeaders> for WebContentType{
+    fn into(self) -> HttpResponseHeaders {
+        HttpResponseHeaders::new(Some(self))
+    }
+}
