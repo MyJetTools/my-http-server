@@ -3,8 +3,6 @@ use serde::*;
 
 use my_http_server::macros::*;
 
-
-
 #[derive(MyHttpInputObjectStructure, Serialize, Deserialize)]
 pub struct QueueInterval {
     #[serde(rename = "fromId")]
