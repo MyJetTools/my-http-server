@@ -104,7 +104,12 @@ fn generate_from_http_request_body() -> proc_macro2::TokenStream {
         type Error = my_http_server::HttpFailResult;
 
         fn try_from(value: my_http_server::HttpRequestBody) -> Result<Self, Self::Error> {
-            value.get_body_as_json()
+            match value {
+                my_http_server::HttpRequestBody::Full(content) => content.get_body_as_json(),
+                _ => Err(my_http_server::HttpFailResult::as_fatal_error(
+                    "Body is not loaded yet".to_string(),
+                )),
+            }
         }
     }
 }
@@ -117,7 +122,7 @@ fn generate_from_form_data(struct_name: &syn::Ident) -> proc_macro2::TokenStream
             use my_http_server::data_src::*;
             match self {
                 my_http_server::FormDataItem::ValueAsString { value, name } => Ok(
-                    my_http_server::convert_from_str::to_json_from_str(name, value, SRC_FORM_DATA)?,
+                    my_http_server::convert_from_str::to_json_from_str(name, &value, SRC_FORM_DATA)?,
                 ),
                 my_http_server::FormDataItem::File {
                     name,
