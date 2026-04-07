@@ -29,10 +29,10 @@ impl<'s> CookiesReader<'s> {
 
             match index {
                 Some(index) => {
-                    result.push((&kv[..index], &kv[index + 1..]));
+                    result.push((kv[..index].trim(), kv[index + 1..].trim()));
                 }
                 None => {
-                    result.push((kv, ""));
+                    result.push((kv.trim(), ""));
                 }
             }
         }

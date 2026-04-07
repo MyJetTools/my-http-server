@@ -9,4 +9,5 @@ members = [
     "my-http-server-socket-io-middleware",
     "static-files-middleware",
     "signal-r-macros",
+    "tests",
 ]

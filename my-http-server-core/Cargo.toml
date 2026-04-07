@@ -26,7 +26,7 @@ url-utils = { tag = "0.1.4", git = "https://github.com/MyJetTools/url-utils.git"
 
 futures = "*"
 
-tokio = { version = "*" }
+tokio = { version = "*", features = ["net", "rt-multi-thread", "macros"] }
 
 lazy_static = "*"
 hyper = { version = "*", features = ["http1", "http2", "server"] }
