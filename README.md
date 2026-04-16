@@ -907,6 +907,207 @@ async fn handle_request(
 
 ---
 
+# `static-files-middleware`
+
+`HttpServerMiddleware` from the [`static-files-middleware`](static-files-middleware/)
+crate — serves static assets (HTML / JS / CSS / images / …) from local
+folders. Wired up like any other middleware:
+
+```rust
+http_server.add_middleware(Arc::new(middleware));
+```
+
+## Features
+
+- Multiple URI-prefix → local-directory mappings.
+- Default folder `./wwwroot` — works with zero mapping configuration.
+- Index files (`index.html`, etc.) for root-like paths.
+- SPA fallback: serve a fixed file on any miss.
+- Automatic `Content-Type` detection by extension
+  (`WebContentType::detect_by_extension`).
+- ETag + `304 Not Modified` (optional).
+- Optional in-memory file cache.
+- **Deflate compression of cached files** with correct
+  `Accept-Encoding` / `Content-Encoding` / `Vary` handling.
+- Arbitrary response headers attached to every file.
+- Per-path hard `no-cache` (full header set against any proxy/CDN).
+
+## Quick start
+
+```rust
+use std::sync::Arc;
+use static_files_middleware::StaticFilesMiddleware;
+
+let middleware = StaticFilesMiddleware::new()
+    .add_index_file("/index.html")          // candidate index files
+    .add_index_path("/")                    // URLs where index files apply
+    .set_not_found_file("index.html".into())// SPA fallback
+    .enable_files_caching()                 // also enables deflate
+    .with_etag();                           // ETag + 304
+
+http_server.add_middleware(Arc::new(middleware));
+```
+
+The minimal configuration — `StaticFilesMiddleware::new()` — will serve
+files out of `./wwwroot` (`StaticFilesMiddleware::DEFAULT_FOLDER`).
+
+## Builder API
+
+Every method consumes `self` and returns `Self`, so calls chain naturally.
+
+| Method | Purpose |
+|---|---|
+| `new()` | Constructor: no cache, no ETag, no mappings. |
+| `add_index_file(name)` | Adds a candidate index-file name (tried in insertion order). |
+| `add_index_path(path)` | Path on which index files apply. Defaults to `/`. |
+| `add_file_mapping(name)` | Adds a URI-prefix mapping (via `FilesMapping { uri_prefix, folder_path }`). |
+| `set_not_found_file(name)` | File for SPA-style fallback. A leading slash is added automatically. |
+| `with_etag()` | Enables ETag (SHA-256 + base64) and `If-None-Match` → `304`. Also flips ETag computation on in `FilesAccess` so SHA-256 isn't recomputed per request. |
+| `enable_files_caching()` | Caches file contents in memory (`HashMap<String, CachedContent>`). Turns on the deflate branch. |
+| `set_path_not_to_cache(path)` | Path (strict case-insensitive match) that must be served with a hard no-cache header set. |
+| `add_header(name, value)` | Arbitrary response header attached to every file. Implements `AddHttpHeaders`. |
+
+Public fields — `file_folders: Vec<FilesMapping>`, `index_paths`,
+`index_files`, `not_found_file`, `files_access`, `headers` — are
+accessible directly when the builder API isn't enough.
+
+## Path resolution
+
+1. If `If-None-Match` is set and the ETag cache already knows this ETag
+   for the requested path — return `304 Not Modified` immediately, no I/O.
+2. For each `FilesMapping`, check whether the URL starts with its
+   `uri_prefix`. If so, attempt to serve from the mapped directory,
+   offsetting by the number of path segments the prefix consumed.
+3. If no mapping matched — same loop against `./wwwroot` with a segment
+   offset of `0`.
+4. Inside every attempt:
+   - If the path is one of the index-paths (default `/`), iterate all
+     `index_files` in order.
+   - Otherwise try the file itself.
+   - If the file isn't found and `not_found_file` is set — serve it
+     (SPA fallback). The fallback file can also use ETag / `304`.
+
+## Cache-Control
+
+Default policy (kicks in only together with `with_etag()`, which is where
+cache-related headers are set):
+
+- Regular path: `Cache-Control: no-cache` + ETag → clients perform
+  conditional GETs and get `304` on a match.
+- Path registered via `set_path_not_to_cache(...)`:
+  - `Cache-Control: no-cache, no-store, must-revalidate`
+  - `Pragma: no-cache`
+  - `Expires: 0`
+
+Without `with_etag()` these headers are not emitted — behavior is left
+entirely to client/proxy defaults.
+
+## ETag
+
+- Algorithm: `SHA-256(raw_bytes)`, `base64(STANDARD)` with trailing `=`
+  padding stripped.
+- ETag is always computed from the **raw** (uncompressed) content —
+  invariant of how the file is stored in the cache.
+- With cache + `with_etag()` the ETag is computed once and stored in
+  `CachedContent.etag`.
+- `EtagCaches` separately holds a path → ETag map plus a dedicated ETag
+  for the `not_found` file. `If-None-Match` hits that cache first, before
+  any I/O.
+
+## In-memory cache
+
+Enabled by `enable_files_caching()`. Entry shape:
+
+```rust
+pub struct CachedContent {
+    pub data: Vec<u8>,      // raw or deflated
+    pub is_deflated: bool,
+    pub etag: Option<String>,
+}
+```
+
+- Cache is a `Mutex<HashMap<String, CachedContent>>` keyed by the full
+  on-disk path.
+- The cache is **not invalidated** on disk changes — intended for
+  immutable assets. A process restart is the only reload path.
+- Without the cache, files are read from disk on every request and
+  compression is **not** attempted (there would be no place to store the
+  compressed result).
+
+## Deflate compression
+
+When `enable_files_caching()` is on, each file's first cache-miss triggers
+a deflate attempt:
+
+- Size threshold: file **`> 10 KB`** (`10 * 1024` bytes) — candidate.
+- Efficiency threshold: compressed **`≤ 80%`** of the original — store
+  the compressed payload with `is_deflated = true`. Otherwise cache raw.
+- Compression runs exactly once per file; every subsequent request uses
+  the pre-computed buffer.
+
+### Serving the client
+
+`Accept-Encoding` is parsed on every request:
+
+| Cache entry | Client accepts `deflate` | Response body |
+|---|---|---|
+| raw | — | raw `Vec<u8>` |
+| deflated | yes | compressed `Vec<u8>` + `Content-Encoding: deflate` |
+| deflated | no | on-the-fly `inflate`, raw `Vec<u8>` |
+
+`Vary: Accept-Encoding` is added to **every** response the middleware
+produces, so intermediate caches/CDNs don't mix compressed and
+uncompressed representations.
+
+The `Accept-Encoding` parser is token-based: split by `,`, strip
+`;q=...` parameters, compare case-insensitive. `"gzip"` does **not**
+trigger the deflate branch (no substring matches).
+
+### When compression is guaranteed not to happen
+
+- Cache is disabled.
+- File `≤ 10 KB`.
+- Compression was ineffective (`> 80%`).
+
+### Why deflate only
+
+Every modern browser speaks `deflate`. Gzip/Brotli can be added later if
+needed — for now one algorithm keeps things simple.
+
+## Arbitrary headers
+
+`.add_header(name, value)` — the header is emitted with every file the
+middleware serves (including the SPA fallback; `304` responses carry no
+body but share the same header set).
+
+The middleware also implements the `AddHttpHeaders` trait, so it is
+compatible with any code that pushes headers through that interface.
+
+## Crate layout
+
+- [static-files-middleware/src/middleware.rs](static-files-middleware/src/middleware.rs)
+  — `StaticFilesMiddleware`, path resolution, response assembly,
+  `Accept-Encoding` parser.
+- [static-files-middleware/src/files_access.rs](static-files-middleware/src/files_access.rs)
+  — `FilesAccess` and `CachedContent` (cache + deflate + ETag).
+- [static-files-middleware/src/deflate.rs](static-files-middleware/src/deflate.rs)
+  — `try_deflate` (10 KB / 80% thresholds) and `inflate`.
+- [static-files-middleware/src/etag_caches.rs](static-files-middleware/src/etag_caches.rs)
+  — `EtagCaches` and `calc_etag`.
+- [static-files-middleware/src/no_cache.rs](static-files-middleware/src/no_cache.rs)
+  — list of paths flagged as no-cache.
+- [static-files-middleware/src/root_paths.rs](static-files-middleware/src/root_paths.rs)
+  — `RootPaths` (paths where index files apply; default `/`).
+- [static-files-middleware/src/file_mapping.rs](static-files-middleware/src/file_mapping.rs)
+  — `FilesMapping { uri_prefix: HttpPath, folder_path: String }`.
+
+## Dependencies
+
+`my-http-server-core`, `tokio`, `async-trait`, `rust-extensions`, `sha2`,
+`base64`, `flate2`.
+
+---
+
 # Centralized HTTP Error Handling and Conversions (Addendum)
 
 ## Goals

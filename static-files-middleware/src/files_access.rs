@@ -2,9 +2,19 @@ use std::collections::HashMap;
 
 use tokio::sync::Mutex;
 
+use crate::{calc_etag, try_deflate};
+
+#[derive(Clone)]
+pub struct CachedContent {
+    pub data: Vec<u8>,
+    pub is_deflated: bool,
+    pub etag: Option<String>,
+}
+
 pub struct FilesAccess {
-    cache: Mutex<HashMap<String, Vec<u8>>>,
+    cache: Mutex<HashMap<String, CachedContent>>,
     enable_caching: bool,
+    enable_etag: bool,
 }
 
 impl FilesAccess {
@@ -12,6 +22,7 @@ impl FilesAccess {
         Self {
             cache: Mutex::new(HashMap::new()),
             enable_caching: false,
+            enable_etag: false,
         }
     }
 
@@ -19,7 +30,11 @@ impl FilesAccess {
         self.enable_caching = true;
     }
 
-    pub async fn get(&self, filename: &str) -> std::io::Result<Vec<u8>> {
+    pub fn enable_etag(&mut self) {
+        self.enable_etag = true;
+    }
+
+    pub async fn get(&self, filename: &str) -> std::io::Result<CachedContent> {
         if self.enable_caching {
             let cache = self.cache.lock().await;
             if let Some(content) = cache.get(filename) {
@@ -27,13 +42,38 @@ impl FilesAccess {
             }
         }
 
-        let result = tokio::fs::read(filename).await?;
+        let raw = tokio::fs::read(filename).await?;
 
-        if self.enable_caching {
-            let mut cache = self.cache.lock().await;
-            cache.insert(filename.to_string(), result.clone());
+        if !self.enable_caching {
+            return Ok(CachedContent {
+                data: raw,
+                is_deflated: false,
+                etag: None,
+            });
         }
 
-        return Ok(result);
+        let etag = if self.enable_etag {
+            Some(calc_etag(&raw))
+        } else {
+            None
+        };
+
+        let entry = match try_deflate(&raw) {
+            Some(compressed) => CachedContent {
+                data: compressed,
+                is_deflated: true,
+                etag,
+            },
+            None => CachedContent {
+                data: raw,
+                is_deflated: false,
+                etag,
+            },
+        };
+
+        let mut cache = self.cache.lock().await;
+        cache.insert(filename.to_string(), entry.clone());
+
+        Ok(entry)
     }
 }
