@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use tokio::sync::Mutex;
 
-use crate::{calc_etag, try_deflate};
+use crate::{calc_etag, try_zstd};
 
 #[derive(Clone)]
 pub struct CachedContent {
     pub data: Vec<u8>,
-    pub is_deflated: bool,
+    pub is_zstd: bool,
     pub etag: Option<String>,
 }
 
@@ -47,7 +47,7 @@ impl FilesAccess {
         if !self.enable_caching {
             return Ok(CachedContent {
                 data: raw,
-                is_deflated: false,
+                is_zstd: false,
                 etag: None,
             });
         }
@@ -58,15 +58,15 @@ impl FilesAccess {
             None
         };
 
-        let entry = match try_deflate(&raw) {
+        let entry = match try_zstd(&raw) {
             Some(compressed) => CachedContent {
                 data: compressed,
-                is_deflated: true,
+                is_zstd: true,
                 etag,
             },
             None => CachedContent {
                 data: raw,
-                is_deflated: false,
+                is_zstd: false,
                 etag,
             },
         };

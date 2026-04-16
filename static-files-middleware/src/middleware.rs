@@ -1,7 +1,10 @@
 use my_http_server_core::*;
 use rust_extensions::StrOrString;
 
-use crate::{calc_etag, inflate, CachedContent, EtagCaches, FilesAccess, FilesMapping, NoCache, RootPaths};
+use crate::{
+    calc_etag, deflate_compress, zstd_decompress, CachedContent, EtagCaches, FilesAccess,
+    FilesMapping, NoCache, RootPaths,
+};
 
 pub struct StaticFilesMiddleware {
     pub file_folders: Vec<FilesMapping>,
@@ -12,6 +15,29 @@ pub struct StaticFilesMiddleware {
     pub headers: Vec<(StrOrString<'static>, String)>,
     etag_caches: Option<EtagCaches>,
     no_cache: NoCache,
+}
+
+#[derive(Clone, Copy, Default)]
+struct AcceptedEncodings {
+    zstd: bool,
+    deflate: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ResponseEncoding {
+    Identity,
+    Zstd,
+    Deflate,
+}
+
+impl ResponseEncoding {
+    fn header_value(self) -> Option<&'static str> {
+        match self {
+            ResponseEncoding::Identity => None,
+            ResponseEncoding::Zstd => Some("zstd"),
+            ResponseEncoding::Deflate => Some("deflate"),
+        }
+    }
 }
 
 impl StaticFilesMiddleware {
@@ -96,7 +122,7 @@ impl StaticFilesMiddleware {
         http_path: &HttpPath,
         segment: usize,
         etag_header: Option<&str>,
-        client_accepts_deflate: bool,
+        accepted: AcceptedEncodings,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let path = http_path.as_str_from_segment(segment);
         if self.index_paths.is_my_path(path) {
@@ -105,7 +131,7 @@ impl StaticFilesMiddleware {
 
                 if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
                     return Some(
-                        self.compile_response(http_path, path, file_content, client_accepts_deflate)
+                        self.compile_response(http_path, path, file_content, accepted)
                             .await,
                     );
                 }
@@ -117,13 +143,13 @@ impl StaticFilesMiddleware {
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
                 let result = self
-                    .compile_response(http_path, path, file_content, client_accepts_deflate)
+                    .compile_response(http_path, path, file_content, accepted)
                     .await;
                 return Some(result);
             }
             Err(_) => {
                 return self
-                    .handle_not_found(file_folder, etag_header, client_accepts_deflate)
+                    .handle_not_found(file_folder, etag_header, accepted)
                     .await;
             }
         }
@@ -133,7 +159,7 @@ impl StaticFilesMiddleware {
         &self,
         file_folder: &str,
         etag_header: Option<&str>,
-        client_accepts_deflate: bool,
+        accepted: AcceptedEncodings,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let not_found_file = self.not_found_file.as_ref()?;
         let file = get_file_name(file_folder, not_found_file);
@@ -148,13 +174,14 @@ impl StaticFilesMiddleware {
 
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
-                let (body, is_deflated) =
-                    resolve_body(file_content.data, file_content.is_deflated, client_accepts_deflate)
-                        .ok()?;
-
-                let etag = match file_content.etag {
-                    Some(e) => e,
-                    None => calc_etag(body_for_etag(&body, is_deflated).ok()?.as_slice()),
+                let (body, encoding, etag) = match build_response_body(&file_content, accepted) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Some(Err(HttpFailResult::as_fatal_error(format!(
+                            "Failed to prepare cached content: {}",
+                            e
+                        ))));
+                    }
                 };
 
                 let mut builder = HttpOutput::from_builder()
@@ -164,8 +191,8 @@ impl StaticFilesMiddleware {
                     .add_header("Vary", "Accept-Encoding")
                     .set_content_type_opt(WebContentType::detect_by_extension(not_found_file));
 
-                if is_deflated {
-                    builder = builder.add_header("Content-Encoding", "deflate");
+                if let Some(enc) = encoding.header_value() {
+                    builder = builder.add_header("Content-Encoding", enc);
                 }
 
                 let result = builder.set_content(body).into_ok_result(false);
@@ -187,33 +214,32 @@ impl StaticFilesMiddleware {
         http_path: &HttpPath,
         path: &str,
         file_content: CachedContent,
-        client_accepts_deflate: bool,
+        accepted: AcceptedEncodings,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let cached_etag = file_content.etag.clone();
-        let was_deflated = file_content.is_deflated;
+        let with_etag = self.etag_caches.is_some();
 
-        let (body, is_deflated) = resolve_body(
-            file_content.data,
-            file_content.is_deflated,
-            client_accepts_deflate,
-        )
-        .map_err(|e| HttpFailResult::as_fatal_error(format!("Failed to inflate cached content: {}", e)))?;
+        let (body, encoding, etag_opt) = if with_etag {
+            let (b, e, t) = build_response_body(&file_content, accepted).map_err(|err| {
+                HttpFailResult::as_fatal_error(format!(
+                    "Failed to prepare cached content: {}",
+                    err
+                ))
+            })?;
+            (b, e, Some(t))
+        } else {
+            let (b, e) = body_without_etag(&file_content, accepted).map_err(|err| {
+                HttpFailResult::as_fatal_error(format!(
+                    "Failed to prepare cached content: {}",
+                    err
+                ))
+            })?;
+            (b, e, None)
+        };
 
         let (etag, cache_control, pragma, expires) = if let Some(etag_cache) =
             self.etag_caches.as_ref()
         {
-            let etag = match cached_etag {
-                Some(e) => e,
-                None => {
-                    let raw = body_for_etag(&body, was_deflated && is_deflated).map_err(|e| {
-                        HttpFailResult::as_fatal_error(format!(
-                            "Failed to inflate cached content: {}",
-                            e
-                        ))
-                    })?;
-                    calc_etag(&raw)
-                }
-            };
+            let etag = etag_opt.expect("etag must be computed when etag_caches is enabled");
             etag_cache.set(http_path, etag.clone()).await;
 
             let (cache_control, pragma, expires) = if self.no_cache.marked_as_no_cache(http_path) {
@@ -240,8 +266,8 @@ impl StaticFilesMiddleware {
             .add_header("Vary", "Accept-Encoding")
             .set_content_type_opt(WebContentType::detect_by_extension(path));
 
-        if is_deflated {
-            builder = builder.add_header("Content-Encoding", "deflate");
+        if let Some(enc) = encoding.header_value() {
+            builder = builder.add_header("Content-Encoding", enc);
         }
 
         let result = builder.set_content(body).into_ok_result(false);
@@ -274,13 +300,13 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
             }
         }
 
-        let client_accepts_deflate = ctx
+        let accepted = ctx
             .request
             .get_headers()
             .try_get_case_insensitive("accept-encoding")
             .and_then(|h| h.as_str().ok())
-            .map(accept_encoding_has_deflate)
-            .unwrap_or(false);
+            .map(parse_accept_encoding)
+            .unwrap_or_default();
 
         for mapping in self.file_folders.iter() {
             if ctx.request.http_path.is_starting_with(&mapping.uri_prefix) {
@@ -290,7 +316,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
                         path,
                         mapping.uri_prefix.segments_amount(),
                         etag_header,
-                        client_accepts_deflate,
+                        accepted,
                     )
                     .await
                 {
@@ -300,13 +326,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         }
 
         if let Some(result) = self
-            .handle_folder(
-                Self::DEFAULT_FOLDER,
-                path,
-                0,
-                etag_header,
-                client_accepts_deflate,
-            )
+            .handle_folder(Self::DEFAULT_FOLDER, path, 0, etag_header, accepted)
             .await
         {
             return Some(result);
@@ -340,74 +360,132 @@ fn get_file_name(file_folder: &str, path: &str) -> String {
     format!("{}/{}", file_folder, path)
 }
 
-fn accept_encoding_has_deflate(header_value: &str) -> bool {
+fn parse_accept_encoding(header_value: &str) -> AcceptedEncodings {
+    let mut out = AcceptedEncodings::default();
     for token in header_value.split(',') {
         let token = token.trim();
         let name = match token.split(';').next() {
             Some(n) => n.trim(),
             None => token,
         };
-        if name.eq_ignore_ascii_case("deflate") {
-            return true;
+        if name.eq_ignore_ascii_case("zstd") {
+            out.zstd = true;
+        } else if name.eq_ignore_ascii_case("deflate") {
+            out.deflate = true;
         }
     }
-    false
+    out
 }
 
-fn resolve_body(
-    data: Vec<u8>,
-    is_deflated: bool,
-    client_accepts_deflate: bool,
-) -> std::io::Result<(Vec<u8>, bool)> {
-    if !is_deflated {
-        return Ok((data, false));
+/// Returns (body, encoding, etag). Used when ETag is required — always
+/// materialises raw bytes if needed to compute the checksum.
+fn build_response_body(
+    cached: &CachedContent,
+    accepted: AcceptedEncodings,
+) -> std::io::Result<(Vec<u8>, ResponseEncoding, String)> {
+    if cached.is_zstd {
+        if accepted.zstd {
+            let etag = match &cached.etag {
+                Some(e) => e.clone(),
+                None => calc_etag(&zstd_decompress(&cached.data)?),
+            };
+            return Ok((cached.data.clone(), ResponseEncoding::Zstd, etag));
+        }
+
+        let raw = zstd_decompress(&cached.data)?;
+        let etag = match &cached.etag {
+            Some(e) => e.clone(),
+            None => calc_etag(&raw),
+        };
+
+        if accepted.deflate {
+            let deflated = deflate_compress(&raw)?;
+            return Ok((deflated, ResponseEncoding::Deflate, etag));
+        }
+
+        return Ok((raw, ResponseEncoding::Identity, etag));
     }
-    if client_accepts_deflate {
-        return Ok((data, true));
-    }
-    let inflated = inflate(&data)?;
-    Ok((inflated, false))
+
+    let etag = match &cached.etag {
+        Some(e) => e.clone(),
+        None => calc_etag(&cached.data),
+    };
+    Ok((cached.data.clone(), ResponseEncoding::Identity, etag))
 }
 
-fn body_for_etag(body: &[u8], is_deflated: bool) -> std::io::Result<Vec<u8>> {
-    if is_deflated {
-        inflate(body)
-    } else {
-        Ok(body.to_vec())
+/// Returns (body, encoding). Used when ETag is NOT required — avoids the
+/// extra decompression needed for checksum calculation.
+fn body_without_etag(
+    cached: &CachedContent,
+    accepted: AcceptedEncodings,
+) -> std::io::Result<(Vec<u8>, ResponseEncoding)> {
+    if !cached.is_zstd {
+        return Ok((cached.data.clone(), ResponseEncoding::Identity));
     }
+
+    if accepted.zstd {
+        return Ok((cached.data.clone(), ResponseEncoding::Zstd));
+    }
+
+    let raw = zstd_decompress(&cached.data)?;
+    if accepted.deflate {
+        let deflated = deflate_compress(&raw)?;
+        return Ok((deflated, ResponseEncoding::Deflate));
+    }
+
+    Ok((raw, ResponseEncoding::Identity))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::accept_encoding_has_deflate;
+    use super::parse_accept_encoding;
 
     #[test]
-    fn accepts_deflate_simple() {
-        assert!(accept_encoding_has_deflate("deflate"));
+    fn parses_zstd() {
+        let a = parse_accept_encoding("zstd");
+        assert!(a.zstd);
+        assert!(!a.deflate);
     }
 
     #[test]
-    fn accepts_deflate_in_list() {
-        assert!(accept_encoding_has_deflate("gzip, deflate, br"));
+    fn parses_deflate() {
+        let a = parse_accept_encoding("deflate");
+        assert!(!a.zstd);
+        assert!(a.deflate);
     }
 
     #[test]
-    fn accepts_deflate_case_insensitive() {
-        assert!(accept_encoding_has_deflate("GZIP, Deflate"));
+    fn parses_both() {
+        let a = parse_accept_encoding("zstd, deflate, br");
+        assert!(a.zstd);
+        assert!(a.deflate);
     }
 
     #[test]
-    fn accepts_deflate_with_qvalue() {
-        assert!(accept_encoding_has_deflate("gzip;q=1.0, deflate;q=0.8"));
+    fn respects_case() {
+        let a = parse_accept_encoding("Zstd, DEFLATE");
+        assert!(a.zstd);
+        assert!(a.deflate);
     }
 
     #[test]
-    fn rejects_when_missing() {
-        assert!(!accept_encoding_has_deflate("gzip, br"));
+    fn parses_qvalues() {
+        let a = parse_accept_encoding("zstd;q=1.0, deflate;q=0.5");
+        assert!(a.zstd);
+        assert!(a.deflate);
+    }
+
+    #[test]
+    fn rejects_when_neither() {
+        let a = parse_accept_encoding("gzip, br");
+        assert!(!a.zstd);
+        assert!(!a.deflate);
     }
 
     #[test]
     fn not_confused_by_substring() {
-        assert!(!accept_encoding_has_deflate("gzip"));
+        let a = parse_accept_encoding("gzip");
+        assert!(!a.zstd);
+        assert!(!a.deflate);
     }
 }

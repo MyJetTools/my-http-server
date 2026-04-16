@@ -10,5 +10,5 @@ mod etag_caches;
 use etag_caches::*;
 mod no_cache;
 use no_cache::*;
-mod deflate;
-use deflate::*;
+mod compression;
+use compression::*;

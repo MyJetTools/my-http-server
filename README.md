@@ -927,8 +927,9 @@ http_server.add_middleware(Arc::new(middleware));
   (`WebContentType::detect_by_extension`).
 - ETag + `304 Not Modified` (optional).
 - Optional in-memory file cache.
-- **Deflate compression of cached files** with correct
-  `Accept-Encoding` / `Content-Encoding` / `Vary` handling.
+- **Zstd compression of cached files** with transparent `deflate` fallback
+  for legacy clients (`Accept-Encoding` / `Content-Encoding` / `Vary`
+  handled correctly).
 - Arbitrary response headers attached to every file.
 - Per-path hard `no-cache` (full header set against any proxy/CDN).
 
@@ -942,7 +943,7 @@ let middleware = StaticFilesMiddleware::new()
     .add_index_file("/index.html")          // candidate index files
     .add_index_path("/")                    // URLs where index files apply
     .set_not_found_file("index.html".into())// SPA fallback
-    .enable_files_caching()                 // also enables deflate
+    .enable_files_caching()                 // also enables compression
     .with_etag();                           // ETag + 304
 
 http_server.add_middleware(Arc::new(middleware));
@@ -963,7 +964,7 @@ Every method consumes `self` and returns `Self`, so calls chain naturally.
 | `add_file_mapping(name)` | Adds a URI-prefix mapping (via `FilesMapping { uri_prefix, folder_path }`). |
 | `set_not_found_file(name)` | File for SPA-style fallback. A leading slash is added automatically. |
 | `with_etag()` | Enables ETag (SHA-256 + base64) and `If-None-Match` → `304`. Also flips ETag computation on in `FilesAccess` so SHA-256 isn't recomputed per request. |
-| `enable_files_caching()` | Caches file contents in memory (`HashMap<String, CachedContent>`). Turns on the deflate branch. |
+| `enable_files_caching()` | Caches file contents in memory (`HashMap<String, CachedContent>`). Turns on the zstd compression branch. |
 | `set_path_not_to_cache(path)` | Path (strict case-insensitive match) that must be served with a hard no-cache header set. |
 | `add_header(name, value)` | Arbitrary response header attached to every file. Implements `AddHttpHeaders`. |
 
@@ -1020,8 +1021,8 @@ Enabled by `enable_files_caching()`. Entry shape:
 
 ```rust
 pub struct CachedContent {
-    pub data: Vec<u8>,      // raw or deflated
-    pub is_deflated: bool,
+    pub data: Vec<u8>,      // raw or zstd-compressed
+    pub is_zstd: bool,
     pub etag: Option<String>,
 }
 ```
@@ -1034,45 +1035,53 @@ pub struct CachedContent {
   compression is **not** attempted (there would be no place to store the
   compressed result).
 
-## Deflate compression
+## Compression: zstd (+ deflate fallback)
 
 When `enable_files_caching()` is on, each file's first cache-miss triggers
-a deflate attempt:
+a **zstd** compression attempt (level 11 — a practical balance between
+ratio and encode time; compression runs exactly once per file):
 
 - Size threshold: file **`> 10 KB`** (`10 * 1024` bytes) — candidate.
 - Efficiency threshold: compressed **`≤ 80%`** of the original — store
-  the compressed payload with `is_deflated = true`. Otherwise cache raw.
-- Compression runs exactly once per file; every subsequent request uses
-  the pre-computed buffer.
+  the compressed payload with `is_zstd = true`. Otherwise cache raw.
 
 ### Serving the client
 
-`Accept-Encoding` is parsed on every request:
+Both `zstd` and `deflate` tokens are parsed out of `Accept-Encoding` on
+every request. The three-way negotiation:
 
-| Cache entry | Client accepts `deflate` | Response body |
-|---|---|---|
-| raw | — | raw `Vec<u8>` |
-| deflated | yes | compressed `Vec<u8>` + `Content-Encoding: deflate` |
-| deflated | no | on-the-fly `inflate`, raw `Vec<u8>` |
+| Cache entry | Client accepts `zstd` | Client accepts `deflate` | Response body |
+|---|---|---|---|
+| raw | — | — | raw `Vec<u8>` (no `Content-Encoding`) |
+| zstd | yes | — | cached as-is + `Content-Encoding: zstd` |
+| zstd | no | yes | decompress cache → `deflate` on the fly + `Content-Encoding: deflate` |
+| zstd | no | no | decompress cache → raw, no `Content-Encoding` |
+
+Rationale: zstd is ~10–20% better ratio and significantly faster to
+decode than deflate, but HTTP `Content-Encoding: zstd` is only widely
+supported from Chrome 123 / Firefox 126 / Safari 17.4 (all spring 2024).
+For clients that don't advertise `zstd` but do advertise `deflate`, we
+transparently re-encode on the fly — no extra memory, no double caching.
 
 `Vary: Accept-Encoding` is added to **every** response the middleware
-produces, so intermediate caches/CDNs don't mix compressed and
-uncompressed representations.
+produces, so intermediate caches/CDNs don't mix representations.
 
 The `Accept-Encoding` parser is token-based: split by `,`, strip
-`;q=...` parameters, compare case-insensitive. `"gzip"` does **not**
-trigger the deflate branch (no substring matches).
+`;q=...` parameters, compare case-insensitive. `"gzip"` is ignored —
+neither algorithm is triggered by substring matches.
 
-### When compression is guaranteed not to happen
+### When no compression is applied
 
 - Cache is disabled.
 - File `≤ 10 KB`.
-- Compression was ineffective (`> 80%`).
+- Zstd was ineffective (`> 80%` of raw) — file is stored raw and served
+  raw to everyone.
 
-### Why deflate only
+### Gzip
 
-Every modern browser speaks `deflate`. Gzip/Brotli can be added later if
-needed — for now one algorithm keeps things simple.
+Not supported. Modern browsers that prefer gzip also accept `deflate`
+(or `zstd`), so the existing fallback covers them. Can be added if an
+HTTP client that only speaks gzip shows up.
 
 ## Arbitrary headers
 
@@ -1089,9 +1098,10 @@ compatible with any code that pushes headers through that interface.
   — `StaticFilesMiddleware`, path resolution, response assembly,
   `Accept-Encoding` parser.
 - [static-files-middleware/src/files_access.rs](static-files-middleware/src/files_access.rs)
-  — `FilesAccess` and `CachedContent` (cache + deflate + ETag).
-- [static-files-middleware/src/deflate.rs](static-files-middleware/src/deflate.rs)
-  — `try_deflate` (10 KB / 80% thresholds) and `inflate`.
+  — `FilesAccess` and `CachedContent` (cache + zstd + ETag).
+- [static-files-middleware/src/compression.rs](static-files-middleware/src/compression.rs)
+  — `try_zstd` (10 KB / 80% thresholds) + `zstd_decompress` for cache,
+  `deflate_compress` / `deflate_decompress` for on-the-fly fallback.
 - [static-files-middleware/src/etag_caches.rs](static-files-middleware/src/etag_caches.rs)
   — `EtagCaches` and `calc_etag`.
 - [static-files-middleware/src/no_cache.rs](static-files-middleware/src/no_cache.rs)
@@ -1104,7 +1114,7 @@ compatible with any code that pushes headers through that interface.
 ## Dependencies
 
 `my-http-server-core`, `tokio`, `async-trait`, `rust-extensions`, `sha2`,
-`base64`, `flate2`.
+`base64`, `zstd`, `flate2`.
 
 ---
 
