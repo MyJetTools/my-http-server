@@ -7,13 +7,13 @@ pub enum RequestIp<'s> {
 
 impl<'s> RequestIp<'s> {
     pub fn new(addr: &SocketAddress, headers: &'s impl HttpRequestHeaders) -> Self {
-        let x_forwarded_for = headers.try_get_case_sensitive_as_str(crate::X_FORWARDED_FOR_HEADER);
+        let Some(x_forwarded_for) = headers.try_get_case_insensitive(crate::X_FORWARDED_FOR_HEADER) else{
+            return RequestIp::SingleIp(addr.ip_as_string());
+        };
 
-        if let Ok(x_forwarded_for) = x_forwarded_for {
-            if let Some(x_forwarded_for) = x_forwarded_for {
+        if let Ok(x_forwarded_for) = x_forwarded_for.as_str() {
                 let result: Vec<&str> = x_forwarded_for.split(",").map(|itm| itm.trim()).collect();
                 return RequestIp::Forwarded(result);
-            }
         }
 
         return RequestIp::SingleIp(addr.ip_as_string());
