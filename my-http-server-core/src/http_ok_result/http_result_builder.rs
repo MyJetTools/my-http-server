@@ -8,6 +8,10 @@ use super::HttpOkResult;
 
 const EMPTY_STATUS_CODE: u16 = 204;
 
+const COMPRESSION_EFFICIENCY_NUM: usize = 80;
+const COMPRESSION_EFFICIENCY_DEN: usize = 100;
+const ZSTD_LEVEL: i32 = 11;
+
 pub struct HttpResultBuilder {
     pub(crate) output: HttpOutput,
     /*
@@ -279,6 +283,39 @@ impl HttpResultBuilder {
         self
     }
 
+    pub fn with_compression(mut self, threshold: usize) -> Self {
+        let compressed = {
+            let body = match &self.output {
+                HttpOutput::Content { content, .. } => content,
+                HttpOutput::File { content, .. } => content,
+                HttpOutput::Empty | HttpOutput::Redirect { .. } => return self,
+                HttpOutput::Raw(_) => panic!("Can not compress raw response"),
+            };
+
+            if body.len() <= threshold {
+                return self;
+            }
+
+            let Ok(c) = zstd::encode_all(body.as_slice(), ZSTD_LEVEL) else {
+                return self;
+            };
+
+            if c.len() * COMPRESSION_EFFICIENCY_DEN > body.len() * COMPRESSION_EFFICIENCY_NUM {
+                return self;
+            }
+
+            c
+        };
+
+        match &mut self.output {
+            HttpOutput::Content { content, .. } => *content = compressed,
+            HttpOutput::File { content, .. } => *content = compressed,
+            _ => unreachable!(),
+        }
+
+        self.add_header("Content-Encoding", "zstd")
+    }
+
     pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
         let output = self.build();
         Ok(HttpOkResult {
@@ -305,6 +342,109 @@ impl HttpResultBuilder {
     pub fn into_http_fail_result(self, write_log: bool, write_telemetry: bool) -> HttpFailResult {
         let output = self.build();
         HttpFailResult::new(output, write_log, write_telemetry)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn find_header<'a>(headers: &'a HttpResponseHeaders, name: &str) -> Option<&'a str> {
+        headers
+            .headers
+            .iter()
+            .find(|(k, _)| k.as_str().eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn empty_is_noop() {
+        let built = HttpResultBuilder::new().with_compression(1024).build();
+        match built {
+            HttpOutput::Empty => {}
+            other => panic!("expected Empty, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn redirect_is_noop() {
+        let built = HttpOutput::as_redirect("/elsewhere", false)
+            .with_compression(1)
+            .build();
+        match built {
+            HttpOutput::Redirect { headers, .. } => {
+                assert!(find_header(&headers, "Content-Encoding").is_none());
+            }
+            other => panic!("expected Redirect, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn body_below_threshold_is_unchanged() {
+        let raw = vec![b'a'; 5 * 1024];
+        let built = HttpResultBuilder {
+            output: HttpOutput::as_content(raw.clone(), None),
+        }
+        .with_compression(10 * 1024)
+            .build();
+
+        match built {
+            HttpOutput::Content {
+                content, headers, ..
+            } => {
+                assert_eq!(content, raw);
+                assert!(find_header(&headers, "Content-Encoding").is_none());
+            }
+            other => panic!("expected Content, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn highly_compressible_body_is_compressed() {
+        let raw = vec![b'a'; 50 * 1024];
+        let built = HttpResultBuilder {
+            output: HttpOutput::as_content(raw.clone(), None),
+        }
+        .with_compression(10 * 1024)
+            .build();
+
+        match built {
+            HttpOutput::Content {
+                content, headers, ..
+            } => {
+                assert!(content.len() * 100 <= raw.len() * 80);
+                assert_eq!(find_header(&headers, "Content-Encoding"), Some("zstd"));
+                let roundtrip = zstd::decode_all(content.as_slice()).unwrap();
+                assert_eq!(roundtrip, raw);
+            }
+            other => panic!("expected Content, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn incompressible_body_is_left_alone() {
+        let mut raw = Vec::with_capacity(50 * 1024);
+        let mut seed: u32 = 0x9E37_79B1;
+        for _ in 0..50 * 1024 {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            raw.push((seed >> 24) as u8);
+        }
+
+        let built = HttpResultBuilder {
+            output: HttpOutput::as_content(raw.clone(), None),
+        }
+        .with_compression(10 * 1024)
+            .build();
+
+        match built {
+            HttpOutput::Content {
+                content, headers, ..
+            } => {
+                assert_eq!(content, raw);
+                assert!(find_header(&headers, "Content-Encoding").is_none());
+            }
+            other => panic!("expected Content, got {:?}", other),
+        }
     }
 }
 
