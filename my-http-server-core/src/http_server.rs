@@ -2,6 +2,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::StatusCode;
 use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::server::conn::auto;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
 use rust_extensions::date_time::DateTimeAsMicroseconds;
@@ -179,6 +180,48 @@ impl MyHttpServer {
             }
             ListenAddr::Unix(_) => {
                 panic!("Unix socket does not support Http2 yet");
+            }
+        }
+    }
+
+    pub fn start_auto(
+        &mut self,
+        app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+        logger: Arc<dyn Logger + Send + Sync + 'static>,
+    ) {
+        let middlewares = self.middlewares.take();
+        let tech_middlewares = self.tech_middlewares.take();
+
+        if middlewares.is_none() {
+            panic!("You can not start HTTP server two times");
+        }
+
+        logger.write_info(
+            "Starting Http Server (auto h1/h2)".to_string(),
+            format!("Http server (auto) starts at: {:?}", self.addr),
+            None,
+        );
+
+        let http_server_middlewares = HttpServerMiddlewares {
+            middlewares: middlewares.unwrap(),
+            tech_middlewares: tech_middlewares.unwrap(),
+        };
+
+        let connections = self.connections.clone();
+
+        match &self.addr {
+            ListenAddr::Tcp(socket_addr) => {
+                let socket_addr = socket_addr.clone();
+                tokio::spawn(start_http_auto(
+                    socket_addr,
+                    Arc::new(http_server_middlewares),
+                    app_states,
+                    logger,
+                    connections,
+                ));
+            }
+            ListenAddr::Unix(_) => {
+                panic!("Unix socket does not support auto h1/h2 mode");
             }
         }
     }
@@ -388,6 +431,68 @@ pub async fn start_http_2(
 
         let connections_clone = connections.clone();
         tokio::task::spawn(async move {
+            if let Err(err) = connection.await {
+                println!("Error serving connection: {:?}", err);
+            }
+
+            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        });
+    }
+}
+
+pub async fn start_http_auto(
+    addr: SocketAddr,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
+    app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
+    connections: Arc<AtomicI64>,
+) {
+    let listener = tokio::net::TcpListener::bind(addr).await;
+
+    if let Err(err) = &listener {
+        let err = format!("Can not start http server at {}. Err: {:?}", addr, err);
+        eprintln!("{}", err);
+        panic!("{}", err);
+    }
+
+    let listener = listener.unwrap();
+
+    let mut auto_builder = auto::Builder::new(TokioExecutor::new());
+    auto_builder.http1().keep_alive(true);
+    auto_builder.http2().enable_connect_protocol();
+    let auto_builder = Arc::new(auto_builder);
+
+    loop {
+        if app_states.is_shutting_down() {
+            break;
+        }
+
+        let (stream, socket_addr) = listener.accept().await.unwrap();
+
+        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let io = TokioIo::new(stream);
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
+        let app_states = app_states.clone();
+        let builder = auto_builder.clone();
+        let connections_clone = connections.clone();
+
+        tokio::task::spawn(async move {
+            let connection = builder.serve_connection_with_upgrades(
+                io,
+                service_fn(move |req| {
+                    let resp = handle_requests(
+                        req,
+                        http_server_middlewares.clone(),
+                        SocketAddress::Tcp(socket_addr.clone()),
+                        logger.clone(),
+                        app_states.is_shutting_down(),
+                    );
+                    resp
+                }),
+            );
+
             if let Err(err) = connection.await {
                 println!("Error serving connection: {:?}", err);
             }

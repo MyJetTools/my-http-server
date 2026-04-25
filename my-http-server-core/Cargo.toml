@@ -35,7 +35,7 @@ serde_json = "*"
 serde_yaml = "*"
 async-trait = "*"
 http-body-util = "*"
-hyper-util = { version = "*", features = ["tokio"] }
+hyper-util = { version = "*", features = ["tokio", "server-auto"] }
 flate2 = "*"
 brotli = "*"
 zstd = "*"
