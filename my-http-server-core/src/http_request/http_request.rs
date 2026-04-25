@@ -132,6 +132,20 @@ impl HttpRequest {
         self.data.uri()
     }
 
+    pub fn extensions(&self) -> &http::Extensions {
+        self.data.extensions()
+    }
+
+    pub fn is_h2_websocket_connect(&self) -> bool {
+        if self.method != Method::CONNECT {
+            return false;
+        }
+        match self.data.extensions().get::<hyper::ext::Protocol>() {
+            Some(protocol) => protocol.as_str().eq_ignore_ascii_case("websocket"),
+            None => false,
+        }
+    }
+
     pub fn get_scheme(&self) -> &str {
         let x_forwarded_proto = self
             .data

@@ -58,12 +58,15 @@ impl<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + 'static> HttpServ
             return None;
         }
 
-        if ctx
+        let is_h1_ws = ctx
             .request
             .get_headers()
             .try_get_case_insensitive("sec-websocket-key")
-            .is_none()
-        {
+            .is_some();
+
+        let is_h2_ws = ctx.request.is_h2_websocket_connect();
+
+        if !is_h1_ws && !is_h2_ws {
             return None;
         }
 

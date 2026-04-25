@@ -347,9 +347,9 @@ pub async fn start_http_2(
 
     let listener = listener.unwrap();
 
-    let http2_builder = Arc::new(hyper::server::conn::http2::Builder::new(
-        TokioExecutor::new(),
-    ));
+    let mut http2_builder = hyper::server::conn::http2::Builder::new(TokioExecutor::new());
+    http2_builder.enable_connect_protocol();
+    let http2_builder = Arc::new(http2_builder);
 
     loop {
         if app_states.is_shutting_down() {

@@ -67,6 +67,14 @@ impl RequestData {
         &self.parts.headers
     }
 
+    pub fn extensions(&self) -> &http::Extensions {
+        &self.parts.extensions
+    }
+
+    pub fn extensions_mut(&mut self) -> &mut http::Extensions {
+        &mut self.parts.extensions
+    }
+
     pub fn take_my_hyper_http_request(&mut self) -> MyHyperHttpRequest {
         match self.body.take() {
             Some(body) => match body {
