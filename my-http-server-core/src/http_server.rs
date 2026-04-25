@@ -220,8 +220,15 @@ impl MyHttpServer {
                     connections,
                 ));
             }
-            ListenAddr::Unix(_) => {
-                panic!("Unix socket does not support auto h1/h2 mode");
+            ListenAddr::Unix(unix_socket_addr) => {
+                let unix_socket_addr = unix_socket_addr.clone();
+                tokio::spawn(start_http_auto_unix_socket(
+                    unix_socket_addr,
+                    Arc::new(http_server_middlewares),
+                    app_states,
+                    logger,
+                    connections,
+                ));
             }
         }
     }
@@ -486,6 +493,85 @@ pub async fn start_http_auto(
                         req,
                         http_server_middlewares.clone(),
                         SocketAddress::Tcp(socket_addr.clone()),
+                        logger.clone(),
+                        app_states.is_shutting_down(),
+                    );
+                    resp
+                }),
+            );
+
+            if let Err(err) = connection.await {
+                println!("Error serving connection: {:?}", err);
+            }
+
+            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        });
+    }
+}
+
+#[cfg(not(unix))]
+pub async fn start_http_auto_unix_socket(
+    _unix_socket: Arc<String>,
+    _http_server_middlewares: Arc<HttpServerMiddlewares>,
+    _app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+    _logger: Arc<dyn Logger + Send + Sync + 'static>,
+    _connections: Arc<AtomicI64>,
+) {
+    panic!("Unix socket is not supported by OS");
+}
+
+#[cfg(unix)]
+pub async fn start_http_auto_unix_socket(
+    unix_socket: Arc<String>,
+    http_server_middlewares: Arc<HttpServerMiddlewares>,
+    app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+    logger: Arc<dyn Logger + Send + Sync + 'static>,
+    connections: Arc<AtomicI64>,
+) {
+    let _ = tokio::fs::remove_file(unix_socket.as_str()).await;
+    let listener = tokio::net::UnixListener::bind(unix_socket.as_str());
+
+    if let Err(err) = &listener {
+        let err = format!(
+            "Can not start http server at {}. Err: {:?}",
+            unix_socket, err
+        );
+        eprintln!("{}", err);
+        panic!("{}", err);
+    }
+
+    let listener = listener.unwrap();
+
+    let mut auto_builder = auto::Builder::new(TokioExecutor::new());
+    auto_builder.http1().keep_alive(true);
+    auto_builder.http2().enable_connect_protocol();
+    let auto_builder = Arc::new(auto_builder);
+
+    loop {
+        if app_states.is_shutting_down() {
+            break;
+        }
+
+        let (stream, socket_addr) = listener.accept().await.unwrap();
+
+        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let io = TokioIo::new(stream);
+        let http_server_middlewares = http_server_middlewares.clone();
+        let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
+        let socket_addr = SocketAddress::Unix(Arc::new(format!("{:?}", socket_addr)));
+        let app_states = app_states.clone();
+        let builder = auto_builder.clone();
+        let connections_clone = connections.clone();
+
+        tokio::task::spawn(async move {
+            let connection = builder.serve_connection_with_upgrades(
+                io,
+                service_fn(move |req| {
+                    let resp = handle_requests(
+                        req,
+                        http_server_middlewares.clone(),
+                        socket_addr.clone(),
                         logger.clone(),
                         app_states.is_shutting_down(),
                     );
