@@ -291,8 +291,8 @@ pub async fn start_http_1(
 
         let connections_clone = connections.clone();
         tokio::task::spawn(async move {
-            if let Err(err) = connection.await {
-                println!("Error serving connection: {:?}", err);
+            if let Err(_err) = connection.await {
+                //println!("Error serving connection: {:?}", err);
             }
 
             connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
@@ -373,8 +373,8 @@ pub async fn start_http_1_unix_socket(
 
         let connections_clone = connections.clone();
         tokio::task::spawn(async move {
-            if let Err(err) = connection.await {
-                println!("Error serving connection: {:?}", err);
+            if let Err(_err) = connection.await {
+                //println!("Error serving connection: {:?}", err);
             }
 
             connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
@@ -438,8 +438,8 @@ pub async fn start_http_2(
 
         let connections_clone = connections.clone();
         tokio::task::spawn(async move {
-            if let Err(err) = connection.await {
-                println!("Error serving connection: {:?}", err);
+            if let Err(_err) = connection.await {
+                //println!("Error serving connection: {:?}", err);
             }
 
             connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
@@ -500,8 +500,8 @@ pub async fn start_http_auto(
                 }),
             );
 
-            if let Err(err) = connection.await {
-                println!("Error serving connection: {:?}", err);
+            if let Err(_err) = connection.await {
+                //println!("Error serving connection: {:?}", err);
             }
 
             connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
@@ -579,8 +579,8 @@ pub async fn start_http_auto_unix_socket(
                 }),
             );
 
-            if let Err(err) = connection.await {
-                println!("Error serving connection: {:?}", err);
+            if let Err(_err) = connection.await {
+                //println!("Error serving connection: {:?}", err);
             }
 
             connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
