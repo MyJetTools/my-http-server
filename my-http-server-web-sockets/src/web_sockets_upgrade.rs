@@ -95,18 +95,20 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
 
         let ws_stream = match ws_stream {
             Ok(ws_stream) => ws_stream,
-            Err(err) => {
+            Err(_) => {
                 let mut ctx = HashMap::new();
                 ctx.insert("SocketId".to_string(), id.to_string());
                 if let Some(query_string) = query_string {
                     ctx.insert("QueryString".to_string(), query_string);
                 }
 
+                /*
                 logs.write_fatal_error(
                     "WebSocketUpgrade".to_string(),
                     format!("{:?}", err),
                     Some(ctx),
                 );
+                 */
                 return;
             }
         };
@@ -136,11 +138,13 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
                     ctx.insert("QueryString".to_string(), query_string);
                 }
 
+                /*
                 logs.write_fatal_error(
                     "UpgradeWsSocket".to_string(),
                     format!("{:?}", err.reason),
                     Some(ctx),
                 );
+                 */
             }
 
             my_web_socket
@@ -158,7 +162,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
 
         let my_web_socket_cloned = my_web_socket.clone();
 
-        if let Err(e) = serve_websocket(
+        if let Err(_) = serve_websocket(
             my_web_socket_cloned,
             ws_receiver,
             callback,
@@ -166,7 +170,7 @@ pub async fn upgrade<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync + '
         )
         .await
         {
-            println!("Error after serving websocket connection: {e}");
+            //println!("Error after serving websocket connection: {e}");
         }
 
         my_web_socket.disconnect().await;
