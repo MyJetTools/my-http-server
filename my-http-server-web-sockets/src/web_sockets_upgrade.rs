@@ -2,7 +2,9 @@ use std::pin::Pin;
 use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
+use futures::FutureExt;
 use futures::StreamExt;
+use std::panic::AssertUnwindSafe;
 use futures_util::stream::SplitStream;
 
 use hyper_tungstenite::tungstenite::protocol::CloseFrame;
@@ -228,13 +230,19 @@ async fn callback_message<TMyWebSocketCallback: MyWebSocketCallback + Send + Syn
     message: Message,
     callback: Arc<TMyWebSocketCallback>,
 ) -> Result<(), String> {
-    let result = tokio::spawn(async move {
-        callback.on_message(web_socket, message).await;
-    })
-    .await;
+    let result = AssertUnwindSafe(callback.on_message(web_socket, message))
+        .catch_unwind()
+        .await;
 
     if let Err(err) = result {
-        return Err(format!("Error in on_message: {}", err));
+        let msg = if let Some(s) = err.downcast_ref::<&'static str>() {
+            (*s).to_string()
+        } else if let Some(s) = err.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "panic".to_string()
+        };
+        return Err(format!("Error in on_message: {}", msg));
     }
 
     Ok(())

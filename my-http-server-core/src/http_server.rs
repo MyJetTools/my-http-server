@@ -1,6 +1,8 @@
+use futures::FutureExt;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::StatusCode;
+use std::panic::AssertUnwindSafe;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto;
 #[cfg(feature = "with-telemetry")]
@@ -618,7 +620,7 @@ pub async fn handle_requests(
 
     let client_id_spawned = client_id.clone();
     let http_server_middlewares_cloned = http_server_middlewares.clone();
-    let flow_execution_result = tokio::spawn(async move {
+    let flow_execution_future = AssertUnwindSafe(async move {
         let mut credentials_assigned = false;
 
         for middleware in http_server_middlewares_cloned.middlewares.iter() {
@@ -647,9 +649,10 @@ pub async fn handle_requests(
                 false,
             )),
         }
-    });
+    })
+    .catch_unwind();
 
-    let flow_execution_result = match flow_execution_result.await {
+    let flow_execution_result = match flow_execution_future.await {
         Ok(flow_execution_result) => {
             if http_server_middlewares.tech_middlewares.len() > 0 {
                 let response_data = ResponseData::from(&flow_execution_result.http_result);
@@ -663,7 +666,15 @@ pub async fn handle_requests(
 
             flow_execution_result
         }
-        Err(err) => {
+        Err(panic_payload) => {
+            let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&'static str>() {
+                (*s).to_string()
+            } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "panic".to_string()
+            };
+
             let request_data = Arc::new(request_data);
             let request_data_cloned = request_data.clone();
             tokio::spawn(async move {
@@ -697,7 +708,7 @@ pub async fn handle_requests(
                         &ctx,
                         request_data.started,
                         format!("[{}]{}", request_data.method, request_data.path.to_string()),
-                        format!("Panic: {:?}", err),
+                        format!("Panic: {}", panic_msg),
                         tags.build(),
                     )
                     .await;
@@ -714,7 +725,7 @@ pub async fn handle_requests(
 
             logger.write_error(
                 "HttpRequest".to_string(),
-                format!("Panic: {:?}", err),
+                format!("Panic: {}", panic_msg),
                 Some(ctx),
             );
 
