@@ -42,10 +42,12 @@ pub fn write(yaml_writer: &mut YamlWriter, field: &HttpField) {
             }
 
             crate::controllers::documentation::ArrayElement::Enum(enum_type) => {
-                panic!(
-                    "Enum in dictionary of enum is not supported. {:?}",
-                    enum_type
-                );
+                yaml_writer.write_upper_level(field.name.as_str(), |yaml_writer| {
+                    yaml_writer.write("type", "object");
+                    yaml_writer.write_upper_level("additionalProperties", |yaml_writer| {
+                        super::object::write_reference_to_object(yaml_writer, enum_type);
+                    });
+                });
             }
         },
         HttpDataType::DictionaryOfArray(array_el) => {
@@ -70,14 +72,7 @@ fn write_body_simple_type(yaml_writer: &mut YamlWriter, simple_type: &HttpSimple
 }
 
 fn write_enum(yaml_writer: &mut YamlWriter, enum_data: &HttpEnumStructure) {
-    match &enum_data.enum_type {
-        crate::controllers::documentation::EnumType::Integer => {
-            yaml_writer.write("type", "integer");
-        }
-        crate::controllers::documentation::EnumType::String => {
-            yaml_writer.write("type", "string");
-        }
-    }
+    super::object::write_reference_to_object(yaml_writer, enum_data);
 }
 
 fn write_body_object_type(yaml_writer: &mut YamlWriter, object: &HttpObjectStructure) {
@@ -105,7 +100,10 @@ fn write_body_array_type(yaml_writer: &mut YamlWriter, array_el: &ArrayElement) 
         }
 
         crate::controllers::documentation::ArrayElement::Enum(enum_type) => {
-            panic!("Enum in array not supported as body type. {:?}", enum_type);
+            yaml_writer.write("type", "array");
+            yaml_writer.write_upper_level("items", |yaml_writer| {
+                super::object::write_reference_to_object(yaml_writer, enum_type);
+            });
         }
     }
 }
