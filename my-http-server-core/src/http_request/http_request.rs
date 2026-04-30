@@ -108,7 +108,12 @@ impl HttpRequest {
         if let Some(value) = self.data.headers().try_get_case_insensitive("host") {
             return value.as_str().unwrap();
         }
-        panic!("Host is not set");
+
+        if let Some(authority) = self.data.uri().authority() {
+            return authority.as_str();
+        }
+
+        panic!("Host is not set: neither Host header nor :authority is present");
     }
 
     pub fn get_path_and_query(&self) -> &str {
