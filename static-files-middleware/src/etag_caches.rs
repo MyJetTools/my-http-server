@@ -35,7 +35,7 @@ impl EtagCaches {
     }
 
     pub async fn set(&self, path: &HttpPath, etag: String) {
-        println!("Setting Etag: {} for path '{}'", etag, path.as_str());
+        //println!("Setting Etag: {} for path '{}'", etag, path.as_str());
 
         let mut write_access = self.inner.write().await;
 
@@ -53,7 +53,7 @@ impl EtagCaches {
     }
 
     pub async fn set_not_found(&self, etag: String) {
-        println!("Setting Etag for not found path");
+        //println!("Setting Etag for not found path");
         let mut write_access = self.inner.write().await;
         write_access.not_found = Some(etag);
     }
