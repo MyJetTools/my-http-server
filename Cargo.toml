@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "my-http-server",
     "my-http-server-controllers",

@@ -703,15 +703,13 @@ pub async fn handle_requests(
                     tags = tags.add("client_id", client_id.to_string());
                 }
 
-                my_telemetry::TELEMETRY_INTERFACE
-                    .write_fail(
-                        &ctx,
-                        request_data.started,
-                        format!("[{}]{}", request_data.method, request_data.path.to_string()),
-                        format!("Panic: {}", panic_msg),
-                        tags.build(),
-                    )
-                    .await;
+                my_telemetry::TELEMETRY_INTERFACE.write_fail(
+                    &ctx,
+                    request_data.started,
+                    format!("[{}]{}", request_data.method, request_data.path.to_string()),
+                    format!("Panic: {}", panic_msg),
+                    tags.build(),
+                );
             }
 
             let mut ctx = HashMap::new();
@@ -758,15 +756,13 @@ pub async fn handle_requests(
                         format!("[{}]{}", request_data.method, request_data.path)
                     };
 
-                    my_telemetry::TELEMETRY_INTERFACE
-                        .write_success(
-                            &ctx,
-                            request_data.started,
-                            telemetry_data,
-                            format!("Status code: {}", ok_result.output.get_status_code()),
-                            tags.into(),
-                        )
-                        .await;
+                    my_telemetry::TELEMETRY_INTERFACE.write_success(
+                        &ctx,
+                        request_data.started,
+                        telemetry_data,
+                        format!("Status code: {}", ok_result.output.get_status_code()),
+                        tags.into(),
+                    );
                 }
             }
 
@@ -827,15 +823,13 @@ pub async fn handle_requests(
                         format!("[{}]{}", request_data.method, request_data.path)
                     };
 
-                    my_telemetry::TELEMETRY_INTERFACE
-                        .write_fail(
-                            &ctx,
-                            request_data.started,
-                            telemetry_data,
-                            format!("Status code: {}", err_result.output.get_status_code()),
-                            tags.into(),
-                        )
-                        .await;
+                    my_telemetry::TELEMETRY_INTERFACE.write_fail(
+                        &ctx,
+                        request_data.started,
+                        telemetry_data,
+                        format!("Status code: {}", err_result.output.get_status_code()),
+                        tags.into(),
+                    );
                 }
             }
 

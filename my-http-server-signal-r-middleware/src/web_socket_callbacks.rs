@@ -178,32 +178,28 @@ impl<TCtx: Send + Sync + Default + 'static> my_http_server_web_sockets::MyWebSoc
                         match _result {
                             Ok(my_telemetry) => {
                                 if my_telemetry.get_write_telemetry() {
-                                    my_telemetry::TELEMETRY_INTERFACE
-                                        .write_success(
-                                            &ctx,
-                                            started,
-                                            format!("[SignalR] {}", target),
-                                            format!("Executed Ok",),
-                                            my_telemetry
-                                                .tags
-                                                .add_ip(my_web_socket.addr.ip_as_string())
-                                                .build(),
-                                        )
-                                        .await;
+                                    my_telemetry::TELEMETRY_INTERFACE.write_success(
+                                        &ctx,
+                                        started,
+                                        format!("[SignalR] {}", target),
+                                        format!("Executed Ok",),
+                                        my_telemetry
+                                            .tags
+                                            .add_ip(my_web_socket.addr.ip_as_string())
+                                            .build(),
+                                    );
                                 }
                             }
                             Err(err) => {
-                                my_telemetry::TELEMETRY_INTERFACE
-                                    .write_fail(
-                                        &ctx,
-                                        started,
-                                        target,
-                                        format!("{:?}", err),
-                                        TelemetryEventTagsBuilder::new()
-                                            .add_ip(my_web_socket.addr.ip_as_string())
-                                            .build(),
-                                    )
-                                    .await;
+                                my_telemetry::TELEMETRY_INTERFACE.write_fail(
+                                    &ctx,
+                                    started,
+                                    target,
+                                    format!("{:?}", err),
+                                    TelemetryEventTagsBuilder::new()
+                                        .add_ip(my_web_socket.addr.ip_as_string())
+                                        .build(),
+                                );
                             }
                         }
                     }
