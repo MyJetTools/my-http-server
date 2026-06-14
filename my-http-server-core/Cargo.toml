@@ -37,7 +37,7 @@ async-trait = "*"
 http-body-util = "*"
 hyper-util = { version = "*", features = ["tokio", "server-auto"] }
 flate2 = "*"
-brotli = "*"
+brotli-decompressor = "*"
 zstd = "*"
 http = "*"
 bytes = "*"

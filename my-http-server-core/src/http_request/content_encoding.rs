@@ -96,7 +96,7 @@ fn decompress_gzip(body: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn decompress_br(body: &[u8]) -> Option<Vec<u8>> {
-    use brotli::Decompressor;
+    use brotli_decompressor::Decompressor;
 
     let mut decompressor = Decompressor::new(body, 4096);
 
