@@ -4,21 +4,17 @@ use proc_macro::TokenStream;
 use syn;
 use types_reader::rust_extensions::date_time::DateTimeAsMicroseconds;
 
-//mod as_token_stream;
 mod attributes;
 mod consts;
-mod enum_doc;
-mod generic_utils;
-mod http_input_field;
-mod http_input_object_structure;
-mod http_object_structure;
 mod http_route;
 mod input_models;
-mod property_type_ext;
-mod types;
 
+/// Server-only companion of `url_utils::macros::MyHttpInput`: generates `parse_http_input`
+/// on the same field markup. The schema and the client request builder come from url-utils;
+/// this adds the server-side parsing of an incoming request. Use both derives together on
+/// server model crates.
 #[proc_macro_derive(
-    MyHttpInput,
+    MyHttpInputServer,
     attributes(
         http_query,
         http_header,
@@ -29,10 +25,10 @@ mod types;
         debug,
     )
 )]
-pub fn my_http_input_doc_derive(input: TokenStream) -> TokenStream {
+pub fn my_http_input_server_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
     let mut debug = false;
-    let result = match crate::input_models::generate(&ast, &mut debug) {
+    let result = match crate::input_models::generate_server(&ast, &mut debug) {
         Ok(result) => result,
         Err(err) => err.to_compile_error().into(),
     };
@@ -42,51 +38,6 @@ pub fn my_http_input_doc_derive(input: TokenStream) -> TokenStream {
     }
 
     result
-}
-
-#[proc_macro_derive(MyHttpInputObjectStructure)]
-pub fn my_http_input_object_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    let (result, debug) = crate::http_input_object_structure::generate(&ast);
-
-    if debug {
-        println!("{}", result);
-    }
-
-    result
-}
-
-#[proc_macro_derive(MyHttpObjectStructure, attributes(debug))]
-pub fn my_http_output_object_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    let mut debug = false;
-    let result = match crate::http_object_structure::generate(&ast, &mut debug) {
-        Ok(result) => result,
-        Err(err) => err.to_compile_error().into(),
-    };
-
-    if debug {
-        println!("{}", result);
-    }
-    result
-}
-
-#[proc_macro_derive(MyHttpStringEnum, attributes(http_enum_case))]
-pub fn my_http_string_enum_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    match crate::enum_doc::generate(&ast, false) {
-        Ok(result) => result,
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-
-#[proc_macro_derive(MyHttpIntegerEnum, attributes(http_enum_case))]
-pub fn my_http_integer_enum_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    match crate::enum_doc::generate(&ast, true) {
-        Ok(result) => result,
-        Err(err) => err.to_compile_error().into(),
-    }
 }
 
 #[proc_macro_attribute]
@@ -101,12 +52,4 @@ pub fn http_route(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn pkg_compile_date_time(_input: TokenStream) -> TokenStream {
     let date = DateTimeAsMicroseconds::now().to_rfc3339();
     TokenStream::from(quote::quote!(#date))
-}
-
-#[proc_macro_attribute]
-pub fn http_input_field(input: TokenStream, item: TokenStream) -> TokenStream {
-    match crate::http_input_field::generate(input, item) {
-        Ok(result) => result.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
 }

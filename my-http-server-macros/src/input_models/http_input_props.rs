@@ -219,35 +219,6 @@ impl<'s> HttpInputProperties<'s> {
         Ok(())
     }
 
-    pub fn get_all(&'s self) -> Vec<&'s InputField<'s>> {
-        let mut result = Vec::new();
-
-        if let Some(header_fields) = &self.header_fields {
-            result.extend(header_fields);
-        }
-
-        if let Some(query_string_fields) = &self.query_string_fields {
-            result.extend(query_string_fields);
-        }
-
-        if let Some(body_fields) = &self.body_fields {
-            result.extend(body_fields);
-        }
-
-        if let Some(form_data_fields) = &self.form_data_fields {
-            result.extend(form_data_fields);
-        }
-
-        if let Some(body_raw_field) = &self.body_raw_field {
-            result.push(body_raw_field);
-        }
-
-        if let Some(path_fields) = &self.path_fields {
-            result.extend(path_fields);
-        }
-
-        result
-    }
 }
 
 fn check_duplicated(items: &[InputField]) -> Result<(), syn::Error> {

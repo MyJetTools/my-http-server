@@ -1,9 +1,8 @@
-pub mod docs;
 mod generate;
 pub mod http_input_props;
 mod input_field;
 pub mod model_reader;
-pub use generate::generate;
+pub use generate::generate_server;
 pub use input_field::*;
 mod http_field_attr;
 pub use http_field_attr::*;

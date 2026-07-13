@@ -311,10 +311,6 @@ impl<'s> InputField<'s> {
         }
     }
 
-    pub fn get_description(&self) -> &str {
-        self.attr.description()
-    }
-
     fn get_validator(&self) -> Option<&str> {
         self.attr.validator()
     }

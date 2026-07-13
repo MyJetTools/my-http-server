@@ -105,7 +105,7 @@ impl HttpActions {
 
             should_be_authorized: if let Some(desc) = action.get_description() {
                 desc.input_params
-                    .check_parameters(&self.action_verb, http_route.route.as_str());
+                    .check_parameters(self.action_verb.as_str(), http_route.route.as_str());
                 desc.should_be_authorized
             } else {
                 ShouldBeAuthorized::UseGlobal

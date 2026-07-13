@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::de::DeserializeOwned;
-use url_utils::server::FormDataReader;
+use url_utils::form_data_reader::FormDataReader;
 
 use crate::{data_src::*, *};
 

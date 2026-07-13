@@ -1,5 +1,11 @@
 #[cfg(feature = "macros")]
-pub extern crate my_http_server_macros as macros;
+pub mod macros {
+    // Model-description derives (schema + client request builder) come from url-utils, so the
+    // same models are shared with clients such as fl-url. Only the server-only pieces stay
+    // local: `http_route` (routing) and `MyHttpInputServer` (parsing an incoming request).
+    pub use my_http_server_macros::{http_route, pkg_compile_date_time, MyHttpInputServer};
+    pub use url_utils::macros::*;
+}
 
 #[cfg(any(feature = "macros", feature = "controllers"))]
 pub extern crate my_http_server_controllers as controllers;

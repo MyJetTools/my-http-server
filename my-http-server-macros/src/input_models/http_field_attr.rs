@@ -31,29 +31,6 @@ impl<'s> HttpFieldAttribute<'s> {
         Some(result)
     }
 
-    pub fn to_src_token_stream(&self) -> proc_macro2::TokenStream {
-        let http_parameter_input_src = crate::consts::get_http_parameter_input_src();
-        match self {
-            Self::HttpQuery(_) => quote::quote!(#http_parameter_input_src::Query),
-            Self::HttpPath(_) => quote::quote!(#http_parameter_input_src::Path),
-            Self::HttpHeader(_) => quote::quote!(#http_parameter_input_src::Header),
-            Self::HttpBody(_) => quote::quote!(#http_parameter_input_src::BodyModel),
-            Self::HttpFormData(_) => quote::quote!(#http_parameter_input_src::FormData),
-            Self::HttpBodyRaw(_) => quote:: quote!(#http_parameter_input_src::BodyRaw),
-        }
-    }
-
-    pub fn description(&'s self) -> &'s str {
-        match self {
-            Self::HttpHeader(http_header) => http_header.description,
-            Self::HttpQuery(http_query) => http_query.description,
-            Self::HttpBody(http_body) => http_body.description,
-            Self::HttpFormData(http_form_data) => http_form_data.description,
-            Self::HttpBodyRaw(http_body_raw) => http_body_raw.description,
-            Self::HttpPath(http_path) => http_path.description,
-        }
-    }
-
     pub fn validator(&'s self) -> Option<&'s str> {
         match self {
             Self::HttpHeader(http_header) => http_header.validator,
