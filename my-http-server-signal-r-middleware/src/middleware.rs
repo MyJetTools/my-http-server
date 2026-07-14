@@ -72,7 +72,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
 
         let negotiation_version =
             if let Some(result) = query_string.get_optional("negotiateVersion") {
-                let value = result.as_str()?;
+                let value = result.as_string()?;
                 value.as_str().parse::<usize>().unwrap()
             } else {
                 0
@@ -94,7 +94,7 @@ impl<TCtx: Send + Sync + Default + 'static> MySignalRMiddleware<TCtx> {
     ) -> Result<HttpOkResult, HttpFailResult> {
         let query_string = ctx.request.get_query_string()?;
         let connection_id_or_token = query_string.get_required("id")?;
-        let connection_id_or_token = connection_id_or_token.as_str()?;
+        let connection_id_or_token = connection_id_or_token.as_string()?;
 
         let signal_r_connection = self
             .signal_r_list

@@ -1,7 +1,3 @@
-use my_http_utils::url_encoded_data_reader::UrlEncodedValue;
-
-use crate::EncodedParamValue;
-
 #[derive(Debug, Clone)]
 pub struct HttpPath {
     pub path: Vec<u8>,
@@ -87,14 +83,6 @@ impl HttpPath {
         Some(std::str::from_utf8(result).unwrap())
     }
 
-    pub fn get_segment_value<'s>(&'s self, index: usize) -> Option<EncodedParamValue<'s>> {
-        let value = self.get_segment_value_as_str(index)?;
-        Some(EncodedParamValue::UrlEncodedValue {
-            value: UrlEncodedValue::new(index.to_string().into(), value),
-            src: "path",
-        })
-    }
-
     pub fn is_starting_with(&self, http_path: &HttpPath) -> bool {
         if self.segments_amount() < http_path.segments_amount() {
             return false;
@@ -166,7 +154,7 @@ mod test {
         assert!(!path.is_root());
         assert_eq!(1, path.segments_amount());
         assert_eq!("First", path.get_segment_value_as_str(0).unwrap());
-        assert!(path.get_segment_value(1).is_none());
+        assert!(path.get_segment_value_as_str(1).is_none());
     }
 
     #[test]
@@ -176,7 +164,7 @@ mod test {
         assert!(!path.is_root());
         assert_eq!(1, path.segments_amount());
         assert_eq!("first", path.get_segment_value_as_str(0).unwrap());
-        assert!(path.get_segment_value(1).is_none());
+        assert!(path.get_segment_value_as_str(1).is_none());
     }
 
     #[test]
@@ -187,7 +175,7 @@ mod test {
         assert_eq!(2, path.segments_amount());
         assert_eq!("First", path.get_segment_value_as_str(0).unwrap());
         assert_eq!("sEcond", path.get_segment_value_as_str(1).unwrap());
-        assert!(path.get_segment_value(2).is_none());
+        assert!(path.get_segment_value_as_str(2).is_none());
     }
 
     #[test]
@@ -198,7 +186,7 @@ mod test {
         assert_eq!(2, path.segments_amount());
         assert_eq!("first", path.get_segment_value_as_str(0).unwrap());
         assert_eq!("second", path.get_segment_value_as_str(1).unwrap());
-        assert!(path.get_segment_value(2).is_none());
+        assert!(path.get_segment_value_as_str(2).is_none());
     }
 
     #[test]

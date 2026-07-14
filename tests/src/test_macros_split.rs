@@ -1,14 +1,14 @@
-// Verifies the macro split: the model is marked up ONCE and gets its schema + client request
-// builder from my-http-utils (`MyHttpInput`, `MyHttpObjectStructure`) while the server-only parse
-// comes from `MyHttpInputServer` here, and `#[http_route]` (server) glues them together.
+// Verifies the model layer is fully driven by my-http-utils: one `MyHttpInput` derive gives the
+// schema, the client request builder, AND (under the `server` feature) the server-side `parse` /
+// `READS_BODY`. No server-side model macro is involved; `#[http_route]` only glues in the action.
 
 use my_http_server::controllers::documentation::DataTypeProvider;
 use my_http_server::macros::*;
 use my_http_server::*;
 use serde::*;
 
-// One markup, two derives: my-http-utils gives schema + client builder, MyHttpInputServer gives parse.
-#[derive(MyHttpInput, MyHttpInputServer)]
+// One markup, one derive: my-http-utils gives schema + client builder + server parse.
+#[derive(MyHttpInput)]
 pub struct UpdateUserRequest {
     #[http_path(name = "id", description = "User id")]
     pub id: String,

@@ -9,7 +9,7 @@ use hyper_tungstenite::{
     tungstenite::{Error, Message},
     HyperWebsocketStream,
 };
-use my_http_server_core::{SocketAddress, UrlEncodedData};
+use my_http_server_core::{QueryStringReader, SocketAddress};
 use rust_extensions::{date_time::DateTimeAsMicroseconds, Logger};
 use tokio::sync::Mutex;
 
@@ -84,10 +84,10 @@ impl MyWebSocket {
         }
     }
 
-    pub fn get_query_string<'s>(&'s self) -> Option<UrlEncodedData<'s>> {
+    pub fn get_query_string<'s>(&'s self) -> Option<QueryStringReader<'s>> {
         let str = self.query_string.as_ref()?;
 
-        match UrlEncodedData::from_query_string(str) {
+        match QueryStringReader::new(str) {
             Ok(result) => Some(result),
             Err(_) => {
                 let mut ctx = HashMap::new();

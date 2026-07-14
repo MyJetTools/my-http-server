@@ -5,8 +5,10 @@ mod authorization;
 mod authorization_map;
 mod http_route;
 mod middleware;
+mod request_reader;
 mod required_claims;
 pub use middleware::ControllersMiddleware;
+pub use request_reader::RequestReader;
 pub mod documentation;
 
 pub use auth_error_factory::*;

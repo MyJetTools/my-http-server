@@ -167,7 +167,7 @@ impl my_http_server_web_sockets::MyWebSocketCallback for WebSocketCallbacks {
 
             let sid = sid.unwrap();
 
-            let sid = match sid.as_str() {
+            let sid = match sid.as_string() {
                 Ok(sid) => sid,
                 Err(_) => {
                     return Err(WebSocketConnectedFail {

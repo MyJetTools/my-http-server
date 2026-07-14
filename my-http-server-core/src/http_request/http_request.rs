@@ -2,12 +2,11 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
     http_headers::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader,
-    HttpRequestBodyContent, HttpRequestHeaders, MyHyperHttpRequest, RequestData, RequestIp,
-    UrlEncodedData,
+    HttpRequestBodyContent, HttpRequestHeaders, MyHyperHttpRequest, QueryStringReader, RequestData,
+    RequestIp,
 };
 
 use hyper::{Method, Uri};
-use my_http_utils::url_decoder::UrlDecodeError;
 
 #[derive(Debug, Clone)]
 pub enum SocketAddress {
@@ -61,13 +60,9 @@ impl HttpRequest {
         Ok(result)
     }
 
-    pub fn get_query_string<'s>(&'s self) -> Result<UrlEncodedData<'s>, UrlDecodeError> {
-        if let Some(query) = self.data.uri().query() {
-            let result = UrlEncodedData::from_query_string(query)?;
-            Ok(result)
-        } else {
-            Ok(UrlEncodedData::new_query_string_empty())
-        }
+    pub fn get_query_string<'s>(&'s self) -> Result<QueryStringReader<'s>, HttpFailResult> {
+        let query = self.data.uri().query().unwrap_or("");
+        Ok(QueryStringReader::new(query)?)
     }
 
     pub fn set_key_value(&mut self, key: String, value: Vec<u8>) -> Option<Vec<u8>> {

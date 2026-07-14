@@ -145,7 +145,7 @@ async fn handle_get_request(
     let sid = query.get_optional("sid");
 
     if let Some(sid) = sid {
-        let sid = sid.as_str()?;
+        let sid = sid.as_string()?;
 
         let response = socket_io_utils::SocketIoHandshakeOpenModel::from_settings(
             sid.to_string(),

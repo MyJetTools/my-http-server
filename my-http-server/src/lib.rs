@@ -1,9 +1,10 @@
 #[cfg(feature = "macros")]
 pub mod macros {
-    // Model-description derives (schema + client request builder) come from my-http-utils, so the
-    // same models are shared with clients such as fl-url. Only the server-only pieces stay
-    // local: `http_route` (routing) and `MyHttpInputServer` (parsing an incoming request).
-    pub use my_http_server_macros::{http_route, pkg_compile_date_time, MyHttpInputServer};
+    // Model description AND parsing come from my-http-utils (`MyHttpInput` emits the schema, the
+    // client request builder, and — under the `server` feature — the sync `parse` / `READS_BODY`),
+    // so the same models are shared with clients such as fl-url. Only server-glue macros stay
+    // local: `http_route` (routing) and `pkg_compile_date_time`.
+    pub use my_http_server_macros::{http_route, pkg_compile_date_time};
     pub use my_http_utils::macros::*;
 }
 

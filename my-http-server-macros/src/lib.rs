@@ -1,44 +1,15 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 
-use syn;
 use types_reader::rust_extensions::date_time::DateTimeAsMicroseconds;
 
-mod attributes;
 mod consts;
 mod http_route;
-mod input_models;
 
-/// Server-only companion of `my_http_utils::macros::MyHttpInput`: generates `parse_http_input`
-/// on the same field markup. The schema and the client request builder come from my-http-utils;
-/// this adds the server-side parsing of an incoming request. Use both derives together on
-/// server model crates.
-#[proc_macro_derive(
-    MyHttpInputServer,
-    attributes(
-        http_query,
-        http_header,
-        http_path,
-        http_form_data,
-        http_body,
-        http_body_raw,
-        debug,
-    )
-)]
-pub fn my_http_input_server_derive(input: TokenStream) -> TokenStream {
-    let ast = syn::parse(input).unwrap();
-    let mut debug = false;
-    let result = match crate::input_models::generate_server(&ast, &mut debug) {
-        Ok(result) => result,
-        Err(err) => err.to_compile_error().into(),
-    };
-
-    if debug {
-        println!("{}", result);
-    }
-
-    result
-}
+// Model description AND parsing now come entirely from `my_http_utils::macros::MyHttpInput`
+// (schema + client builder always, and the server-side sync `parse` + `READS_BODY` under the
+// `server` feature). This crate keeps only the server-glue macros: `#[http_route]` (routing /
+// action wiring) and `pkg_compile_date_time`.
 
 #[proc_macro_attribute]
 pub fn http_route(attr: TokenStream, item: TokenStream) -> TokenStream {

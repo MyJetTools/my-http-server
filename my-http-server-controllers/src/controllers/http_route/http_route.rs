@@ -1,6 +1,4 @@
-use my_http_server_core::{HttpFailResult, HttpPath};
-
-use crate::PathValue;
+use my_http_server_core::HttpPath;
 
 use super::HttpRouteSegment;
 
@@ -85,43 +83,21 @@ impl HttpRoute {
         true
     }
 
-    pub fn get_value<'s>(
-        &'s self,
-        path: &'s HttpPath,
-        key: &'static str,
-    ) -> Result<PathValue<'s>, HttpFailResult> {
-        if self.keys_amount == 0 {
-            return Err((
-                400,
-                format!("Route {} does not contain any keys", self.route),
-            )
-                .into());
-        }
-
+    /// The raw (still percent-encoded) value of the named route key `{key}` out of a matched
+    /// `path`, or `None` when the route has no such key. Never errors — it backs
+    /// `THttpRequest::get_path_value`.
+    pub fn get_segment_str<'s>(&'s self, path: &'s HttpPath, key: &str) -> Option<&'s str> {
         let mut index = 0;
         for segment in &self.segments {
-            match segment {
-                HttpRouteSegment::Key(segment_key) => {
-                    if segment_key == key {
-                        match path.get_segment_value_as_str(index) {
-                            Some(value) => return Ok(PathValue::new(key, value)),
-                            None => {
-                                panic!("Should not be here");
-                            }
-                        }
-                    }
+            if let HttpRouteSegment::Key(segment_key) = segment {
+                if segment_key == key {
+                    return path.get_segment_value_as_str(index);
                 }
-                HttpRouteSegment::Segment(_) => {}
             }
-
             index += 1;
         }
 
-        return Err((
-            400,
-            format!("Route {} does not have key {}", self.route, key),
-        )
-            .into());
+        None
     }
 
     pub fn has_route_key(&self, key: &str) -> bool {
@@ -183,7 +159,7 @@ mod tests {
         let path = HttpPath::from_str("/test/1/second");
         assert_eq!(route.is_my_path(&path), true);
 
-        assert_eq!(route.get_value(&path, "key").unwrap().as_str(), "1");
+        assert_eq!(route.get_segment_str(&path, "key").unwrap(), "1");
     }
 
     #[test]
