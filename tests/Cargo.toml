@@ -14,4 +14,4 @@ my-http-server = { path = "../my-http-server", features = [
 
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
-url-utils = { tag = "0.2.0", git = "https://github.com/MyJetTools/url-utils.git" }
+my-http-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-http-utils.git" }

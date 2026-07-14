@@ -1,6 +1,6 @@
 // The attribute structs describe the full `#[http_query(...)]`-family markup so the server derive
 // can parse it. Some fields (e.g. `description`) are part of that markup but are consumed by the
-// schema/client derives in url-utils, not by the server-side parse — hence they are read there,
+// schema/client derives in my-http-utils, not by the server-side parse — hence they are read there,
 // not here.
 #![allow(dead_code)]
 

@@ -4,7 +4,7 @@ use super::http_input_props::HttpInputProperties;
 
 /// Server-only half of the model derive: generates just `parse_http_input`, which reads the
 /// model out of an incoming request. The schema (`get_input_params`/`get_model_routes`) and the
-/// client request builder come from `url_utils::macros::MyHttpInput`; this one is added on the
+/// client request builder come from `my_http_utils::macros::MyHttpInput`; this one is added on the
 /// server via `MyHttpInputServer` so the same field markup drives both sides.
 pub fn generate_server(ast: &syn::DeriveInput, debug: &mut bool) -> Result<TokenStream, syn::Error> {
     let struct_name = &ast.ident;

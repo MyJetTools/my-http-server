@@ -9,7 +9,7 @@ default = []
 
 [dependencies]
 my-http-server-core = { path = "../my-http-server-core" }
-url-utils = { tag = "0.2.0", git = "https://github.com/MyJetTools/url-utils.git" }
+my-http-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-http-utils.git" }
 tokio = { version = "*" }
 async-trait = "*"
 hyper = { version = "*" }

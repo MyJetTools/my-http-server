@@ -1,8 +1,8 @@
-use url_utils::{url_decoder::UrlDecodeError, url_encoded_data_reader::UrlEncodedDataReader};
+use my_http_utils::{url_decoder::UrlDecodeError, url_encoded_data_reader::UrlEncodedDataReader};
 
 use crate::data_src::*;
 use crate::{EncodedParamValue, HttpFailResult};
-use url_utils::url_encoded_data_reader::UrlEncodedValue;
+use my_http_utils::url_encoded_data_reader::UrlEncodedValue;
 
 pub enum UrlEncodedData<'s> {
     Body(UrlEncodedDataReader<'s>),

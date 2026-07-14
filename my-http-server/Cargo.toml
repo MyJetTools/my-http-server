@@ -35,6 +35,6 @@ my-http-server-signal-r-middleware = { optional = true, path = "../my-http-serve
 my-http-server-socket-io-middleware = { optional = true, path = "../my-http-server-socket-io-middleware" }
 my-http-server-controllers = { optional = true, path = "../my-http-server-controllers" }
 my-http-server-core = { path = "../my-http-server-core" }
-url-utils = { tag = "0.2.0", git = "https://github.com/MyJetTools/url-utils.git" }
+my-http-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-http-utils.git" }
 signal-r-macros = { optional = true, path = "../signal-r-macros" }
 static-files-middleware = { path = "../static-files-middleware", optional = true }

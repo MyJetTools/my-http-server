@@ -9,8 +9,8 @@ mod consts;
 mod http_route;
 mod input_models;
 
-/// Server-only companion of `url_utils::macros::MyHttpInput`: generates `parse_http_input`
-/// on the same field markup. The schema and the client request builder come from url-utils;
+/// Server-only companion of `my_http_utils::macros::MyHttpInput`: generates `parse_http_input`
+/// on the same field markup. The schema and the client request builder come from my-http-utils;
 /// this adds the server-side parsing of an incoming request. Use both derives together on
 /// server model crates.
 #[proc_macro_derive(

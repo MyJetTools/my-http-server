@@ -1,5 +1,5 @@
 // Verifies the macro split: the model is marked up ONCE and gets its schema + client request
-// builder from url-utils (`MyHttpInput`, `MyHttpObjectStructure`) while the server-only parse
+// builder from my-http-utils (`MyHttpInput`, `MyHttpObjectStructure`) while the server-only parse
 // comes from `MyHttpInputServer` here, and `#[http_route]` (server) glues them together.
 
 use my_http_server::controllers::documentation::DataTypeProvider;
@@ -7,7 +7,7 @@ use my_http_server::macros::*;
 use my_http_server::*;
 use serde::*;
 
-// One markup, two derives: url-utils gives schema + client builder, MyHttpInputServer gives parse.
+// One markup, two derives: my-http-utils gives schema + client builder, MyHttpInputServer gives parse.
 #[derive(MyHttpInput, MyHttpInputServer)]
 pub struct UpdateUserRequest {
     #[http_path(name = "id", description = "User id")]
@@ -55,15 +55,15 @@ async fn handle_request(
 
 #[test]
 fn macro_split_round_trip_compiles() {
-    // Schema half — from url-utils MyHttpInput.
+    // Schema half — from my-http-utils MyHttpInput.
     let params = UpdateUserRequest::get_input_params();
     assert_eq!(params.len(), 4);
 
-    // Output schema — from url-utils MyHttpObjectStructure.
+    // Output schema — from my-http-utils MyHttpObjectStructure.
     let structure = UpdateUserResponse::get_http_data_structure();
     assert_eq!(structure.main.fields.len(), 1);
 
-    // Server action description — from #[http_route], built off the url-utils schema.
+    // Server action description — from #[http_route], built off the my-http-utils schema.
     let description = UpdateUserAction::get_description();
     assert!(description.is_some());
 }

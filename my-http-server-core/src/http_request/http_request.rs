@@ -7,7 +7,7 @@ use crate::{
 };
 
 use hyper::{Method, Uri};
-use url_utils::url_decoder::UrlDecodeError;
+use my_http_utils::url_decoder::UrlDecodeError;
 
 #[derive(Debug, Clone)]
 pub enum SocketAddress {

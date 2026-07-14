@@ -24,8 +24,8 @@ impl HttpFailResult {
     }
 }
 
-impl From<url_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
-    fn from(src: url_utils::url_encoded_data_reader::ReadingEncodedDataError) -> Self {
+impl From<my_http_utils::url_encoded_data_reader::ReadingEncodedDataError> for HttpFailResult {
+    fn from(src: my_http_utils::url_encoded_data_reader::ReadingEncodedDataError) -> Self {
         let output = HttpOutput::as_validation_error(format!(
             "Reading encoded parameter failed. Err: '{:?}'",
             src
