@@ -220,6 +220,35 @@ pub struct RawDataInputModel {
 }
 ```
 
+**Typed raw body (`RawDataTyped<T>`) — deserialize with `?`:**
+
+Instead of `Vec<u8>` you can type a `#[http_body_raw]` field as `RawDataTyped<T>`. It is built **infallibly** (it just holds the raw bytes) — `T` is parsed only when you call `.deserialize_json()`, which returns `Result<T, my_http_utils::http_input::HttpParseError>`.
+
+`HttpFailResult` implements `From<HttpParseError>`, so that call ends with `?` right in the handler — a malformed body is turned into the correct validation-error `HttpFailResult` (status + text) for you, no `map_err`:
+
+```rust
+use my_http_server::RawDataTyped;
+
+#[derive(MyHttpInput)]
+pub struct CreateOrderInputModel {
+    #[http_body_raw(description = "Order payload as JSON")]
+    pub body: RawDataTyped<OrderPayload>,
+}
+
+async fn handle_request(
+    _action: &ActionName,
+    input_data: CreateOrderInputModel,
+    _ctx: &HttpContext,
+) -> Result<HttpOkResult, HttpFailResult> {
+    // deserialize_json() -> Result<OrderPayload, HttpParseError>; `?` converts the error
+    // into an HttpFailResult via `From<HttpParseError>`.
+    let payload: OrderPayload = input_data.body.deserialize_json()?;
+    // ... use payload ...
+}
+```
+
+The same `From<HttpParseError> for HttpFailResult` conversion backs the generated `parse` in every action, so **any** `my_http_utils` call that returns `Result<_, HttpParseError>` (e.g. `HttpInputValue::deserialize_json` / `::parse`) can be finished with `?` inside a handler.
+
 **Field Options:**
 
 All input field attributes support these optional parameters:
