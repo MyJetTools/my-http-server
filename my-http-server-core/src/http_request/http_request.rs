@@ -100,15 +100,23 @@ impl HttpRequest {
     }
 
     pub fn get_host(&self) -> &str {
+        // HTTP/1 sends the host in the `Host` header — check it first.
         if let Some(value) = self.data.headers().try_get_case_insensitive("host") {
             return value.as_str().unwrap();
         }
 
+        // Behind a reverse proxy the original host may come in X-Forwarded-Host.
+        if let Some(value) = self.data.headers().try_get_case_insensitive(X_FORWARDED_HOST) {
+            return value.as_str().unwrap();
+        }
+
+        // HTTP/2 carries the host in the `:authority` pseudo-header (surfaced by hyper as the URI
+        // authority).
         if let Some(authority) = self.data.uri().authority() {
             return authority.as_str();
         }
 
-        panic!("Host is not set: neither Host header nor :authority is present");
+        panic!("Host is not set: neither Host header, X-Forwarded-Host, nor :authority is present");
     }
 
     pub fn get_path_and_query(&self) -> &str {
