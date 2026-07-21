@@ -110,7 +110,55 @@ impl MyHttpServer {
 
         logger.write_info(
             "Starting Http Server".to_string(),
-            format!("Http server starts at: {:?}", self.addr),
+            format!("Http server (auto h1/h2) starts at: {:?}", self.addr),
+            None,
+        );
+
+        let http_server_middlewares = HttpServerMiddlewares {
+            middlewares: middlewares.unwrap(),
+            tech_middlewares: self.tech_middlewares.take().unwrap(),
+        };
+
+        let connections = self.connections.clone();
+        match &self.addr {
+            ListenAddr::Tcp(socket_addr) => {
+                let socket_addr = socket_addr.clone();
+                tokio::spawn(start_http_auto(
+                    socket_addr,
+                    Arc::new(http_server_middlewares),
+                    app_states,
+                    logger,
+                    connections,
+                ));
+            }
+            ListenAddr::Unix(unix_socket_addr) => {
+                let unix_socket_addr = unix_socket_addr.clone();
+                tokio::spawn(start_http_auto_unix_socket(
+                    unix_socket_addr,
+                    Arc::new(http_server_middlewares),
+                    app_states,
+                    logger,
+                    connections,
+                ));
+            }
+        }
+    }
+
+    /// Starts server in HTTP/1 only mode. Use it when auto h1/h2 negotiation is not desired.
+    pub fn start_h1(
+        &mut self,
+        app_states: Arc<dyn ApplicationStates + Send + Sync + 'static>,
+        logger: Arc<dyn Logger + Send + Sync + 'static>,
+    ) {
+        let middlewares = self.middlewares.take();
+
+        if middlewares.is_none() {
+            panic!("You can not start HTTP server two times");
+        }
+
+        logger.write_info(
+            "Starting Http Server".to_string(),
+            format!("Http server (h1 only) starts at: {:?}", self.addr),
             None,
         );
 
