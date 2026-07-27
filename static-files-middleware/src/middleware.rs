@@ -3,7 +3,7 @@ use rust_extensions::StrOrString;
 
 use crate::{
     calc_etag, deflate_compress, zstd_decompress, CachedContent, EtagCaches, FilesAccess,
-    FilesMapping, NoCache, RootPaths,
+    FilesMapping, NoCache, RootPaths, NO_CACHE_CACHE_CONTROL, NO_CACHE_EXPIRES, NO_CACHE_PRAGMA,
 };
 
 pub struct StaticFilesMiddleware {
@@ -21,6 +21,67 @@ pub struct StaticFilesMiddleware {
 struct AcceptedEncodings {
     zstd: bool,
     deflate: bool,
+}
+
+/// Either the path is registered as "never cache it" - and then there is nothing
+/// to negotiate with the client, or we are doing a regular ETag negotiation -
+/// with or without an `If-None-Match` header from the client.
+#[derive(Clone, Copy)]
+enum CachePolicy<'s> {
+    /// Path is registered with `add_no_cache_headers_to_response_by_path`
+    NoCache,
+    /// Regular path. Client sent us `If-None-Match`
+    IfNoneMatch(&'s str),
+    /// Regular path. Client did not send us `If-None-Match`
+    Regular,
+}
+
+impl<'s> CachePolicy<'s> {
+    pub fn get_if_none_match(&self) -> Option<&'s str> {
+        match self {
+            CachePolicy::IfNoneMatch(etag) => Some(etag),
+            _ => None,
+        }
+    }
+}
+
+/// Caching related headers of the response
+#[derive(Default)]
+struct CacheHeaders {
+    etag: Option<String>,
+    cache_control: Option<&'static str>,
+    pragma: Option<&'static str>,
+    expires: Option<&'static str>,
+}
+
+impl CacheHeaders {
+    /// Client is not allowed to cache the content at all
+    pub fn no_cache() -> Self {
+        Self {
+            etag: None,
+            cache_control: Some(NO_CACHE_CACHE_CONTROL),
+            pragma: Some(NO_CACHE_PRAGMA),
+            expires: Some(NO_CACHE_EXPIRES),
+        }
+    }
+
+    /// Client caches the content but revalidates it with `If-None-Match` each time
+    pub fn with_etag(etag: String) -> Self {
+        Self {
+            etag: Some(etag),
+            cache_control: Some("no-cache"),
+            pragma: None,
+            expires: None,
+        }
+    }
+
+    pub fn apply(self, builder: HttpResultBuilder) -> HttpResultBuilder {
+        builder
+            .add_header_if_some("ETag", self.etag)
+            .add_header_if_some("Cache-Control", self.cache_control)
+            .add_header_if_some("Pragma", self.pragma)
+            .add_header_if_some("Expires", self.expires)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -90,7 +151,15 @@ impl StaticFilesMiddleware {
         self
     }
 
-    pub fn set_path_not_to_cache(mut self, path: impl Into<String>) -> Self {
+    /// Registers a path which must never be cached by the client.
+    ///
+    /// Path is matched segment by segment (case-insensitive, trailing slash does
+    /// not matter) and the query string is ignored - so `/` matches `/?ver=123`.
+    ///
+    /// For such a path the middleware does not deal with ETag at all: no
+    /// `If-None-Match` check, no `304 Not Modified`, no `ETag` header. Instead the
+    /// content is always served with the full set of no-cache headers.
+    pub fn add_no_cache_headers_to_response_by_path(mut self, path: impl Into<String>) -> Self {
         self.no_cache.add_path(path.into());
         self
     }
@@ -121,8 +190,8 @@ impl StaticFilesMiddleware {
         file_folder: &str,
         http_path: &HttpPath,
         segment: usize,
-        etag_header: Option<&str>,
         accepted: AcceptedEncodings,
+        cache_policy: CachePolicy<'_>,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let path = http_path.as_str_from_segment(segment);
         if self.index_paths.is_my_path(path) {
@@ -131,7 +200,7 @@ impl StaticFilesMiddleware {
 
                 if let Ok(file_content) = self.files_access.get(file_name.as_str()).await {
                     return Some(
-                        self.compile_response(http_path, path, file_content, accepted)
+                        self.compile_response(http_path, path, file_content, accepted, cache_policy)
                             .await,
                     );
                 }
@@ -143,13 +212,13 @@ impl StaticFilesMiddleware {
         match self.files_access.get(file.as_str()).await {
             Ok(file_content) => {
                 let result = self
-                    .compile_response(http_path, path, file_content, accepted)
+                    .compile_response(http_path, path, file_content, accepted, cache_policy)
                     .await;
                 return Some(result);
             }
             Err(_) => {
                 return self
-                    .handle_not_found(file_folder, etag_header, accepted)
+                    .handle_not_found(file_folder, accepted, cache_policy)
                     .await;
             }
         }
@@ -158,13 +227,13 @@ impl StaticFilesMiddleware {
     async fn handle_not_found(
         &self,
         file_folder: &str,
-        etag_header: Option<&str>,
         accepted: AcceptedEncodings,
+        cache_policy: CachePolicy<'_>,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let not_found_file = self.not_found_file.as_ref()?;
         let file = get_file_name(file_folder, not_found_file);
 
-        if let Some(etag_header) = etag_header {
+        if let Some(etag_header) = cache_policy.get_if_none_match() {
             if let Some(etag_caches) = self.etag_caches.as_ref() {
                 if etag_caches.is_not_found(etag_header).await {
                     return Some(HttpOutput::as_not_modified().into_ok_result(false));
@@ -172,41 +241,41 @@ impl StaticFilesMiddleware {
             }
         }
 
-        match self.files_access.get(file.as_str()).await {
-            Ok(file_content) => {
-                let (body, encoding, etag) = match build_response_body(&file_content, accepted) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Some(Err(HttpFailResult::as_fatal_error(format!(
-                            "Failed to prepare cached content: {}",
-                            e
-                        ))));
-                    }
+        let file_content = self.files_access.get(file.as_str()).await.ok()?;
+
+        let (body, encoding, cache_headers) = match cache_policy {
+            CachePolicy::NoCache => {
+                let (body, encoding) = match body_without_etag(&file_content, accepted) {
+                    Ok(result) => result,
+                    Err(err) => return Some(Err(content_preparation_error(err))),
                 };
 
-                let mut builder = HttpOutput::from_builder()
-                    .add_headers_opt(self.get_headers())
-                    .add_header("ETag", etag.as_str())
-                    .add_header("Cache-Control", "no-cache")
-                    .add_header("Vary", "Accept-Encoding")
-                    .set_content_type_opt(WebContentType::detect_by_extension(not_found_file));
-
-                if let Some(enc) = encoding.header_value() {
-                    builder = builder.add_header("Content-Encoding", enc);
-                }
-
-                let result = builder.set_content(body).into_ok_result(false);
+                (body, encoding, CacheHeaders::no_cache())
+            }
+            CachePolicy::IfNoneMatch(_) | CachePolicy::Regular => {
+                let (body, encoding, etag) = match build_response_body(&file_content, accepted) {
+                    Ok(result) => result,
+                    Err(err) => return Some(Err(content_preparation_error(err))),
+                };
 
                 if let Some(etag_caches) = self.etag_caches.as_ref() {
-                    etag_caches.set_not_found(etag).await;
+                    etag_caches.set_not_found(etag.clone()).await;
                 }
 
-                return Some(result);
+                (body, encoding, CacheHeaders::with_etag(etag))
             }
-            Err(_) => {
-                return None;
-            }
+        };
+
+        let mut builder = cache_headers
+            .apply(HttpOutput::from_builder().add_headers_opt(self.get_headers()))
+            .add_header("Vary", "Accept-Encoding")
+            .set_content_type_opt(WebContentType::detect_by_extension(not_found_file));
+
+        if let Some(enc) = encoding.header_value() {
+            builder = builder.add_header("Content-Encoding", enc);
         }
+
+        Some(builder.set_content(body).into_ok_result(false))
     }
 
     async fn compile_response(
@@ -215,54 +284,35 @@ impl StaticFilesMiddleware {
         path: &str,
         file_content: CachedContent,
         accepted: AcceptedEncodings,
+        cache_policy: CachePolicy<'_>,
     ) -> Result<HttpOkResult, HttpFailResult> {
-        let with_etag = self.etag_caches.is_some();
+        let (body, encoding, cache_headers) = match cache_policy {
+            CachePolicy::NoCache => {
+                let (body, encoding) =
+                    body_without_etag(&file_content, accepted).map_err(content_preparation_error)?;
 
-        let (body, encoding, etag_opt) = if with_etag {
-            let (b, e, t) = build_response_body(&file_content, accepted).map_err(|err| {
-                HttpFailResult::as_fatal_error(format!(
-                    "Failed to prepare cached content: {}",
-                    err
-                ))
-            })?;
-            (b, e, Some(t))
-        } else {
-            let (b, e) = body_without_etag(&file_content, accepted).map_err(|err| {
-                HttpFailResult::as_fatal_error(format!(
-                    "Failed to prepare cached content: {}",
-                    err
-                ))
-            })?;
-            (b, e, None)
+                (body, encoding, CacheHeaders::no_cache())
+            }
+            CachePolicy::IfNoneMatch(_) | CachePolicy::Regular => match self.etag_caches.as_ref() {
+                Some(etag_cache) => {
+                    let (body, encoding, etag) = build_response_body(&file_content, accepted)
+                        .map_err(content_preparation_error)?;
+
+                    etag_cache.set(http_path, etag.clone()).await;
+
+                    (body, encoding, CacheHeaders::with_etag(etag))
+                }
+                None => {
+                    let (body, encoding) = body_without_etag(&file_content, accepted)
+                        .map_err(content_preparation_error)?;
+
+                    (body, encoding, CacheHeaders::default())
+                }
+            },
         };
 
-        let (etag, cache_control, pragma, expires) = if let Some(etag_cache) =
-            self.etag_caches.as_ref()
-        {
-            let etag = etag_opt.expect("etag must be computed when etag_caches is enabled");
-            etag_cache.set(http_path, etag.clone()).await;
-
-            let (cache_control, pragma, expires) = if self.no_cache.marked_as_no_cache(http_path) {
-                (
-                    "no-cache, no-store, must-revalidate",
-                    Some("no-cache"),
-                    Some("0"),
-                )
-            } else {
-                ("no-cache", None, None)
-            };
-
-            (Some(etag), Some(cache_control), pragma, expires)
-        } else {
-            (None, None, None, None)
-        };
-
-        let mut builder = HttpOutput::from_builder()
-            .add_headers_opt(self.get_headers())
-            .add_header_if_some("ETag", etag)
-            .add_header_if_some("Cache-Control", cache_control)
-            .add_header_if_some("Pragma", pragma)
-            .add_header_if_some("Expires", expires)
+        let mut builder = cache_headers
+            .apply(HttpOutput::from_builder().add_headers_opt(self.get_headers()))
             .add_header("Vary", "Accept-Encoding")
             .set_content_type_opt(WebContentType::detect_by_extension(path));
 
@@ -270,9 +320,7 @@ impl StaticFilesMiddleware {
             builder = builder.add_header("Content-Encoding", enc);
         }
 
-        let result = builder.set_content(body).into_ok_result(false);
-
-        return result;
+        builder.set_content(body).into_ok_result(false)
     }
 }
 
@@ -284,17 +332,26 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let path = &ctx.request.http_path;
 
-        let mut etag_header = None;
-        if let Some(etag) = ctx
-            .request
-            .get_headers()
-            .try_get_case_insensitive("if-none-match")
-        {
-            if let Ok(etag) = etag.as_str() {
-                etag_header = Some(etag);
-                if let Some(etag_cache) = self.etag_caches.as_ref() {
-                    if etag_cache.check_etag(path, etag).await {
-                        return Some(HttpOutput::as_not_modified().build().into_ok_result(false));
+        let mut cache_policy = if self.no_cache.marked_as_no_cache(path) {
+            CachePolicy::NoCache
+        } else {
+            CachePolicy::Regular
+        };
+
+        if let CachePolicy::Regular = cache_policy {
+            if let Some(etag) = ctx
+                .request
+                .get_headers()
+                .try_get_case_insensitive("if-none-match")
+            {
+                if let Ok(etag) = etag.as_str() {
+                    cache_policy = CachePolicy::IfNoneMatch(etag);
+                    if let Some(etag_cache) = self.etag_caches.as_ref() {
+                        if etag_cache.check_etag(path, etag).await {
+                            return Some(
+                                HttpOutput::as_not_modified().build().into_ok_result(false),
+                            );
+                        }
                     }
                 }
             }
@@ -315,8 +372,8 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
                         mapping.folder_path.as_str(),
                         path,
                         mapping.uri_prefix.segments_amount(),
-                        etag_header,
                         accepted,
+                        cache_policy,
                     )
                     .await
                 {
@@ -326,7 +383,7 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         }
 
         if let Some(result) = self
-            .handle_folder(Self::DEFAULT_FOLDER, path, 0, etag_header, accepted)
+            .handle_folder(Self::DEFAULT_FOLDER, path, 0, accepted, cache_policy)
             .await
         {
             return Some(result);
@@ -341,6 +398,10 @@ impl AddHttpHeaders for StaticFilesMiddleware {
         self.headers
             .push((header_name.into().into(), header_value.into()));
     }
+}
+
+fn content_preparation_error(err: std::io::Error) -> HttpFailResult {
+    HttpFailResult::as_fatal_error(format!("Failed to prepare cached content: {}", err))
 }
 
 fn get_file_name(file_folder: &str, path: &str) -> String {

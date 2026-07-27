@@ -965,7 +965,7 @@ Every method consumes `self` and returns `Self`, so calls chain naturally.
 | `set_not_found_file(name)` | File for SPA-style fallback. A leading slash is added automatically. |
 | `with_etag()` | Enables ETag (SHA-256 + base64) and `If-None-Match` → `304`. Also flips ETag computation on in `FilesAccess` so SHA-256 isn't recomputed per request. |
 | `enable_files_caching()` | Caches file contents in memory (`HashMap<String, CachedContent>`). Turns on the zstd compression branch. |
-| `set_path_not_to_cache(path)` | Path (strict case-insensitive match) that must be served with a hard no-cache header set. |
+| `add_no_cache_headers_to_response_by_path(path)` | Path which must never be cached by the client. Matched segment by segment (case-insensitive, trailing slash and query string are ignored). For such a path ETag is not used at all — no `If-None-Match` check, no `304`, no `ETag` header — the content is always served with the full no-cache header set. Works with or without `with_etag()`. |
 | `add_header(name, value)` | Arbitrary response header attached to every file. Implements `AddHttpHeaders`. |
 
 Public fields — `file_folders: Vec<FilesMapping>`, `index_paths`,
@@ -974,8 +974,11 @@ accessible directly when the builder API isn't enough.
 
 ## Path resolution
 
-1. If `If-None-Match` is set and the ETag cache already knows this ETag
-   for the requested path — return `304 Not Modified` immediately, no I/O.
+1. If the path is registered via
+   `add_no_cache_headers_to_response_by_path(...)` — the whole ETag step is
+   skipped. Otherwise: if `If-None-Match` is set and the ETag cache already
+   knows this ETag for the requested path — return `304 Not Modified`
+   immediately, no I/O.
 2. For each `FilesMapping`, check whether the URL starts with its
    `uri_prefix`. If so, attempt to serve from the mapped directory,
    offsetting by the number of path segments the prefix consumed.
@@ -990,18 +993,21 @@ accessible directly when the builder API isn't enough.
 
 ## Cache-Control
 
-Default policy (kicks in only together with `with_etag()`, which is where
-cache-related headers are set):
-
-- Regular path: `Cache-Control: no-cache` + ETag → clients perform
-  conditional GETs and get `304` on a match.
-- Path registered via `set_path_not_to_cache(...)`:
-  - `Cache-Control: no-cache, no-store, must-revalidate`
+- Regular path with `with_etag()`: `Cache-Control: no-cache` + ETag →
+  clients perform conditional GETs and get `304` on a match.
+- Path registered via `add_no_cache_headers_to_response_by_path(...)`:
+  - `Cache-Control: no-store, no-cache, must-revalidate, max-age=0`
   - `Pragma: no-cache`
   - `Expires: 0`
 
-Without `with_etag()` these headers are not emitted — behavior is left
-entirely to client/proxy defaults.
+  Such a path bypasses ETag entirely: the incoming `If-None-Match` is not
+  checked, `304` is never returned and no `ETag` header is emitted — even
+  when `with_etag()` is on. The path is matched segment by segment
+  (case-insensitive), a trailing slash and the query string do not matter,
+  so `/` covers `/`, `/?ver=123` and so on. The SPA fallback file, when it
+  is served for such a path, gets the very same headers.
+- Regular path without `with_etag()`: no cache-related headers are emitted
+  — behavior is left entirely to client/proxy defaults.
 
 ## ETag
 
