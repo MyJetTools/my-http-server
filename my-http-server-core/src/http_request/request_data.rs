@@ -2,6 +2,8 @@ use http::{HeaderMap, HeaderValue};
 
 use hyper::Uri;
 
+use my_http_utils::http_input::HttpBodyAsStream;
+
 use crate::{
     BodyContentType, HttpFailResult, HttpRequestBody, HttpRequestBodyContent, MyHyperHttpRequest,
 };
@@ -57,6 +59,37 @@ impl RequestData {
                 panic!("Body is taken by some middleware before")
             }
         }
+    }
+
+    /// Takes the body as a stream of chunks. Like [`receive_body`](Self::receive_body) it *takes*
+    /// the body, so afterwards `get_body` / `take_my_hyper_http_request` behave exactly as they do
+    /// after any other middleware consumed it.
+    pub fn take_body_stream(
+        &mut self,
+        buffer: usize,
+    ) -> Result<HttpBodyAsStream, HttpFailResult> {
+        let content_length = self.content_length();
+
+        match self.body.take() {
+            Some(body) => Ok(body.into_body_stream(content_length, buffer)),
+            None => Err(HttpFailResult::as_fatal_error(
+                "Body is taken by some middleware before".to_string(),
+            )),
+        }
+    }
+
+    /// `Content-Length` when the client sent a valid one. `None` for a chunked body — and for a
+    /// malformed header, which is not worth failing the request over: the length is a hint here,
+    /// the body is read frame by frame either way.
+    fn content_length(&self) -> Option<u64> {
+        self.parts
+            .headers
+            .get("content-length")?
+            .to_str()
+            .ok()?
+            .trim()
+            .parse::<u64>()
+            .ok()
     }
 
     pub fn uri(&self) -> &Uri {

@@ -1,5 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
+use my_http_utils::http_input::{HttpBodyAsStream, BODY_STREAM_DEFAULT_BUFFER};
+
 use crate::{
     http_headers::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader,
     HttpRequestBodyContent, HttpRequestHeaders, MyHyperHttpRequest, QueryStringReader, RequestData,
@@ -85,6 +87,21 @@ impl HttpRequest {
 
     pub async fn receive_body(&mut self) -> Result<HttpRequestBodyContent, HttpFailResult> {
         self.data.receive_body().await
+    }
+
+    /// Takes the body as a stream of chunks, with the default channel capacity. Used by the
+    /// generated action code for a `#[http_body_as_stream]` model.
+    pub fn take_body_stream(&mut self) -> Result<HttpBodyAsStream, HttpFailResult> {
+        self.take_body_stream_with_buffer(BODY_STREAM_DEFAULT_BUFFER)
+    }
+
+    /// Same, with an explicit channel capacity — how many chunks the pump may read ahead. The
+    /// memory ceiling for the request is roughly `buffer × chunk size`.
+    pub fn take_body_stream_with_buffer(
+        &mut self,
+        buffer: usize,
+    ) -> Result<HttpBodyAsStream, HttpFailResult> {
+        self.data.take_body_stream(buffer)
     }
 
     pub fn take_my_hyper_http_request(&mut self) -> MyHyperHttpRequest {

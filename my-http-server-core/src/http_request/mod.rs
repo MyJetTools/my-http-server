@@ -12,5 +12,7 @@ mod content_encoding;
 pub use content_encoding::*;
 mod http_request_body_mode;
 pub use http_request_body_mode::*;
+mod body_stream_pump;
+pub use body_stream_pump::*;
 mod my_hyper_http_request;
 pub use my_hyper_http_request::*;

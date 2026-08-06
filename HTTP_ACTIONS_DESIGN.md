@@ -249,6 +249,53 @@ async fn handle_request(
 
 The same `From<HttpParseError> for HttpFailResult` conversion backs the generated `parse` in every action, so **any** `my_http_utils` call that returns `Result<_, HttpParseError>` (e.g. `HttpInputValue::deserialize_json` / `::parse`) can be finished with `?` inside a handler.
 
+**Streamed body (`#[http_body_as_stream]`) — read it in chunks, never materialize it:**
+
+Every body kind above puts the whole body in memory before the handler runs. For uploads and proxying that is not acceptable. `#[http_body_as_stream]` hands the handler a reader instead:
+
+```rust
+use my_http_server::HttpBodyAsStream;
+
+#[derive(MyHttpInput)]
+pub struct UploadInputModel {
+    #[http_header(name = "X-File-Name", description = "File name")]
+    pub file_name: String,
+
+    #[http_body_as_stream(description = "File content")]
+    pub body: HttpBodyAsStream,
+}
+
+async fn handle_request(
+    _action: &ActionName,
+    input_data: UploadInputModel,
+    _ctx: &mut HttpContext,
+) -> Result<HttpOkResult, HttpFailResult> {
+    let reader = input_data.body.get_body_reader()?;
+
+    // Some(n) when the client sent Content-Length; None for a chunked body.
+    let _expected = reader.get_content_length();
+
+    while let Some(chunk) = reader.get_next_chunk().await? {
+        // chunk: Vec<u8> — write it to a file, hash it, forward it...
+    }
+
+    HttpOutput::as_text("ok".to_string()).into_ok_result(true).into()
+}
+```
+
+It works identically for `Transfer-Encoding: chunked` and for a `Content-Length` body — the server reads hyper's DATA frames either way, and the only difference is whether the length is known up front.
+
+Things worth knowing before using it:
+
+- **Memory.** The chunks travel through a *bounded* channel (`BODY_STREAM_DEFAULT_BUFFER`), so a request costs roughly `buffer × chunk size` no matter how big the upload is. A pump that runs into a full channel parks, and that back-pressure reaches the TCP window. `take_body_stream_with_buffer` changes the capacity.
+- **A truncated upload is an error, not a short body.** If the client disappears mid-upload, `get_next_chunk()` returns `Err(HttpParseError::BodyStream(..))` — it never reports a clean end after a partial body. Do not "handle" that by treating it as end-of-data; you would be writing half a file and calling it success.
+- **`read_to_end(max_size)`** is there when you just want the bytes but still want a ceiling: it fails past `max_size` instead of allocating without limit.
+- **Returning without reading is fine.** An action may answer 403 and never touch the reader; the pump notices the reader is gone and stops. It does not hang and does not hold the connection.
+- **The body can only be taken once.** `get_body_reader()` hands out exactly one reader; a second call fails. And like `receive_body()`, taking the stream consumes the body — a middleware that reads the body afterwards will find it gone.
+- **Not for client models.** A model with a streamed body describes an incoming request only; building it into an outgoing request fails.
+
+Swagger shows the body as `type: string, format: binary`.
+
 **Field Options:**
 
 All input field attributes support these optional parameters:
@@ -275,7 +322,7 @@ pub struct SearchInputModel {
 }
 ```
 
-**Note:** You cannot mix `http_body`, `http_form_data`, and `http_body_raw` in the same model - only one body type is allowed per input model.
+**Note:** You cannot mix `http_body`, `http_form_data`, `http_body_raw` and `http_body_as_stream` in the same model - only one body type is allowed per input model.
 
 **Note on Field Transformations:** The `to_lowercase` and `to_uppercase` attributes work only with `String` types, not with other types like `Option<String>` or numeric types.
 

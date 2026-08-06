@@ -17,3 +17,10 @@ serde_json = "*"
 my-http-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-http-utils.git", features = [
     "server",
 ] }
+
+# The `#[http_body_as_stream]` end-to-end test drives a real server over a raw TCP socket — the
+# only way to check how hyper behaves on the wire (chunked vs Content-Length, an aborted upload,
+# an action that answers without draining the body).
+[dev-dependencies]
+tokio = { version = "*", features = ["rt-multi-thread", "macros", "net", "time", "io-util"] }
+rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-extensions.git" }

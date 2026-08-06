@@ -1,4 +1,4 @@
-use my_http_server_core::{HttpRequest, HttpRequestHeaders};
+use my_http_server_core::{HttpBodyAsStream, HttpRequest, HttpRequestHeaders};
 use my_http_utils::http_input::core::THttpRequest;
 
 use super::HttpRoute;
@@ -11,6 +11,10 @@ pub struct RequestReader<'s> {
     request: &'s HttpRequest,
     http_route: &'s HttpRoute,
     body: &'s [u8],
+    /// The chunk stream for a `#[http_body_as_stream]` model, already created and being filled by
+    /// the pump before `parse` runs. `Cell` because `parse` hands the request over by shared
+    /// reference and the stream has to be *moved* out of it — there is exactly one receiver.
+    body_stream: std::cell::Cell<Option<HttpBodyAsStream>>,
 }
 
 impl<'s> RequestReader<'s> {
@@ -19,7 +23,15 @@ impl<'s> RequestReader<'s> {
             request,
             http_route,
             body,
+            body_stream: std::cell::Cell::new(None),
         }
+    }
+
+    /// Hands the reader the body stream taken off the request. Only a model whose `STREAMS_BODY`
+    /// is set gets one; for every other model this stays `None` and nothing changes.
+    pub fn with_body_stream(self, body_stream: Option<HttpBodyAsStream>) -> Self {
+        self.body_stream.set(body_stream);
+        self
     }
 }
 
@@ -44,5 +56,9 @@ impl<'s> THttpRequest for RequestReader<'s> {
 
     fn get_body(&self) -> &[u8] {
         self.body
+    }
+
+    fn take_body_stream(&self) -> Option<HttpBodyAsStream> {
+        self.body_stream.take()
     }
 }

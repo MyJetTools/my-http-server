@@ -28,6 +28,11 @@ pub use my_http_utils::http_input::core::{
 pub use my_http_utils::http_input::{
     FileContent, HttpInputValue, HttpParseError, PasswordHttpInputField, RawData, RawDataTyped,
 };
+// Streaming the request body: the type a `#[http_body_as_stream]` model field carries, the reader
+// an action pulls chunks out of, and the sending half the pump in this crate fills.
+pub use my_http_utils::http_input::{
+    HttpBodyAsStream, HttpBodyReader, HttpBodyStreamSender, BODY_STREAM_DEFAULT_BUFFER,
+};
 
 pub use http_ctx::HttpContext;
 pub use http_fail_result::HttpFailResult;

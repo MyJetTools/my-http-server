@@ -56,6 +56,18 @@ impl From<my_http_utils::http_input::HttpParseError> for HttpFailResult {
             NotSupportedContentType(msg) => HttpFailResult::as_not_supported_content_type(msg),
             Forbidden(msg) => HttpFailResult::as_forbidden(Some(msg)),
             Validation(msg) => HttpFailResult::as_validation_error(msg),
+            // Streaming the body failed mid-flight: an aborted upload, a stream that was already
+            // taken, or a size limit. The transfer broke on the client's side, so 400 — but unlike
+            // an ordinary validation error it is worth seeing in the log.
+            BodyStream(msg) => HttpFailResult::new(
+                HttpOutput::Content {
+                    status_code: 400,
+                    headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                    content: msg.into_bytes(),
+                },
+                true,
+                true,
+            ),
         }
     }
 }

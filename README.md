@@ -108,6 +108,7 @@ Input models use the `MyHttpInput` derive macro and specify where data comes fro
 4. **Body Data** (`#[http_body]`) - For JSON body in POST/PUT requests
 5. **Form Data** (`#[http_form_data]`) - For multipart/form-data requests
 6. **Raw Body** (`#[http_body_raw]`) - For raw body content (only one field allowed)
+7. **Streamed Body** (`#[http_body_as_stream]`) - Reads the body in chunks instead of materializing it (uploads, proxying)
 
 **For POST/PUT requests (body data):**
 ```rust
@@ -218,6 +219,33 @@ pub struct RawDataInputModel {
 }
 ```
 
+**Streamed Body:**
+
+Every body kind above puts the whole body in memory before the handler runs. `#[http_body_as_stream]` hands the handler a reader instead, so an upload of any size costs a bounded amount of memory:
+
+```rust
+use my_http_server::HttpBodyAsStream;
+
+#[derive(MyHttpInput)]
+pub struct UploadInputModel {
+    #[http_header(name = "X-File-Name", description = "File name")]
+    pub file_name: String,
+
+    #[http_body_as_stream(description = "File content")]
+    pub body: HttpBodyAsStream,
+}
+
+// in the handler:
+let reader = input_data.body.get_body_reader()?;
+let _expected = reader.get_content_length();   // Some(n) with Content-Length, None when chunked
+
+while let Some(chunk) = reader.get_next_chunk().await? {
+    // chunk: Vec<u8>
+}
+```
+
+Works the same for `Transfer-Encoding: chunked` and for a `Content-Length` body. The chunks travel through a *bounded* channel, so the cost per request is roughly `BODY_STREAM_DEFAULT_BUFFER × chunk size` and the back-pressure reaches the TCP window; `take_body_stream_with_buffer` changes the capacity. A client that disappears mid-upload produces `Err(HttpParseError::BodyStream(..))` — never a clean end after a partial body. An action may also answer without reading the body at all; the reader is simply dropped and the pump stops. See `HTTP_ACTIONS_DESIGN.md` for the full notes.
+
 **Field Options:**
 
 All input field attributes support these optional parameters:
@@ -244,7 +272,7 @@ pub struct SearchInputModel {
 }
 ```
 
-**Note:** You cannot mix `http_body`, `http_form_data`, and `http_body_raw` in the same model - only one body type is allowed per input model.
+**Note:** You cannot mix `http_body`, `http_form_data`, `http_body_raw` and `http_body_as_stream` in the same model - only one body type is allowed per input model.
 
 **Note on Field Transformations:** The `to_lowercase` and `to_uppercase` attributes work only with `String` types, not with other types like `Option<String>` or numeric types.
 
@@ -891,7 +919,8 @@ async fn handle_request(
 - Swagger documentation is automatically generated from `http_route` annotations
 - Business logic should be implemented in `scripts/` module, not directly in actions
 - Path parameters in routes must match `#[http_path]` fields in input models
-- Only one body type (`http_body`, `http_form_data`, or `http_body_raw`) can be used per input model
+- Only one body type (`http_body`, `http_form_data`, `http_body_raw` or `http_body_as_stream`) can be used per input model
+- A `#[http_body_as_stream]` body is read in chunks and is never materialized; a truncated upload surfaces as an error, not as a short body
 - Headers are case-insensitive when reading
 - Optional fields use `Option<T>` type
 - Default values can be specified for any input field attribute
