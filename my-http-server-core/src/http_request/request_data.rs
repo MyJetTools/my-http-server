@@ -5,7 +5,8 @@ use hyper::Uri;
 use my_http_utils::http_input::HttpBodyAsStream;
 
 use crate::{
-    BodyContentType, HttpFailResult, HttpRequestBody, HttpRequestBodyContent, MyHyperHttpRequest,
+    BodyContentType, BodyExpectations, HttpFailResult, HttpRequestBody, HttpRequestBodyContent,
+    MyHyperHttpRequest,
 };
 
 pub struct RequestData {
@@ -44,8 +45,10 @@ impl RequestData {
     }
 
     pub async fn get_body(&mut self) -> Result<&HttpRequestBodyContent, HttpFailResult> {
+        let expectations = self.body_expectations();
+
         match self.body.as_mut() {
-            Some(body) => body.get_http_request_body().await,
+            Some(body) => body.get_http_request_body(expectations).await,
             None => {
                 panic!("Body is removed and can not be accessed")
             }
@@ -53,8 +56,10 @@ impl RequestData {
     }
 
     pub async fn receive_body(&mut self) -> Result<HttpRequestBodyContent, HttpFailResult> {
+        let expectations = self.body_expectations();
+
         match self.body.take() {
-            Some(body) => return body.into_http_request_body().await,
+            Some(body) => return body.into_http_request_body(expectations).await,
             None => {
                 panic!("Body is taken by some middleware before")
             }
@@ -68,13 +73,22 @@ impl RequestData {
         &mut self,
         buffer: usize,
     ) -> Result<HttpBodyAsStream, HttpFailResult> {
-        let content_length = self.content_length();
+        let expectations = self.body_expectations();
 
         match self.body.take() {
-            Some(body) => Ok(body.into_body_stream(content_length, buffer)),
+            Some(body) => Ok(body.into_body_stream(expectations, buffer)),
             None => Err(HttpFailResult::as_fatal_error(
                 "Body is taken by some middleware before".to_string(),
             )),
+        }
+    }
+
+    /// What this request promised about its body — used by both body-reading paths to tell a
+    /// complete body from one the client abandoned.
+    fn body_expectations(&self) -> BodyExpectations {
+        BodyExpectations {
+            version: self.parts.version,
+            content_length: self.content_length(),
         }
     }
 

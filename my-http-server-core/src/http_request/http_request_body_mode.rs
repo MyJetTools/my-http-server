@@ -1,8 +1,8 @@
 use my_http_utils::http_input::HttpBodyAsStream;
 
 use crate::{
-    next_data_frame, spawn_body_pump, BodyContentType, ContentEncoding, HttpFailResult,
-    HttpRequestBodyContent,
+    next_data_frame, spawn_body_pump, BodyContentType, BodyExpectations, ContentEncoding,
+    HttpFailResult, HttpRequestBodyContent,
 };
 
 /// The request body, kept **lazy**: it holds hyper's `Incoming` and is not turned into bytes until
@@ -25,6 +25,7 @@ pub enum HttpRequestBody {
 impl HttpRequestBody {
     pub async fn get_http_request_body(
         &mut self,
+        expectations: BodyExpectations,
     ) -> Result<&HttpRequestBodyContent, HttpFailResult> {
         match self {
             HttpRequestBody::Incoming {
@@ -33,7 +34,7 @@ impl HttpRequestBody {
             } => {
                 let mut take = incoming.take().unwrap();
 
-                let bytes = read_bytes(ContentEncoding::None, &mut take).await?;
+                let bytes = read_bytes(ContentEncoding::None, &mut take, expectations).await?;
                 let body = HttpRequestBodyContent::new(bytes, content_type.clone())?;
                 *self = HttpRequestBody::Full(body);
             }
@@ -48,14 +49,17 @@ impl HttpRequestBody {
         }
     }
 
-    pub async fn into_http_request_body(self) -> Result<HttpRequestBodyContent, HttpFailResult> {
+    pub async fn into_http_request_body(
+        self,
+        expectations: BodyExpectations,
+    ) -> Result<HttpRequestBodyContent, HttpFailResult> {
         match self {
             HttpRequestBody::Incoming {
                 mut incoming,
                 content_type,
             } => {
                 let mut take = incoming.take().unwrap();
-                let bytes = read_bytes(ContentEncoding::None, &mut take).await?;
+                let bytes = read_bytes(ContentEncoding::None, &mut take, expectations).await?;
                 let body = HttpRequestBodyContent::new(bytes, content_type)?;
                 return Ok(body);
             }
@@ -64,28 +68,44 @@ impl HttpRequestBody {
     }
 
     /// Turns the body into a stream of chunks: creates the channel and starts the pump that fills
-    /// it. `content_length` is the `Content-Length` header when present (`None` for a chunked
-    /// body); `buffer` is the bounded channel's capacity — the back-pressure knob.
-    pub fn into_body_stream(self, content_length: Option<u64>, buffer: usize) -> HttpBodyAsStream {
-        spawn_body_pump(self, content_length, buffer)
+    /// it. `buffer` is the bounded channel's capacity — the back-pressure knob.
+    pub fn into_body_stream(
+        self,
+        expectations: BodyExpectations,
+        buffer: usize,
+    ) -> HttpBodyAsStream {
+        spawn_body_pump(self, expectations, buffer)
     }
 }
 
-/// Materializes a whole body through the same frame loop the stream pump uses, so the two paths
-/// cannot drift apart in how they take a body off the wire.
+/// Materializes a whole body through the same frame loop the stream pump uses — and holds it to
+/// the same completeness rule. Both matter: a truncated upload must not reach a `#[http_body_raw]`
+/// action, or a middleware that reads the body, looking like the whole thing.
 async fn read_bytes(
     body_compression: ContentEncoding,
     incoming: &mut hyper::body::Incoming,
+    expectations: BodyExpectations,
 ) -> Result<Vec<u8>, HttpFailResult> {
     let mut result: Vec<u8> = Vec::new();
+    let mut delivered: u64 = 0;
+    let mut end_stream = crate::EndStreamWatch::new();
 
     while let Some(chunk) = next_data_frame(incoming).await? {
+        delivered += chunk.len() as u64;
+        end_stream.sample(incoming);
+
         if result.is_empty() {
             // The common single-frame case moves the buffer instead of copying it.
             result = chunk.into();
         } else {
             result.extend_from_slice(&chunk);
         }
+    }
+
+    end_stream.sample(incoming);
+
+    if let Some(reason) = expectations.incomplete_reason(delivered, end_stream.end_stream_seen()) {
+        return Err(HttpFailResult::from((400u16, reason)));
     }
 
     body_compression.decompress_if_needed(result.into())

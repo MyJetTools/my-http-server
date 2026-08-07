@@ -24,3 +24,9 @@ my-http-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-http-ut
 [dev-dependencies]
 tokio = { version = "*", features = ["rt-multi-thread", "macros", "net", "time", "io-util"] }
 rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-extensions.git" }
+# A real HTTP/2 client, for the one thing raw bytes can not express conveniently: aborting an
+# upload with RST_STREAM(NO_ERROR) — which hyper reports to the server as an ordinary end of body,
+# not as an error.
+h2 = "0.4"
+http = "1"
+bytes = "1"
