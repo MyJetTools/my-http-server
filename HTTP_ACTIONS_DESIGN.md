@@ -110,6 +110,7 @@ Input models use the `MyHttpInput` derive macro and specify where data comes fro
 4. **Body Data** (`#[http_body]`) - For JSON body in POST/PUT requests
 5. **Form Data** (`#[http_form_data]`) - For multipart/form-data requests
 6. **Raw Body** (`#[http_body_raw]`) - For raw body content (only one field allowed)
+7. **Streamed Body** (`#[http_body_as_stream]`) - Reads the body in chunks instead of materializing it (uploads, proxying)
 
 **For POST/PUT requests (body data):**
 ```rust
@@ -297,6 +298,7 @@ Things worth knowing before using it:
   One HTTP/2 case is decided conservatively rather than correctly, because it can not be decided at all. A client may send `END_STREAM` and then immediately reset the stream to cancel a request it is no longer waiting for; h2 overwrites the state that recorded `END_STREAM` with the reset, so a complete body becomes indistinguishable from a truncated one. The server keeps the flag from the moment the frame arrives, which covers this whenever `END_STREAM` was seen first; in the remaining race the body is reported as possibly incomplete. A client that sends `Content-Length` is unaffected — the length settles it. This only matters if you read the body from a task that outlives the handler, since hyper drops the handler on a reset anyway.
 - **`read_to_end(max_size)`** is there when you just want the bytes but still want a ceiling: it fails past `max_size` instead of allocating without limit.
 - **Returning without reading is fine.** An action may answer 403 and never touch the reader; the pump notices the reader is gone and stops. It does not hang and does not hold the connection.
+- **Nothing waits on a silent client forever — if you switch it on.** `MyHttpServer::set_body_read_timeout(duration)` stops a body read that has gone quiet. It is an **idle** timeout: it restarts for every piece of the body, so a large upload over a slow link is never cut off, and time the pump spends parked because *your handler* is slow to consume does not count against it either. It is **off by default**, keeping the behaviour the server has always had — but without it a client that announces a large body and then goes silent holds a connection, and for a streamed body a pump task, indefinitely. It applies to both ways of reading a body, streamed and materialized.
 - **The body can only be taken once.** `get_body_reader()` hands out exactly one reader; a second call fails. And like `receive_body()`, taking the stream consumes the body — a middleware that reads the body afterwards will find it gone.
 - **Not for client models.** A model with a streamed body describes an incoming request only; building it into an outgoing request fails.
 

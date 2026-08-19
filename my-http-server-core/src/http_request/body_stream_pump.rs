@@ -22,11 +22,23 @@ use crate::HttpRequestBody;
 /// body — so a handler would be handed a half-received upload labelled complete. Both ways of
 /// reading a body ([the pump](spawn_body_pump) and [read-it-whole](crate::HttpRequestBody)) check
 /// this, and they check it the same way.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct BodyExpectations {
     pub version: hyper::Version,
     /// The `Content-Length` the client announced, when it announced one.
     pub content_length: Option<u64>,
+    /// How long to wait for the *next* piece of the body before giving up — an **idle** timeout,
+    /// not a deadline for the whole upload, so a large but progressing transfer is never cut off.
+    ///
+    /// It covers only the wait for the client. Time spent parked because the handler is slow to
+    /// consume (a full channel) does not count against it: that is back-pressure working, not a
+    /// stalled client.
+    ///
+    /// `None` (the default) waits forever, which is the behaviour this server has always had.
+    /// Set it via `MyHttpServer::set_body_read_timeout` — a client that opens a connection,
+    /// announces a large body and then goes silent otherwise holds a pump and a connection
+    /// indefinitely.
+    pub read_timeout: Option<std::time::Duration>,
 }
 
 impl BodyExpectations {
@@ -137,6 +149,27 @@ pub async fn next_data_frame(
     }
 }
 
+/// Raised instead of a frame when the client went quiet for longer than the idle timeout.
+pub struct BodyReadTimeout;
+
+/// [`next_data_frame`] under an idle timeout. `None` timeout waits forever.
+///
+/// The timeout wraps the wait for *one* frame and is restarted for the next one, so it only ever
+/// fires on a client that has stopped sending — never on a slow but progressing upload.
+pub async fn next_data_frame_with_timeout(
+    incoming: &mut hyper::body::Incoming,
+    timeout: Option<std::time::Duration>,
+) -> Result<Result<Option<bytes::Bytes>, hyper::Error>, BodyReadTimeout> {
+    let Some(timeout) = timeout else {
+        return Ok(next_data_frame(incoming).await);
+    };
+
+    match tokio::time::timeout(timeout, next_data_frame(incoming)).await {
+        Ok(frame) => Ok(frame),
+        Err(_elapsed) => Err(BodyReadTimeout),
+    }
+}
+
 /// Creates the channel and starts the background pump that fills it.
 ///
 /// The channel is **bounded**, so the pump reads at most `buffer` chunks ahead and then parks on
@@ -185,7 +218,21 @@ async fn pump(
 
                     _ = sender.closed() => return,
 
-                    frame = next_data_frame(&mut incoming) => frame,
+                    frame = next_data_frame_with_timeout(&mut incoming, expectations.read_timeout) => frame,
+                };
+
+                let frame = match frame {
+                    Ok(frame) => frame,
+                    Err(BodyReadTimeout) => {
+                        sender
+                            .send_error(HttpParseError::BodyStream(format!(
+                                "Timeout while waiting for the request body: nothing received for {:?} after {} bytes",
+                                expectations.read_timeout.unwrap_or_default(),
+                                delivered
+                            )))
+                            .await;
+                        return;
+                    }
                 };
 
                 match frame {

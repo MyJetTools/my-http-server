@@ -12,6 +12,7 @@ use crate::{
 pub struct RequestData {
     parts: hyper::http::request::Parts,
     body: Option<HttpRequestBody>,
+    body_read_timeout: Option<std::time::Duration>,
 }
 
 impl RequestData {
@@ -39,6 +40,7 @@ impl RequestData {
         let result = Self {
             parts,
             body: Some(body),
+            body_read_timeout: None,
         };
 
         Ok(result)
@@ -89,7 +91,12 @@ impl RequestData {
         BodyExpectations {
             version: self.parts.version,
             content_length: self.content_length(),
+            read_timeout: self.body_read_timeout,
         }
+    }
+
+    pub fn set_body_read_timeout(&mut self, timeout: Option<std::time::Duration>) {
+        self.body_read_timeout = timeout;
     }
 
     /// `Content-Length` when the client sent a valid one. `None` for a chunked body — and for a

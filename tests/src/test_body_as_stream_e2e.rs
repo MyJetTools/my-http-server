@@ -231,6 +231,75 @@ pub mod upload_raw {
     }
 }
 
+/// Reads the body but is deliberately slow about it, so the bounded channel fills and the pump
+/// parks on `send`. That waiting must NOT count against the body-read timeout: it is the handler
+/// being slow, not the client.
+pub mod upload_slow {
+    use my_http_server::macros::*;
+    use my_http_server::*;
+
+    #[derive(MyHttpInput)]
+    pub struct UploadSlowHttpInput {
+        #[http_header(name = "X-Test-Id", description = "Test id")]
+        pub test_id: String,
+
+        #[http_header(name = "X-Chunk-Delay-Ms", description = "How long to sleep per chunk")]
+        pub chunk_delay_ms: u64,
+
+        #[http_body_as_stream(description = "File content")]
+        pub body: HttpBodyAsStream,
+    }
+
+    #[http_route(
+        method: "POST",
+        route: "/upload-slow",
+        controller: "Test",
+        summary: "Upload slow",
+        description: "Reads the body slowly on purpose",
+        input_data: "UploadSlowHttpInput",
+        result: [
+            { status_code: 200, description: "Ok" },
+        ]
+    )]
+    pub struct UploadSlowAction;
+
+    async fn handle_request(
+        _action: &UploadSlowAction,
+        input_data: UploadSlowHttpInput,
+        _ctx: &mut HttpContext,
+    ) -> Result<HttpOkResult, HttpFailResult> {
+        let UploadSlowHttpInput {
+            test_id,
+            chunk_delay_ms,
+            body,
+        } = input_data;
+
+        let reader = body.get_body_reader()?;
+
+        let mut total = 0usize;
+
+        loop {
+            match reader.get_next_chunk().await {
+                Ok(Some(chunk)) => {
+                    total += chunk.len();
+                    tokio::time::sleep(std::time::Duration::from_millis(chunk_delay_ms)).await;
+                }
+                Ok(None) => break,
+                Err(err) => {
+                    super::set_outcome(test_id, format!("err:{}", err));
+                    return Err(err.into());
+                }
+            }
+        }
+
+        super::set_outcome(test_id, format!("ok:total={}", total));
+
+        HttpOutput::as_text("ok".to_string())
+            .into_ok_result(true)
+            .into()
+    }
+}
+
 pub mod reject {
     use my_http_server::macros::*;
     use my_http_server::*;
@@ -299,16 +368,33 @@ async fn start_server_h2() -> (u16, HttpConnectionsCounter) {
 }
 
 async fn start_server_with(h2: bool) -> (u16, HttpConnectionsCounter) {
+    start_server_full(h2, None).await
+}
+
+/// Same, with a body-read idle timeout in force.
+async fn start_server_with_read_timeout(timeout: Duration) -> (u16, HttpConnectionsCounter) {
+    start_server_full(false, Some(timeout)).await
+}
+
+async fn start_server_full(
+    h2: bool,
+    body_read_timeout: Option<Duration>,
+) -> (u16, HttpConnectionsCounter) {
     let port = free_port();
 
     let mut controllers = ControllersMiddleware::new(None, None);
     controllers.register_post_action(Arc::new(upload::UploadAction));
     controllers.register_post_action(Arc::new(upload_detached::UploadDetachedAction));
     controllers.register_post_action(Arc::new(upload_raw::UploadRawAction));
+    controllers.register_post_action(Arc::new(upload_slow::UploadSlowAction));
     controllers.register_post_action(Arc::new(reject::RejectAction));
 
     let mut server = MyHttpServer::new(SocketAddr::from(([127, 0, 0, 1], port)));
     server.add_middleware(Arc::new(controllers));
+
+    if let Some(body_read_timeout) = body_read_timeout {
+        server.set_body_read_timeout(body_read_timeout);
+    }
 
     let counter = server.get_http_connections_counter();
 
@@ -775,6 +861,7 @@ async fn a_body_already_materialized_by_a_middleware_still_streams() {
 
     let stream = HttpRequestBody::Full(content).into_body_stream(
         my_http_server::BodyExpectations {
+            read_timeout: None,
             version: my_http_server::hyper::Version::HTTP_11,
             content_length: Some(11),
         },
@@ -801,6 +888,7 @@ async fn an_already_materialized_empty_body_streams_as_a_clean_end() {
 
     let stream = HttpRequestBody::Full(content).into_body_stream(
         my_http_server::BodyExpectations {
+            read_timeout: None,
             version: my_http_server::hyper::Version::HTTP_11,
             content_length: None,
         },
@@ -820,4 +908,178 @@ fn the_model_consts_say_which_path_the_body_takes() {
 
     assert!(!crate::test_macros_split::UpdateUserRequest::STREAMS_BODY);
     assert!(crate::test_macros_split::UpdateUserRequest::READS_BODY);
+}
+
+// ───────────────────── body-read idle timeout ─────────────────────
+
+/// Sends request headers, part of the announced body, and then goes quiet — the shape that used to
+/// hold a pump and a connection forever.
+async fn stall_mid_body(port: u16, path: &str, id: &str, send: usize, extra_header: &str) -> String {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+
+    stream
+        .write_all(
+            format!(
+                "POST {} HTTP/1.1\r\nHost: localhost\r\nX-Test-Id: {}\r\n{}Content-Length: 100000000\r\nConnection: close\r\n\r\n",
+                path, id, extra_header
+            )
+            .as_bytes(),
+        )
+        .await
+        .unwrap();
+    stream.write_all(&payload(send)).await.unwrap();
+    stream.flush().await.unwrap();
+
+    // ...and now we say nothing at all, holding the socket open.
+    let mut buf = Vec::new();
+    let _ = tokio::time::timeout(Duration::from_secs(10), stream.read_to_end(&mut buf)).await;
+
+    String::from_utf8_lossy(&buf).to_string()
+}
+
+/// A client that stops sending mid-body must stop being waited on. Without the timeout this test
+/// would sit there until its own outer limit.
+#[tokio::test]
+async fn a_stalled_client_is_cut_off_on_the_streamed_path() {
+    let (port, counter) = start_server_with_read_timeout(Duration::from_millis(400)).await;
+    let id = test_id("stall-stream");
+
+    let started = std::time::Instant::now();
+    stall_mid_body(port, "/upload", &id, 1024, "").await;
+    let elapsed = started.elapsed();
+
+    let outcome = take_outcome(&id).expect("the handler never recorded an outcome");
+
+    assert!(
+        outcome.starts_with("err:") && outcome.contains("Timeout"),
+        "outcome: {}",
+        outcome
+    );
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "the stalled client was not cut off promptly: {:?}",
+        elapsed
+    );
+
+    // And the connection is released rather than pinned by a pump waiting on a silent client.
+    let mut released = false;
+    for _ in 0..100 {
+        if counter.get_connections_amount() == 0 {
+            released = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(released, "connection was never released");
+}
+
+/// The same on the materialize path — `#[http_body_raw]`, `#[http_body]`, and any middleware that
+/// reads the body, which is every existing action.
+#[tokio::test]
+async fn a_stalled_client_is_cut_off_on_the_materialize_path() {
+    let (port, _) = start_server_with_read_timeout(Duration::from_millis(400)).await;
+    let id = test_id("stall-raw");
+
+    let started = std::time::Instant::now();
+    let response = stall_mid_body(port, "/upload-raw", &id, 1024, "").await;
+    let elapsed = started.elapsed();
+
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "the stalled client was not cut off promptly: {:?}",
+        elapsed
+    );
+    // The action must never have run on a partial body.
+    assert!(
+        take_outcome(&id).is_none(),
+        "a stalled upload reached the action"
+    );
+    assert!(
+        response.starts_with("HTTP/1.1 400"),
+        "response: {}",
+        response
+    );
+}
+
+/// It is an **idle** timeout, not a deadline for the upload. A body delivered in pieces, each gap
+/// shorter than the timeout but the whole transfer longer than it, must go through untouched —
+/// otherwise every large upload over a slow link would break.
+#[tokio::test]
+async fn a_slow_but_progressing_upload_is_not_cut_off() {
+    let (port, _) = start_server_with_read_timeout(Duration::from_millis(400)).await;
+    let id = test_id("slow-progress");
+
+    let body = payload(8 * 4096);
+
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+    stream
+        .write_all(
+            format!(
+                "POST /upload HTTP/1.1\r\nHost: localhost\r\nX-Test-Id: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                id,
+                body.len()
+            )
+            .as_bytes(),
+        )
+        .await
+        .unwrap();
+
+    // 8 pieces, 150 ms apart: every gap is under the 400 ms timeout, the whole transfer is well
+    // over it.
+    for piece in body.chunks(4096) {
+        stream.write_all(piece).await.unwrap();
+        stream.flush().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    }
+
+    let mut buf = Vec::new();
+    let _ = tokio::time::timeout(Duration::from_secs(10), stream.read_to_end(&mut buf)).await;
+
+    let outcome = take_outcome(&id).expect("the handler never recorded an outcome");
+    assert!(
+        outcome.starts_with(&format!("ok:total={},", body.len())),
+        "a slow but progressing upload was cut off: {}",
+        outcome
+    );
+}
+
+/// A slow *handler* must not look like a slow client. When the handler lags, the bounded channel
+/// fills and the pump parks on `send` — that wait belongs to back-pressure and must not count
+/// against the client's timeout. Wrapping the whole loop iteration in the timeout instead of just
+/// the frame wait would break exactly this.
+#[tokio::test]
+async fn a_slow_consumer_does_not_trigger_the_timeout() {
+    let (port, _) = start_server_with_read_timeout(Duration::from_millis(400)).await;
+    let id = test_id("slow-consumer");
+
+    let body = payload(5 * 4096);
+
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+    stream
+        .write_all(
+            format!(
+                "POST /upload-slow HTTP/1.1\r\nHost: localhost\r\nX-Test-Id: {}\r\nX-Chunk-Delay-Ms: 500\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                id,
+                body.len()
+            )
+            .as_bytes(),
+        )
+        .await
+        .unwrap();
+
+    for piece in body.chunks(4096) {
+        stream.write_all(piece).await.unwrap();
+        stream.flush().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    let mut buf = Vec::new();
+    let _ = tokio::time::timeout(Duration::from_secs(20), stream.read_to_end(&mut buf)).await;
+
+    let outcome = take_outcome(&id).expect("the handler never recorded an outcome");
+    assert_eq!(
+        outcome,
+        format!("ok:total={}", body.len()),
+        "a slow handler was mistaken for a stalled client"
+    );
 }

@@ -244,7 +244,7 @@ while let Some(chunk) = reader.get_next_chunk().await? {
 }
 ```
 
-Works the same for `Transfer-Encoding: chunked` and for a `Content-Length` body. The chunks travel through a *bounded* channel, so the cost per request is roughly `BODY_STREAM_DEFAULT_BUFFER × chunk size` and the back-pressure reaches the TCP window; `take_body_stream_with_buffer` changes the capacity. A client that disappears mid-upload produces `Err(HttpParseError::BodyStream(..))` — never a clean end after a partial body. An action may also answer without reading the body at all; the reader is simply dropped and the pump stops. See `HTTP_ACTIONS_DESIGN.md` for the full notes.
+Works the same for `Transfer-Encoding: chunked` and for a `Content-Length` body. `MyHttpServer::set_body_read_timeout(duration)` (off by default) stops waiting on a client that has gone quiet mid-body — an idle timeout, so a slow but progressing upload is never cut off, and a slow *handler* is not mistaken for a stalled client. The chunks travel through a *bounded* channel, so the cost per request is roughly `BODY_STREAM_DEFAULT_BUFFER × chunk size` and the back-pressure reaches the TCP window; `take_body_stream_with_buffer` changes the capacity. A client that disappears mid-upload produces `Err(HttpParseError::BodyStream(..))` — never a clean end after a partial body. An action may also answer without reading the body at all; the reader is simply dropped and the pump stops. See `HTTP_ACTIONS_DESIGN.md` for the full notes.
 
 **Field Options:**
 

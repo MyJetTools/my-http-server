@@ -1,8 +1,8 @@
 use my_http_utils::http_input::HttpBodyAsStream;
 
 use crate::{
-    next_data_frame, spawn_body_pump, BodyContentType, BodyExpectations, ContentEncoding,
-    HttpFailResult, HttpRequestBodyContent,
+    next_data_frame_with_timeout, spawn_body_pump, BodyContentType, BodyExpectations,
+    ContentEncoding, HttpFailResult, HttpRequestBodyContent,
 };
 
 /// The request body, kept **lazy**: it holds hyper's `Incoming` and is not turned into bytes until
@@ -90,7 +90,24 @@ async fn read_bytes(
     let mut delivered: u64 = 0;
     let mut end_stream = crate::EndStreamWatch::new();
 
-    while let Some(chunk) = next_data_frame(incoming).await? {
+    loop {
+        let frame = next_data_frame_with_timeout(incoming, expectations.read_timeout).await;
+
+        let Ok(frame) = frame else {
+            return Err(HttpFailResult::from((
+                400u16,
+                format!(
+                    "Timeout while waiting for the request body: nothing received for {:?} after {} bytes",
+                    expectations.read_timeout.unwrap_or_default(),
+                    delivered
+                ),
+            )));
+        };
+
+        let Some(chunk) = frame? else {
+            break;
+        };
+
         delivered += chunk.len() as u64;
         end_stream.sample(incoming);
 

@@ -49,6 +49,7 @@ pub struct MyHttpServer {
     middlewares: Option<Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>>,
     tech_middlewares: Option<Vec<Arc<dyn HttpServerTechMiddleware + Send + Sync + 'static>>>,
     connections: Arc<AtomicI64>,
+    body_read_timeout: Option<std::time::Duration>,
 }
 
 impl MyHttpServer {
@@ -58,6 +59,7 @@ impl MyHttpServer {
             middlewares: Some(Vec::new()),
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
+            body_read_timeout: None,
         }
     }
 
@@ -68,7 +70,20 @@ impl MyHttpServer {
             middlewares: Some(Vec::new()),
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
+            body_read_timeout: None,
         }
+    }
+
+    /// Stop waiting on a client that has gone quiet mid-body.
+    ///
+    /// This is an **idle** timeout — it is restarted for every piece of the body, so a large but
+    /// progressing upload is never cut off, and time spent waiting for a slow *handler* to consume
+    /// the body does not count against it either. Without it, a client that announces a large body
+    /// and then goes silent holds a connection (and, for a streamed body, a pump task) forever.
+    ///
+    /// Off by default, to keep the behaviour this server has always had.
+    pub fn set_body_read_timeout(&mut self, timeout: std::time::Duration) {
+        self.body_read_timeout = Some(timeout);
     }
 
     pub fn add_middleware(
@@ -117,6 +132,7 @@ impl MyHttpServer {
         let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
             tech_middlewares: self.tech_middlewares.take().unwrap(),
+            body_read_timeout: self.body_read_timeout,
         };
 
         let connections = self.connections.clone();
@@ -165,6 +181,7 @@ impl MyHttpServer {
         let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
             tech_middlewares: self.tech_middlewares.take().unwrap(),
+            body_read_timeout: self.body_read_timeout,
         };
 
         let connections = self.connections.clone();
@@ -213,6 +230,7 @@ impl MyHttpServer {
         let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
             tech_middlewares: tech_middlewares.unwrap(),
+            body_read_timeout: self.body_read_timeout,
         };
 
         let connections = self.connections.clone();
@@ -255,6 +273,7 @@ impl MyHttpServer {
         let http_server_middlewares = HttpServerMiddlewares {
             middlewares: middlewares.unwrap(),
             tech_middlewares: tech_middlewares.unwrap(),
+            body_read_timeout: self.body_read_timeout,
         };
 
         let connections = self.connections.clone();
@@ -649,7 +668,8 @@ pub async fn handle_requests(
         return compile_app_is_shutting_down_http_response();
     }
 
-    let req = HttpRequest::new(req, addr).unwrap();
+    let mut req = HttpRequest::new(req, addr).unwrap();
+    req.set_body_read_timeout(http_server_middlewares.body_read_timeout);
 
     let method = req.method.clone();
     let mut request_ctx = HttpContext::new(req);

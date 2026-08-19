@@ -89,6 +89,13 @@ impl HttpRequest {
         self.data.receive_body().await
     }
 
+    /// How long to wait for the next piece of the body before giving up. Set from
+    /// [`MyHttpServer::set_body_read_timeout`](crate::MyHttpServer::set_body_read_timeout); a
+    /// middleware may narrow it for a particular route before the body is read.
+    pub fn set_body_read_timeout(&mut self, timeout: Option<std::time::Duration>) {
+        self.data.set_body_read_timeout(timeout);
+    }
+
     /// Takes the body as a stream of chunks, with the default channel capacity. Used by the
     /// generated action code for a `#[http_body_as_stream]` model.
     pub fn take_body_stream(&mut self) -> Result<HttpBodyAsStream, HttpFailResult> {
