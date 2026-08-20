@@ -1,8 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 
-use types_reader::rust_extensions::date_time::DateTimeAsMicroseconds;
-
+mod compile_date_time;
 mod consts;
 mod http_route;
 
@@ -21,6 +20,6 @@ pub fn http_route(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn pkg_compile_date_time(_input: TokenStream) -> TokenStream {
-    let date = DateTimeAsMicroseconds::now().to_rfc3339();
+    let date = crate::compile_date_time::now_as_rfc3339();
     TokenStream::from(quote::quote!(#date))
 }
