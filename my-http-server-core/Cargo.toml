@@ -38,7 +38,6 @@ http-body-util = "*"
 hyper-util = { version = "*", features = ["tokio", "server-auto"] }
 flate2 = "*"
 brotli-decompressor = "*"
-zstd = "*"
 http = "*"
 bytes = "*"
 my-hyper-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-hyper-utils.git" }

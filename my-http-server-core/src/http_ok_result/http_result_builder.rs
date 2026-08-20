@@ -1,3 +1,6 @@
+use std::io::Write;
+
+use flate2::{write::GzEncoder, Compression};
 use rust_extensions::StrOrString;
 
 use crate::{
@@ -10,7 +13,9 @@ const EMPTY_STATUS_CODE: u16 = 204;
 
 const COMPRESSION_EFFICIENCY_NUM: usize = 80;
 const COMPRESSION_EFFICIENCY_DEN: usize = 100;
-const ZSTD_LEVEL: i32 = 11;
+/// A dynamic response is compressed on every request, so we stay on the
+/// balanced level instead of the slowest one.
+const GZIP_LEVEL: Compression = Compression::new(6);
 
 pub struct HttpResultBuilder {
     pub(crate) output: HttpOutput,
@@ -21,6 +26,12 @@ pub struct HttpResultBuilder {
     pub(crate) cookies: Option<CookieJar>,
     pub(crate) content: Vec<u8>,
      */
+}
+
+fn gzip(raw: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut encoder = GzEncoder::new(Vec::with_capacity(raw.len()), GZIP_LEVEL);
+    encoder.write_all(raw)?;
+    encoder.finish()
 }
 
 impl HttpResultBuilder {
@@ -296,7 +307,7 @@ impl HttpResultBuilder {
                 return self;
             }
 
-            let Ok(c) = zstd::encode_all(body.as_slice(), ZSTD_LEVEL) else {
+            let Ok(c) = gzip(body.as_slice()) else {
                 return self;
             };
 
@@ -313,7 +324,7 @@ impl HttpResultBuilder {
             _ => unreachable!(),
         }
 
-        self.add_header("Content-Encoding", "zstd")
+        self.add_header("Content-Encoding", "gzip")
     }
 
     pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
@@ -413,8 +424,10 @@ mod tests {
                 content, headers, ..
             } => {
                 assert!(content.len() * 100 <= raw.len() * 80);
-                assert_eq!(find_header(&headers, "Content-Encoding"), Some("zstd"));
-                let roundtrip = zstd::decode_all(content.as_slice()).unwrap();
+                assert_eq!(find_header(&headers, "Content-Encoding"), Some("gzip"));
+                let mut decoder = flate2::read::GzDecoder::new(content.as_slice());
+                let mut roundtrip = Vec::new();
+                std::io::Read::read_to_end(&mut decoder, &mut roundtrip).unwrap();
                 assert_eq!(roundtrip, raw);
             }
             other => panic!("expected Content, got {:?}", other),

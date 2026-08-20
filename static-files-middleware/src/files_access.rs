@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use tokio::sync::Mutex;
 
-use crate::{calc_etag, try_zstd};
+use crate::{calc_etag, try_gzip};
 
 #[derive(Clone)]
 pub struct CachedContent {
     pub data: Vec<u8>,
-    pub is_zstd: bool,
+    pub is_gzip: bool,
     pub etag: Option<String>,
 }
 
@@ -47,7 +47,7 @@ impl FilesAccess {
         if !self.enable_caching {
             return Ok(CachedContent {
                 data: raw,
-                is_zstd: false,
+                is_gzip: false,
                 etag: None,
             });
         }
@@ -58,15 +58,15 @@ impl FilesAccess {
             None
         };
 
-        let entry = match try_zstd(&raw) {
+        let entry = match try_gzip(&raw) {
             Some(compressed) => CachedContent {
                 data: compressed,
-                is_zstd: true,
+                is_gzip: true,
                 etag,
             },
             None => CachedContent {
                 data: raw,
-                is_zstd: false,
+                is_gzip: false,
                 etag,
             },
         };

@@ -2,7 +2,7 @@ use my_http_server_core::*;
 use rust_extensions::StrOrString;
 
 use crate::{
-    calc_etag, deflate_compress, zstd_decompress, CachedContent, EtagCaches, FilesAccess,
+    calc_etag, deflate_compress, gzip_decompress, CachedContent, EtagCaches, FilesAccess,
     FilesMapping, NoCache, RootPaths, NO_CACHE_CACHE_CONTROL, NO_CACHE_EXPIRES, NO_CACHE_PRAGMA,
 };
 
@@ -19,7 +19,7 @@ pub struct StaticFilesMiddleware {
 
 #[derive(Clone, Copy, Default)]
 struct AcceptedEncodings {
-    zstd: bool,
+    gzip: bool,
     deflate: bool,
 }
 
@@ -87,7 +87,7 @@ impl CacheHeaders {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ResponseEncoding {
     Identity,
-    Zstd,
+    Gzip,
     Deflate,
 }
 
@@ -95,7 +95,7 @@ impl ResponseEncoding {
     fn header_value(self) -> Option<&'static str> {
         match self {
             ResponseEncoding::Identity => None,
-            ResponseEncoding::Zstd => Some("zstd"),
+            ResponseEncoding::Gzip => Some("gzip"),
             ResponseEncoding::Deflate => Some("deflate"),
         }
     }
@@ -429,8 +429,8 @@ fn parse_accept_encoding(header_value: &str) -> AcceptedEncodings {
             Some(n) => n.trim(),
             None => token,
         };
-        if name.eq_ignore_ascii_case("zstd") {
-            out.zstd = true;
+        if name.eq_ignore_ascii_case("gzip") {
+            out.gzip = true;
         } else if name.eq_ignore_ascii_case("deflate") {
             out.deflate = true;
         }
@@ -444,16 +444,16 @@ fn build_response_body(
     cached: &CachedContent,
     accepted: AcceptedEncodings,
 ) -> std::io::Result<(Vec<u8>, ResponseEncoding, String)> {
-    if cached.is_zstd {
-        if accepted.zstd {
+    if cached.is_gzip {
+        if accepted.gzip {
             let etag = match &cached.etag {
                 Some(e) => e.clone(),
-                None => calc_etag(&zstd_decompress(&cached.data)?),
+                None => calc_etag(&gzip_decompress(&cached.data)?),
             };
-            return Ok((cached.data.clone(), ResponseEncoding::Zstd, etag));
+            return Ok((cached.data.clone(), ResponseEncoding::Gzip, etag));
         }
 
-        let raw = zstd_decompress(&cached.data)?;
+        let raw = gzip_decompress(&cached.data)?;
         let etag = match &cached.etag {
             Some(e) => e.clone(),
             None => calc_etag(&raw),
@@ -480,15 +480,15 @@ fn body_without_etag(
     cached: &CachedContent,
     accepted: AcceptedEncodings,
 ) -> std::io::Result<(Vec<u8>, ResponseEncoding)> {
-    if !cached.is_zstd {
+    if !cached.is_gzip {
         return Ok((cached.data.clone(), ResponseEncoding::Identity));
     }
 
-    if accepted.zstd {
-        return Ok((cached.data.clone(), ResponseEncoding::Zstd));
+    if accepted.gzip {
+        return Ok((cached.data.clone(), ResponseEncoding::Gzip));
     }
 
-    let raw = zstd_decompress(&cached.data)?;
+    let raw = gzip_decompress(&cached.data)?;
     if accepted.deflate {
         let deflated = deflate_compress(&raw)?;
         return Ok((deflated, ResponseEncoding::Deflate));
@@ -502,51 +502,51 @@ mod tests {
     use super::parse_accept_encoding;
 
     #[test]
-    fn parses_zstd() {
-        let a = parse_accept_encoding("zstd");
-        assert!(a.zstd);
+    fn parses_gzip() {
+        let a = parse_accept_encoding("gzip");
+        assert!(a.gzip);
         assert!(!a.deflate);
     }
 
     #[test]
     fn parses_deflate() {
         let a = parse_accept_encoding("deflate");
-        assert!(!a.zstd);
+        assert!(!a.gzip);
         assert!(a.deflate);
     }
 
     #[test]
     fn parses_both() {
-        let a = parse_accept_encoding("zstd, deflate, br");
-        assert!(a.zstd);
+        let a = parse_accept_encoding("gzip, deflate, br");
+        assert!(a.gzip);
         assert!(a.deflate);
     }
 
     #[test]
     fn respects_case() {
-        let a = parse_accept_encoding("Zstd, DEFLATE");
-        assert!(a.zstd);
+        let a = parse_accept_encoding("GZip, DEFLATE");
+        assert!(a.gzip);
         assert!(a.deflate);
     }
 
     #[test]
     fn parses_qvalues() {
-        let a = parse_accept_encoding("zstd;q=1.0, deflate;q=0.5");
-        assert!(a.zstd);
+        let a = parse_accept_encoding("gzip;q=1.0, deflate;q=0.5");
+        assert!(a.gzip);
         assert!(a.deflate);
     }
 
     #[test]
     fn rejects_when_neither() {
-        let a = parse_accept_encoding("gzip, br");
-        assert!(!a.zstd);
+        let a = parse_accept_encoding("br, zstd");
+        assert!(!a.gzip);
         assert!(!a.deflate);
     }
 
     #[test]
     fn not_confused_by_substring() {
-        let a = parse_accept_encoding("gzip");
-        assert!(!a.zstd);
+        let a = parse_accept_encoding("gzip2, deflate-raw");
+        assert!(!a.gzip);
         assert!(!a.deflate);
     }
 }

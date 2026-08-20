@@ -71,7 +71,7 @@ fn civil_from_days(days_since_epoch: i64) -> (i64, u32, u32) {
 
 #[cfg(test)]
 mod tests {
-    use super::to_rfc3339;
+    use super::{civil_from_days, to_rfc3339};
 
     #[test]
     fn test_unix_epoch() {
@@ -105,6 +105,114 @@ mod tests {
     #[test]
     fn test_before_unix_epoch() {
         assert_eq!(to_rfc3339(-1), "1969-12-31T23:59:59.999999+00:00");
+    }
+
+    #[test]
+    fn test_leap_day_of_a_leap_century() {
+        // 1600 and 2000 are divisible by 400 - leap.
+        assert_eq!(
+            to_rfc3339(-11_670_998_400_000_000),
+            "1600-02-29T00:00:00.000000+00:00"
+        );
+
+        assert_eq!(
+            to_rfc3339(951_868_799_000_000),
+            "2000-02-29T23:59:59.000000+00:00"
+        );
+    }
+
+    #[test]
+    fn test_february_of_a_non_leap_century() {
+        // 1700, 1900 and 2100 are divisible by 100 but not by 400 - February has 28 days,
+        // so the day right after it is March 1st.
+        assert_eq!(
+            to_rfc3339(-8_515_238_401_000_000),
+            "1700-02-28T23:59:59.000000+00:00"
+        );
+        assert_eq!(
+            to_rfc3339(-8_515_238_400_000_000),
+            "1700-03-01T00:00:00.000000+00:00"
+        );
+
+        assert_eq!(
+            to_rfc3339(-2_203_934_400_000_000),
+            "1900-02-28T12:00:00.000000+00:00"
+        );
+        assert_eq!(
+            to_rfc3339(-2_203_891_200_000_000),
+            "1900-03-01T00:00:00.000000+00:00"
+        );
+
+        assert_eq!(
+            to_rfc3339(4_107_456_000_000_000),
+            "2100-02-28T00:00:00.000000+00:00"
+        );
+        assert_eq!(
+            to_rfc3339(4_107_542_400_000_000),
+            "2100-03-01T00:00:00.000000+00:00"
+        );
+    }
+
+    /// Every single day of 1600-01-01..2500-01-01 against a day-by-day walk that applies the
+    /// Gregorian leap rule directly - an implementation that shares nothing with
+    /// `civil_from_days`. The range holds every leap-rule case there is: leap centuries
+    /// (1600, 2000, 2400) and non-leap ones (1700, 1800, 1900, 2100, 2200, 2300).
+    #[test]
+    fn test_every_day_of_nine_centuries() {
+        fn is_leap_year(year: i64) -> bool {
+            year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+        }
+
+        fn days_in_month(year: i64, month: u32) -> u32 {
+            match month {
+                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+                4 | 6 | 9 | 11 => 30,
+                2 => {
+                    if is_leap_year(year) {
+                        29
+                    } else {
+                        28
+                    }
+                }
+                _ => panic!("month out of range: {}", month),
+            }
+        }
+
+        const FIRST_DAY: i64 = -135_140; // 1600-01-01
+        const LAST_DAY: i64 = 193_579; // 2500-01-01
+
+        let (mut year, mut month, mut day) = (1600i64, 1u32, 1u32);
+        let mut leap_days = 0;
+
+        for days_since_epoch in FIRST_DAY..=LAST_DAY {
+            assert_eq!(
+                civil_from_days(days_since_epoch),
+                (year, month, day),
+                "mismatch at day {}",
+                days_since_epoch
+            );
+
+            if (month, day) == (2, 29) {
+                leap_days += 1;
+            }
+
+            day += 1;
+            if day > days_in_month(year, month) {
+                day = 1;
+                month += 1;
+
+                if month > 12 {
+                    month = 1;
+                    year += 1;
+                }
+            }
+        }
+
+        // The walk really covered the whole range...
+        assert_eq!((year, month, day), (2500, 1, 2));
+        // ...and met every leap year of 1600..=2499: 900/4 = 225, minus the six centuries that are
+        // not divisible by 400.
+        assert_eq!(leap_days, 219);
     }
 
     #[test]
