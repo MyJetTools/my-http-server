@@ -115,6 +115,7 @@ fn populate_array_type(
         ArrayElement::Enum(enum_structure) => {
             write_enum_type(yaml_writer, definitions, enum_structure);
         }
+        ArrayElement::ArrayOf(inner) => populate_array_type(yaml_writer, definitions, inner),
     }
 }
 

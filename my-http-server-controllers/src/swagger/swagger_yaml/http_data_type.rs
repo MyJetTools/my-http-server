@@ -38,17 +38,7 @@ pub fn build(yaml_writer: &mut YamlWriter, root_name: &str, data_type: &HttpData
                 yaml_writer.write("type", "object");
 
                 yaml_writer.write_upper_level("additionalProperties", |yaml_writer| {
-                    match array_element {
-                        ArrayElement::SimpleType(param_type) => {
-                            write_simple_type(yaml_writer, param_type);
-                        }
-                        ArrayElement::Object(object_type) => {
-                            super::object::write_reference_to_object(yaml_writer, object_type);
-                        }
-                        ArrayElement::Enum(enum_type) => {
-                            super::object::write_reference_to_object(yaml_writer, enum_type);
-                        }
-                    };
+                    write_array_element_type(yaml_writer, array_element);
                 });
             });
         }
@@ -73,14 +63,19 @@ fn write_array_element(yaml_writer: &mut YamlWriter, array_element: &ArrayElemen
     yaml_writer.write("type", "array");
 
     yaml_writer.write_upper_level("items", |yaml_writer| {
-        match array_element {
-            ArrayElement::SimpleType(param_type) => write_simple_type(yaml_writer, param_type),
-            ArrayElement::Object(object_type) => {
-                super::object::write_reference_to_object(yaml_writer, object_type);
-            }
-            ArrayElement::Enum(enum_type) => {
-                super::object::write_reference_to_object(yaml_writer, enum_type);
-            }
-        };
+        write_array_element_type(yaml_writer, array_element);
     });
+}
+
+fn write_array_element_type(yaml_writer: &mut YamlWriter, array_element: &ArrayElement) {
+    match array_element {
+        ArrayElement::SimpleType(param_type) => write_simple_type(yaml_writer, param_type),
+        ArrayElement::Object(object_type) => {
+            super::object::write_reference_to_object(yaml_writer, object_type);
+        }
+        ArrayElement::Enum(enum_type) => {
+            super::object::write_reference_to_object(yaml_writer, enum_type);
+        }
+        ArrayElement::ArrayOf(inner) => write_array_element(yaml_writer, inner),
+    };
 }

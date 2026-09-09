@@ -49,6 +49,15 @@ pub fn write(yaml_writer: &mut YamlWriter, field: &HttpField) {
                     });
                 });
             }
+
+            crate::controllers::documentation::ArrayElement::ArrayOf(inner) => {
+                yaml_writer.write_upper_level(field.name.as_str(), |yaml_writer| {
+                    yaml_writer.write("type", "object");
+                    yaml_writer.write_upper_level("additionalProperties", |yaml_writer| {
+                        write_body_array_type(yaml_writer, inner);
+                    });
+                });
+            }
         },
         HttpDataType::DictionaryOfArray(array_el) => {
             yaml_writer.write_upper_level(field.name.as_str(), |yaml_writer| {
@@ -103,6 +112,13 @@ fn write_body_array_type(yaml_writer: &mut YamlWriter, array_el: &ArrayElement) 
             yaml_writer.write("type", "array");
             yaml_writer.write_upper_level("items", |yaml_writer| {
                 super::object::write_reference_to_object(yaml_writer, enum_type);
+            });
+        }
+
+        crate::controllers::documentation::ArrayElement::ArrayOf(inner) => {
+            yaml_writer.write("type", "array");
+            yaml_writer.write_upper_level("items", |yaml_writer| {
+                write_body_array_type(yaml_writer, inner);
             });
         }
     }

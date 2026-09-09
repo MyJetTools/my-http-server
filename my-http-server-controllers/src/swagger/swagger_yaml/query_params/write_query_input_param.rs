@@ -47,5 +47,9 @@ fn write_array_item_of(yaml_writer: &mut YamlWriter, array_el: &ArrayElement) {
         crate::controllers::documentation::ArrayElement::Enum(enum_data) => {
             super::write_array_enum_case(yaml_writer, enum_data);
         }
+
+        crate::controllers::documentation::ArrayElement::ArrayOf(_) => {
+            panic!("Array of arrays is not supported for non body parameter")
+        }
     }
 }
