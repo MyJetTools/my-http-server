@@ -33,9 +33,22 @@ impl RequestData {
 
         let content_type = BodyContentType::from_content_type(content_type)?;
 
+        let content_encoding = match parts.headers.get("content-encoding") {
+            Some(header_value) => match header_value.to_str() {
+                Ok(content_encoding) => Some(content_encoding.to_string()),
+                Err(_) => {
+                    return Err(HttpFailResult::as_validation_error(
+                        "header content-encoding has response is not as string",
+                    ))
+                }
+            },
+            None => None,
+        };
+
         let body = HttpRequestBody::Incoming {
             incoming: Some(incoming),
             content_type,
+            content_encoding,
         };
         let result = Self {
             parts,

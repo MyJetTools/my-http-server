@@ -30,3 +30,6 @@ rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-ext
 h2 = "0.4"
 http = "1"
 bytes = "1"
+# Compressing a request body the way a client would, for the `Content-Encoding` tests.
+flate2 = "*"
+ruzstd = "*"

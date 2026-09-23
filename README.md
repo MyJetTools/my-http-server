@@ -912,6 +912,34 @@ async fn handle_request(
 }
 ```
 
+### Compressed Request Bodies
+
+A request that announces `Content-Encoding` is decoded before the action sees it — the model is
+parsed from the decompressed bytes, so nothing in the action changes:
+
+| header | what happens |
+|---|---|
+| absent / `identity` | the body is taken as it is (the overwhelming majority of requests) |
+| `gzip` / `x-gzip` | decoded with `flate2` |
+| `br` | decoded with `brotli-decompressor` |
+| `zstd` | decoded with `ruzstd` — pure Rust, decoding only, so no C toolchain in the build |
+| anything else (`deflate`, a list like `gzip, br`) | `400 Validation error: Unsupported content encoding: …` |
+
+Decoding happens on the **materialize** path only — `#[http_body]`, `#[http_body_raw]`,
+`#[http_form_data]` and any middleware that reads the body. A `#[http_body_as_stream]` body is
+handed on exactly as it arrived, still compressed: a pass-through action wants the bytes the
+client sent, and the header is there for it to act on.
+
+Two details worth knowing:
+
+- The header is parsed when the body is read, not when the request arrives. A request whose body
+  nobody reads is never rejected over an encoding, and neither is a streamed one.
+- `Content-Length` and the completeness check count the bytes **on the wire**, i.e. the compressed
+  ones. Decompression is the last step, after the body is known to be complete.
+
+If the announced codec fails to decode the body, the other ones are tried before giving up — a
+body that decodes is the body the client meant to send, whatever the header says.
+
 ## Notes
 
 - Actions receive `Arc<AppContext>` for shared application state
@@ -921,6 +949,7 @@ async fn handle_request(
 - Path parameters in routes must match `#[http_path]` fields in input models
 - Only one body type (`http_body`, `http_form_data`, `http_body_raw` or `http_body_as_stream`) can be used per input model
 - A `#[http_body_as_stream]` body is read in chunks and is never materialized; a truncated upload surfaces as an error, not as a short body
+- A request body compressed with `gzip` / `br` / `zstd` is decoded before the model is parsed; a streamed body is passed through as it arrived (see [Compressed Request Bodies](#compressed-request-bodies))
 - Headers are case-insensitive when reading
 - Optional fields use `Option<T>` type
 - Default values can be specified for any input field attribute

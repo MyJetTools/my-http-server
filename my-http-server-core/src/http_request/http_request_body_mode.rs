@@ -14,10 +14,19 @@ use crate::{
 ///   `#[http_body_raw]` and middleware;
 /// * stream it — [`into_body_stream`](Self::into_body_stream), used by a
 ///   `#[http_body_as_stream]` model.
+///
+/// A body that announced a `Content-Encoding` is decompressed on the first path, and only there:
+/// a streamed body is handed on exactly as it arrived, which is what a pass-through action wants
+/// and the only thing this crate can do frame by frame.
 pub enum HttpRequestBody {
     Incoming {
         incoming: Option<hyper::body::Incoming>,
         content_type: BodyContentType,
+        /// The `Content-Encoding` the request announced, verbatim. It is parsed when the body is
+        /// materialized rather than when the request arrives: a streamed body is passed through
+        /// exactly as it came, and a request whose body is never read must not be rejected for an
+        /// encoding nobody was going to undo.
+        content_encoding: Option<String>,
     },
     Full(HttpRequestBodyContent),
 }
@@ -31,10 +40,12 @@ impl HttpRequestBody {
             HttpRequestBody::Incoming {
                 incoming,
                 content_type,
+                content_encoding,
             } => {
                 let mut take = incoming.take().unwrap();
+                let content_encoding = ContentEncoding::new(content_encoding.as_deref())?;
 
-                let bytes = read_bytes(ContentEncoding::None, &mut take, expectations).await?;
+                let bytes = read_bytes(content_encoding, &mut take, expectations).await?;
                 let body = HttpRequestBodyContent::new(bytes, content_type.clone())?;
                 *self = HttpRequestBody::Full(body);
             }
@@ -57,9 +68,11 @@ impl HttpRequestBody {
             HttpRequestBody::Incoming {
                 mut incoming,
                 content_type,
+                content_encoding,
             } => {
                 let mut take = incoming.take().unwrap();
-                let bytes = read_bytes(ContentEncoding::None, &mut take, expectations).await?;
+                let content_encoding = ContentEncoding::new(content_encoding.as_deref())?;
+                let bytes = read_bytes(content_encoding, &mut take, expectations).await?;
                 let body = HttpRequestBodyContent::new(bytes, content_type)?;
                 return Ok(body);
             }
@@ -81,6 +94,9 @@ impl HttpRequestBody {
 /// Materializes a whole body through the same frame loop the stream pump uses — and holds it to
 /// the same completeness rule. Both matter: a truncated upload must not reach a `#[http_body_raw]`
 /// action, or a middleware that reads the body, looking like the whole thing.
+///
+/// Decompression comes last, after the completeness check: `Content-Length` counts the bytes on
+/// the wire, which are the compressed ones.
 async fn read_bytes(
     body_compression: ContentEncoding,
     incoming: &mut hyper::body::Incoming,

@@ -38,6 +38,9 @@ http-body-util = "*"
 hyper-util = { version = "*", features = ["tokio", "server-auto"] }
 flate2 = "*"
 brotli-decompressor = "*"
+# Pure Rust, and a decoder only - which is all a server does to a request body. No C toolchain,
+# so it costs the build nothing to carry unconditionally.
+ruzstd = "*"
 http = "*"
 bytes = "*"
 my-hyper-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-hyper-utils.git" }
