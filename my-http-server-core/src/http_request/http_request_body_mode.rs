@@ -141,5 +141,25 @@ async fn read_bytes(
         return Err(HttpFailResult::from((400u16, reason)));
     }
 
-    body_compression.decompress_if_needed(result.into())
+    // The overwhelming majority of bodies announce no encoding: they are handed on right here,
+    // with no trip to the blocking pool.
+    if body_compression == ContentEncoding::None {
+        return Ok(result);
+    }
+
+    // Decompressing is CPU work, and with a limit in the tens of megabytes it is hundreds of
+    // milliseconds of it - enough to stall every other task parked on this tokio worker. So it
+    // runs on the blocking pool, and this task just waits for it.
+    let max_decompressed_size = expectations.max_decompressed_body_size;
+
+    tokio::task::spawn_blocking(move || {
+        body_compression.decompress_if_needed(result.into(), max_decompressed_size)
+    })
+    .await
+    .map_err(|err| {
+        HttpFailResult::as_fatal_error(format!(
+            "Decompressing the request body did not finish: {}",
+            err
+        ))
+    })?
 }

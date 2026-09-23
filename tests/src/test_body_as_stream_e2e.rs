@@ -864,6 +864,7 @@ async fn a_body_already_materialized_by_a_middleware_still_streams() {
             read_timeout: None,
             version: my_http_server::hyper::Version::HTTP_11,
             content_length: Some(11),
+            max_decompressed_body_size: my_http_server::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
         },
         4,
     );
@@ -891,6 +892,7 @@ async fn an_already_materialized_empty_body_streams_as_a_clean_end() {
             read_timeout: None,
             version: my_http_server::hyper::Version::HTTP_11,
             content_length: None,
+            max_decompressed_body_size: my_http_server::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
         },
         4,
     );

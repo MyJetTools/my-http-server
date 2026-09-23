@@ -13,6 +13,7 @@ pub struct RequestData {
     parts: hyper::http::request::Parts,
     body: Option<HttpRequestBody>,
     body_read_timeout: Option<std::time::Duration>,
+    max_decompressed_body_size: usize,
 }
 
 impl RequestData {
@@ -54,6 +55,7 @@ impl RequestData {
             parts,
             body: Some(body),
             body_read_timeout: None,
+            max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
         };
 
         Ok(result)
@@ -105,11 +107,16 @@ impl RequestData {
             version: self.parts.version,
             content_length: self.content_length(),
             read_timeout: self.body_read_timeout,
+            max_decompressed_body_size: self.max_decompressed_body_size,
         }
     }
 
     pub fn set_body_read_timeout(&mut self, timeout: Option<std::time::Duration>) {
         self.body_read_timeout = timeout;
+    }
+
+    pub fn set_max_decompressed_body_size(&mut self, max_size: usize) {
+        self.max_decompressed_body_size = max_size;
     }
 
     /// `Content-Length` when the client sent a valid one. `None` for a chunked body — and for a

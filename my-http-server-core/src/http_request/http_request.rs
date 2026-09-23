@@ -96,6 +96,13 @@ impl HttpRequest {
         self.data.set_body_read_timeout(timeout);
     }
 
+    /// How large a compressed body may grow once decompressed. Set from
+    /// [`MyHttpServer::set_max_decompressed_body_size`](crate::MyHttpServer::set_max_decompressed_body_size);
+    /// a middleware may raise or lower it for a particular route before the body is read.
+    pub fn set_max_decompressed_body_size(&mut self, max_size: usize) {
+        self.data.set_max_decompressed_body_size(max_size);
+    }
+
     /// Takes the body as a stream of chunks, with the default channel capacity. Used by the
     /// generated action code for a `#[http_body_as_stream]` model.
     pub fn take_body_stream(&mut self) -> Result<HttpBodyAsStream, HttpFailResult> {

@@ -22,7 +22,7 @@ use crate::HttpRequestBody;
 /// body — so a handler would be handed a half-received upload labelled complete. Both ways of
 /// reading a body ([the pump](spawn_body_pump) and [read-it-whole](crate::HttpRequestBody)) check
 /// this, and they check it the same way.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct BodyExpectations {
     pub version: hyper::Version,
     /// The `Content-Length` the client announced, when it announced one.
@@ -39,6 +39,26 @@ pub struct BodyExpectations {
     /// announces a large body and then goes silent otherwise holds a pump and a connection
     /// indefinitely.
     pub read_timeout: Option<std::time::Duration>,
+    /// How large a body announced with a `Content-Encoding` may grow once decompressed; past it
+    /// the request is answered `413`. It bounds what a decoder produces, and nothing else: a body
+    /// with no encoding, and a streamed body (which is never decoded), are not held to it.
+    ///
+    /// Set it via `MyHttpServer::set_max_decompressed_body_size`; the default is
+    /// [`DEFAULT_MAX_DECOMPRESSED_BODY_SIZE`](crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE).
+    pub max_decompressed_body_size: usize,
+}
+
+/// Written out by hand, because a derived one would make the limit `0` - and every compressed
+/// body a `413`.
+impl Default for BodyExpectations {
+    fn default() -> Self {
+        Self {
+            version: Default::default(),
+            content_length: None,
+            read_timeout: None,
+            max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
+        }
+    }
 }
 
 impl BodyExpectations {

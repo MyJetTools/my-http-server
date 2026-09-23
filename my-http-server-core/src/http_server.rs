@@ -50,6 +50,7 @@ pub struct MyHttpServer {
     tech_middlewares: Option<Vec<Arc<dyn HttpServerTechMiddleware + Send + Sync + 'static>>>,
     connections: Arc<AtomicI64>,
     body_read_timeout: Option<std::time::Duration>,
+    max_decompressed_body_size: usize,
 }
 
 impl MyHttpServer {
@@ -60,6 +61,7 @@ impl MyHttpServer {
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
             body_read_timeout: None,
+            max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
         }
     }
 
@@ -71,6 +73,7 @@ impl MyHttpServer {
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
             body_read_timeout: None,
+            max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
         }
     }
 
@@ -84,6 +87,19 @@ impl MyHttpServer {
     /// Off by default, to keep the behaviour this server has always had.
     pub fn set_body_read_timeout(&mut self, timeout: std::time::Duration) {
         self.body_read_timeout = Some(timeout);
+    }
+
+    /// How large a request body announced with a `Content-Encoding` may grow once decompressed.
+    /// Past it the request is answered `413 Payload Too Large`, and the decoder is stopped as soon
+    /// as it crosses the line - it never inflates the whole bomb first.
+    ///
+    /// Only decoded bodies are held to it: a body with no `Content-Encoding` is taken as it is,
+    /// and a `#[http_body_as_stream]` body is never decoded by this server at all.
+    ///
+    /// [`DEFAULT_MAX_DECOMPRESSED_BODY_SIZE`](crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE) (64 MiB)
+    /// unless set.
+    pub fn set_max_decompressed_body_size(&mut self, max_size: usize) {
+        self.max_decompressed_body_size = max_size;
     }
 
     pub fn add_middleware(
@@ -133,6 +149,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: self.tech_middlewares.take().unwrap(),
             body_read_timeout: self.body_read_timeout,
+            max_decompressed_body_size: self.max_decompressed_body_size,
         };
 
         let connections = self.connections.clone();
@@ -182,6 +199,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: self.tech_middlewares.take().unwrap(),
             body_read_timeout: self.body_read_timeout,
+            max_decompressed_body_size: self.max_decompressed_body_size,
         };
 
         let connections = self.connections.clone();
@@ -231,6 +249,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: tech_middlewares.unwrap(),
             body_read_timeout: self.body_read_timeout,
+            max_decompressed_body_size: self.max_decompressed_body_size,
         };
 
         let connections = self.connections.clone();
@@ -274,6 +293,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: tech_middlewares.unwrap(),
             body_read_timeout: self.body_read_timeout,
+            max_decompressed_body_size: self.max_decompressed_body_size,
         };
 
         let connections = self.connections.clone();
@@ -670,6 +690,7 @@ pub async fn handle_requests(
 
     let mut req = HttpRequest::new(req, addr).unwrap();
     req.set_body_read_timeout(http_server_middlewares.body_read_timeout);
+    req.set_max_decompressed_body_size(http_server_middlewares.max_decompressed_body_size);
 
     let method = req.method.clone();
     let mut request_ctx = HttpContext::new(req);

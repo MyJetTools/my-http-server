@@ -939,7 +939,44 @@ Two details worth knowing:
   ones. Decompression is the last step, after the body is known to be complete.
 
 If the announced codec fails to decode the body, the other ones are tried before giving up — a
-body that decodes is the body the client meant to send, whatever the header says.
+body that decodes is the body the client meant to send, whatever the header says. A body that
+none of them decodes is the client's mistake, and is answered as one:
+`400 Validation error: Can not decompress the request body: it does not decode as gzip, the announced Content-Encoding, nor as any other supported encoding`.
+
+#### The decompressed-size limit
+
+A compressed body is a promise about how much memory it will take, made by the client — 10 MB of
+gzipped zeros inflate to about 10 GB, and zstd and brotli do better still. So what a body may
+decode to is capped:
+
+```rust
+let mut http_server = MyHttpServer::new(addr);
+http_server.set_max_decompressed_body_size(16 * 1024 * 1024); // default: 64 MiB
+```
+
+- The default is `DEFAULT_MAX_DECOMPRESSED_BODY_SIZE` — 64 MiB. The limit is inclusive: a body that
+  decodes to exactly that many bytes is taken.
+- Past it the request is answered
+  `413 Payload Too Large: the request body decompresses to more than N bytes, the most this server accepts`.
+- The decoder is stopped **as it crosses the limit**, not after inflating the whole bomb: the
+  output is checked every 8 KiB, and the buffer never grows past the limit either.
+- Hitting the limit is final. It does not send the body on to the other codecs the way a failed
+  decode does — the bytes are a valid stream of their codec, just too much of it, and trying the
+  rest would only inflate the bomb once more per codec.
+- Only a **decoded** body is held to it. A body with no `Content-Encoding` (or `identity`) is taken
+  as it is, whatever its size, and a `#[http_body_as_stream]` body is never decoded by this server.
+- A middleware can raise or lower it for a particular route before the body is read:
+  `ctx.request.set_max_decompressed_body_size(..)`.
+
+<!-- decoder-windows -->
+
+#### Decompression runs off the tokio worker
+
+Inflating tens of megabytes is hundreds of milliseconds of CPU — long enough to stall every other
+task on the worker thread. So a compressed body is decoded on tokio's blocking pool
+(`spawn_blocking`) while the request's task waits. A body that announced no encoding — the
+overwhelming majority — never leaves the worker. Should the decoding task itself die (a panic in
+a decoder), the request is answered `500`.
 
 **Every codec in this server is pure Rust** — `flate2` on its default `miniz_oxide` backend
 (gzip / zlib / deflate), `brotli-decompressor`, `ruzstd`. No `libz-sys`, no `zstd-sys`, no `cc`
@@ -956,7 +993,7 @@ means one dependency asking for them is enough to change the whole build.
 - Path parameters in routes must match `#[http_path]` fields in input models
 - Only one body type (`http_body`, `http_form_data`, `http_body_raw` or `http_body_as_stream`) can be used per input model
 - A `#[http_body_as_stream]` body is read in chunks and is never materialized; a truncated upload surfaces as an error, not as a short body
-- A request body compressed with `gzip` / `deflate` / `br` / `zstd` is decoded before the model is parsed; a streamed body is passed through as it arrived (see [Compressed Request Bodies](#compressed-request-bodies))
+- A request body compressed with `gzip` / `deflate` / `br` / `zstd` is decoded before the model is parsed, off the tokio worker and up to `set_max_decompressed_body_size` (64 MiB by default, `413` past it); a streamed body is passed through as it arrived (see [Compressed Request Bodies](#compressed-request-bodies))
 - Headers are case-insensitive when reading
 - Optional fields use `Option<T>` type
 - Default values can be specified for any input field attribute
