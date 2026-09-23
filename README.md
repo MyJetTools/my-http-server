@@ -968,7 +968,22 @@ http_server.set_max_decompressed_body_size(16 * 1024 * 1024); // default: 64 MiB
 - A middleware can raise or lower it for a particular route before the body is read:
   `ctx.request.set_max_decompressed_body_size(..)`.
 
-<!-- decoder-windows -->
+#### Decoder windows
+
+The limit stops a bomb as it inflates. It can not stop a decoder that allocates from the stream's
+header *before* producing anything — so each decoder was checked for that, against the versions
+in `Cargo.lock`:
+
+| codec | window | what a hostile header can make it allocate up front |
+|---|---|---|
+| gzip / zlib / deflate (`flate2` on `miniz_oxide`) | fixed 32 KiB | nothing: the whole decoder stays under ~270 KiB, whatever the header says |
+| zstd (`ruzstd`) | declared by the frame | nothing: the window buffer grows with the output, which the limit bounds. A frame declaring more than 100 MiB is refused by `ruzstd` itself. Only the first frame of a body is decoded |
+| br (`brotli-decompressor`) | declared by the stream | up to 16 MiB for standard brotli — bounded. "Large Window Brotli" would get up to **1 GiB from a 6-byte body**, so it is refused before decoding (see below) |
+
+`brotli_decompressor::Decompressor` accepts "Large Window Brotli", a non-standard extension that
+is not part of the `br` content coding (RFC 7932). A strict decoder rejects its header — the
+first byte's low seven bits are `0x11` — and so does this server, before the decoder runs: such a
+body is not `br`, and ends in the `400` of a body that does not decode.
 
 #### Decompression runs off the tokio worker
 
