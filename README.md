@@ -923,7 +923,8 @@ parsed from the decompressed bytes, so nothing in the action changes:
 | `gzip` / `x-gzip` | decoded with `flate2` |
 | `br` | decoded with `brotli-decompressor` |
 | `zstd` | decoded with `ruzstd` — pure Rust, decoding only, so no C toolchain in the build |
-| anything else (`deflate`, a list like `gzip, br`) | `400 Validation error: Unsupported content encoding: …` |
+| `deflate` | decoded with `flate2` — as a zlib stream (RFC 1950, what the spec means), falling back to a bare deflate stream (RFC 1951, what some clients send) |
+| anything else (`compress`, a list like `gzip, br`) | `400 Validation error: Unsupported content encoding: …` |
 
 Decoding happens on the **materialize** path only — `#[http_body]`, `#[http_body_raw]`,
 `#[http_form_data]` and any middleware that reads the body. A `#[http_body_as_stream]` body is
@@ -940,6 +941,12 @@ Two details worth knowing:
 If the announced codec fails to decode the body, the other ones are tried before giving up — a
 body that decodes is the body the client meant to send, whatever the header says.
 
+**Every codec in this server is pure Rust** — `flate2` on its default `miniz_oxide` backend
+(gzip / zlib / deflate), `brotli-decompressor`, `ruzstd`. No `libz-sys`, no `zstd-sys`, no `cc`
+in the build: nothing here needs a C toolchain, on any platform. Keep it that way — `flate2`'s
+`zlib` / `cloudflare_zlib` backends and the `zstd` crate all pull C in, and feature unification
+means one dependency asking for them is enough to change the whole build.
+
 ## Notes
 
 - Actions receive `Arc<AppContext>` for shared application state
@@ -949,7 +956,7 @@ body that decodes is the body the client meant to send, whatever the header says
 - Path parameters in routes must match `#[http_path]` fields in input models
 - Only one body type (`http_body`, `http_form_data`, `http_body_raw` or `http_body_as_stream`) can be used per input model
 - A `#[http_body_as_stream]` body is read in chunks and is never materialized; a truncated upload surfaces as an error, not as a short body
-- A request body compressed with `gzip` / `br` / `zstd` is decoded before the model is parsed; a streamed body is passed through as it arrived (see [Compressed Request Bodies](#compressed-request-bodies))
+- A request body compressed with `gzip` / `deflate` / `br` / `zstd` is decoded before the model is parsed; a streamed body is passed through as it arrived (see [Compressed Request Bodies](#compressed-request-bodies))
 - Headers are case-insensitive when reading
 - Optional fields use `Option<T>` type
 - Default values can be specified for any input field attribute
@@ -1178,7 +1185,7 @@ compatible with any code that pushes headers through that interface.
 ## Dependencies
 
 `my-http-server-core`, `tokio`, `async-trait`, `rust-extensions`, `sha2`,
-`base64`, `zstd`, `flate2`.
+`base64`, `flate2`.
 
 ---
 

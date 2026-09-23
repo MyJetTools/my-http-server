@@ -224,6 +224,13 @@ fn zstd(raw: &[u8]) -> Vec<u8> {
     ruzstd::encoding::compress_to_vec(raw, ruzstd::encoding::CompressionLevel::Fastest)
 }
 
+/// `deflate` on the wire is a zlib stream.
+fn deflate(raw: &[u8]) -> Vec<u8> {
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+    encoder.write_all(raw).unwrap();
+    encoder.finish().unwrap()
+}
+
 // ─────────────────────────────── tests ───────────────────────────────
 
 #[tokio::test]
@@ -241,6 +248,16 @@ async fn a_zstd_body_reaches_the_action_decoded() {
     let port = start_server().await;
 
     let response = post(port, "/echo-json", Some("zstd"), &zstd(BODY)).await;
+
+    assert!(response.starts_with("HTTP/1.1 200"), "response: {}", response);
+    assert!(response.contains("email=a@b.com"), "response: {}", response);
+}
+
+#[tokio::test]
+async fn a_deflate_body_reaches_the_action_decoded() {
+    let port = start_server().await;
+
+    let response = post(port, "/echo-json", Some("deflate"), &deflate(BODY)).await;
 
     assert!(response.starts_with("HTTP/1.1 200"), "response: {}", response);
     assert!(response.contains("email=a@b.com"), "response: {}", response);
@@ -288,10 +305,10 @@ async fn a_plain_body_is_untouched() {
 async fn an_encoding_we_can_not_undo_is_a_400() {
     let port = start_server().await;
 
-    let response = post(port, "/echo-json", Some("deflate"), BODY).await;
+    let response = post(port, "/echo-json", Some("compress"), BODY).await;
 
     assert!(response.starts_with("HTTP/1.1 400"), "response: {}", response);
-    assert!(response.contains("deflate"), "response: {}", response);
+    assert!(response.contains("compress"), "response: {}", response);
 }
 
 /// The boundary: a streamed body is passed through as it arrived, so what the action sees is the
