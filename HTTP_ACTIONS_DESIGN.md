@@ -19,6 +19,7 @@ src/
 ├── http_server/
 │   ├── mod.rs                      # HTTP module exports
 │   ├── build_controllers.rs        # Controller registration (fn build_controllers)
+│   ├── start_up.rs                 # Creates and starts MyHttpServer (fn start)
 │   ├── errors.rs                   # HTTP error types + From<DomainError> (if needed)
 │   └── controllers/
 │       ├── mod.rs                  # Controller module exports
@@ -30,8 +31,7 @@ src/
     └── app_ctx.rs                  # Application context
 ```
 
-**No `start_up.rs`** — the SDK handles HTTP server lifecycle via `configure_http_server`.
-**No `app_states` in `AppContext`** — not needed for HTTP services.
+`AppContext` holds the application states (`Arc<AppStates>` from rust-extensions): `MyHttpServer::start` takes them and stops accepting connections once they say the application is shutting down.
 
 ### 2. Action Structure
 
@@ -709,39 +709,44 @@ HttpOutput::as_text("Custom error message")
 
 ### 7. Controller Registration
 
-Actions are registered in `src/http_server/build_controllers.rs`. The function receives `&mut HttpServerBuilder` from `service_sdk` — call `register_*_action` directly on it:
+Actions are registered in `src/http_server/build_controllers.rs`, on a `ControllersMiddleware`. Every `register_*_action` takes the action in an `Arc`:
 
 ```rust
 use std::sync::Arc;
 
-use service_sdk::HttpServerBuilder;
+use my_http_server::controllers::ControllersMiddleware;
 
 use crate::app::AppContext;
 
-pub fn build_controllers(app: &Arc<AppContext>, http_server_builder: &mut HttpServerBuilder) {
+pub fn build_controllers(app: &Arc<AppContext>) -> ControllersMiddleware {
+    // (authorization, auth error factory) - None, None: no global authorization
+    let mut result = ControllersMiddleware::new(None, None);
+
     // POST actions
-    http_server_builder
-        .register_post_action(super::controllers::controller_group::PostAction::new(app.clone()));
+    result.register_post_action(Arc::new(
+        super::controllers::controller_group::PostAction::new(app.clone()),
+    ));
 
     // GET actions
-    http_server_builder
-        .register_get_action(super::controllers::controller_group::GetAction::new(app.clone()));
+    result.register_get_action(Arc::new(
+        super::controllers::controller_group::GetAction::new(app.clone()),
+    ));
 
     // PUT actions
-    http_server_builder
-        .register_put_action(super::controllers::controller_group::UpdateAction::new(app.clone()));
+    result.register_put_action(Arc::new(
+        super::controllers::controller_group::UpdateAction::new(app.clone()),
+    ));
 
     // DELETE actions
-    http_server_builder
-        .register_delete_action(super::controllers::controller_group::DeleteAction::new(app.clone()));
+    result.register_delete_action(Arc::new(
+        super::controllers::controller_group::DeleteAction::new(app.clone()),
+    ));
+
+    result
 }
 ```
 
-**Key differences from the old pattern:**
-- No `ControllersMiddleware` — `HttpServerBuilder` is passed in by the SDK
-- No `Arc::new(...)` wrapping around actions — pass the struct directly
-- No return value — register actions in-place on `http_server_builder`
-- Import from `service_sdk::HttpServerBuilder`, not `my_http_server`
+Global authorization is the first argument of `ControllersMiddleware::new` — `Some(ControllersAuthorization::BearerAuthentication { .. })` (or `BasicAuthentication`, `ApiKeys`); the second is an optional `AuthErrorFactory` that shapes the response to a failed check.
 
 **Authorization Levels:**
 
@@ -779,26 +784,34 @@ pub mod controller_group;
 
 ### 9. Server Startup
 
-HTTP server is started entirely by the SDK. In `main.rs`, call `configure_http_server` **before** `start_application`:
+The server is created and started in `src/http_server/start_up.rs`:
 
 ```rust
-service_context.configure_http_server(|cb| {
-    crate::http_server::build_controllers(&app, cb);
-});
+use std::{net::SocketAddr, sync::Arc};
 
-service_context.start_application().await;
+use my_http_server::controllers::swagger::SwaggerMiddleware;
+use my_http_server::MyHttpServer;
+
+use crate::app::AppContext;
+
+pub fn start(app: &Arc<AppContext>) {
+    let mut http_server = MyHttpServer::new(SocketAddr::from(([0, 0, 0, 0], 8000)));
+
+    let controllers = Arc::new(super::build_controllers(app));
+
+    // Swagger UI at /swagger, generated from the registered actions
+    let swagger_middleware =
+        SwaggerMiddleware::new(controllers.clone(), crate::app::APP_NAME, crate::app::APP_VERSION);
+
+    http_server.add_middleware(Arc::new(swagger_middleware));
+    http_server.add_middleware(controllers);
+
+    http_server.start(app.app_states.clone(), my_logger::LOGGER.clone());
+}
 ```
 
-**No `start_up.rs` file needed.** Do NOT:
-- Instantiate `MyHttpServer` manually
-- Create `SwaggerMiddleware` yourself
-- Add `app_states` to `AppContext`
-- Import from `my_http_server` directly — use `service_sdk::HttpServerBuilder`
-
-The SDK automatically:
-- Starts the HTTP server on the configured port
-- Mounts Swagger UI at `/swagger`
-- Handles graceful shutdown via its own lifecycle management
+- Middlewares answer in the order they are added: swagger first, then the controllers.
+- `start` spawns the server and returns; calling it a second time panics.
 
 ## Design Principles
 
@@ -874,13 +887,11 @@ summary: "Summary",
 
 **Cause:** The `MyHttpObjectStructure` trait is not in scope.
 
-**Solution:** Ensure you have `service_sdk::macros::use_my_http_server!();` at the top of your file, which brings `MyHttpObjectStructure` into scope.
+**Solution:** Ensure you have `use my_http_server::macros::*;` at the top of your file, which brings `MyHttpObjectStructure` into scope.
 
 ## Example: Complete Action
 
 Two complete action files. Each holds the route, the action struct, its models and the handler. Registration is one line in `build_controllers.rs` (section 7) and the module export lives in `{group}/mod.rs` (section 8).
-
-In a service built on `service-sdk`, the two `use my_http_server...` lines are replaced by a single `service_sdk::macros::use_my_http_server!();`.
 
 **GET with a query parameter and a JSON response** — `src/http_server/controllers/certificates/get_cert_info_action.rs`:
 
