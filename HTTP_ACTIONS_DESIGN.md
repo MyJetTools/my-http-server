@@ -615,19 +615,18 @@ HttpOutput::from_builder()
 **Streaming Response:**
 ```rust
 let (output, producer) = HttpOutput::as_stream(100);
-// Send output in handle_request
-// Use producer to send chunks asynchronously
-output.into_ok_result(true).into()
+// Hand `producer` to a task which sends the chunks: `producer.send(bytes).await`
+output.get_result()
 ```
 
-**Response Compression (zstd):**
+**Response Compression (gzip):**
 
-`HttpResultBuilder::with_compression(threshold)` opts the response into on-the-fly `zstd` compression. The body is compressed only when **both** conditions hold:
+`HttpResultBuilder::with_compression(threshold)` opts the response into on-the-fly `gzip` compression. The body is compressed only when **both** conditions hold:
 
 1. The current body size is **strictly greater** than `threshold` bytes.
 2. The compressed payload is **≤ 80%** of the original size (otherwise compression isn't worth it and the original body is kept).
 
-When the body is replaced with the compressed payload, the `Content-Encoding: zstd` header is added automatically. Otherwise the builder is returned untouched (no header, no allocation kept).
+When the body is replaced with the compressed payload, the `Content-Encoding: gzip` header is added automatically. Otherwise the builder is returned untouched (no header, no allocation kept).
 
 ```rust
 HttpOutput::as_json(large_model)
@@ -648,41 +647,64 @@ Pick `threshold` based on the response type — JSON / HTML payloads under a few
 Use appropriate error types based on the failure:
 
 ```rust
-// Not Found (404)
+// Not Found (404) - the second argument says whether to write telemetry
 HttpFailResult::as_not_found(error_message, false).into_err()
 
-// Fatal Error (500)
-HttpFailResult::as_fatal_error(error_message).into_err()
-
-// Bad Request (400)
-HttpFailResult::as_bad_request(error_message, false).into_err()
+// Validation error (400)
+HttpFailResult::as_validation_error(error_message).into_err()
 
 // Unauthorized (401) - Authentication required
 HttpFailResult::as_unauthorized(Some("Authentication required")).into_err()
 
 // Forbidden (403) - Not authorized
-HttpFailResult::as_forbidden(error_message, false).into_err()
+HttpFailResult::as_forbidden(Some(error_message)).into_err()
 
-// Conflict (409)
-HttpFailResult::as_conflict(error_message, false).into_err()
+// Unsupported Media Type (415)
+HttpFailResult::as_not_supported_content_type(error_message).into_err()
 
-// Unprocessable Entity (422)
-HttpFailResult::as_unprocessable_entity(error_message, false).into_err()
+// Fatal Error (500)
+HttpFailResult::as_fatal_error(error_message).into_err()
+
+// Any other status with a text body - e.g. Conflict (409), Unprocessable Entity (422)
+HttpFailResult::from((409, "Order is already closed")).into_err()
 ```
 
-**Error Parameters:**
+There is no `as_bad_request`, `as_conflict` or `as_unprocessable_entity`: a 400 is
+`as_validation_error`, and any other status goes through `HttpFailResult::from((status_code, text))`
+(`text` is a `String` or a `&'static str`).
 
-Most error methods take two parameters:
-1. `error_message` - The error message to return
-2. `write_log` - Boolean indicating whether to write to log (usually `false` for client errors, `true` for server errors)
+**Log and telemetry:**
+
+Each helper decides on its own whether the failure is written to the log and to telemetry:
+
+| Helper | Log | Telemetry |
+|---|---|---|
+| `as_not_found(text, write_telemetry)` | no | the second argument |
+| `as_validation_error(text)` | no | yes |
+| `as_unauthorized(text)` | no | no |
+| `as_forbidden(text)` | no | yes |
+| `as_not_supported_content_type(text)` | yes | yes |
+| `as_fatal_error(text)` | yes | yes |
+| `HttpFailResult::from((status_code, text))` | no | yes |
 
 **Custom Error with Status Code:**
+
+To choose the status code, the body and both flags yourself, build the output and hand it over:
+
 ```rust
 HttpFailResult::new(
-    HttpOutput::as_text("Custom error message"),
-    false,  // write_log
-    false   // write_telemetry
-).into_err()
+    HttpOutput::as_text("Custom error message")
+        .set_status_code(418)
+        .build(),
+    false, // write_to_log
+    false, // write_telemetry
+)
+.into_err()
+
+// The same, straight from the builder
+HttpOutput::as_text("Custom error message")
+    .set_status_code(418)
+    .into_err(false, false) // write_log, write_telemetry
 ```
 
 ### 7. Controller Registration
@@ -992,6 +1014,7 @@ async fn handle_request(
 
 This pattern requires:
 - `my_http_server` crate with macros support
+- `my-http-utils` as a direct dependency of every crate which derives `MyHttpInput` or `MyHttpObjectStructure`: the derives expand to `my_http_utils::…` paths, and the re-export through `my_http_server::macros` does not make that name resolve in your crate
 - `serde` for serialization
 - `tokio` for async runtime
 - Application context (`AppContext`) for shared state
