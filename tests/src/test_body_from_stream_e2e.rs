@@ -590,7 +590,7 @@ async fn an_h2_body_reset_mid_way_never_reaches_the_action() {
 
 #[test]
 fn the_model_consts_send_the_body_to_the_stream() {
-    assert!(echo_email::EchoEmailHttpInput::READS_BODY);
-    assert!(!echo_email::EchoEmailHttpInput::READS_BODY_RAW);
-    assert!(!echo_email::EchoEmailHttpInput::STREAMS_BODY);
+    const { assert!(echo_email::EchoEmailHttpInput::READS_BODY) };
+    const { assert!(!echo_email::EchoEmailHttpInput::READS_BODY_RAW) };
+    const { assert!(!echo_email::EchoEmailHttpInput::STREAMS_BODY) };
 }
