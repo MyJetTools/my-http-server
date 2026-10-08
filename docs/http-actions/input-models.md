@@ -178,6 +178,8 @@ pub struct SearchInputModel {
 
 **Note:** You cannot mix `http_body`, `http_form_data`, `http_body_raw` and `http_body_as_stream` in the same model - only one body type is allowed per input model.
 
+**How the body is read.** A `#[http_body]` / `#[http_form_data]` body is parsed as it comes off the wire rather than collected first. Of a JSON body only the members the model reads are kept; the rest is still read, and let go, before the action runs — so a body cut short never reaches it, and the connection can be used again. A url-encoded or multipart body can only be parsed whole and is collected first. A body that announced a `Content-Encoding`, or that a middleware has already read, is parsed from the materialized (decoded) bytes instead. `#[http_body_raw]` always gets the whole body. A malformed JSON body is answered `412` as soon as the broken part arrives.
+
 **Note on Field Transformations:** The `to_lowercase` and `to_uppercase` attributes work only with `String` types, not with other types like `Option<String>` or numeric types.
 
 ## Parameter-less actions

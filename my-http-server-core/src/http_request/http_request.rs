@@ -4,8 +4,8 @@ use my_http_utils::http_input::{HttpBodyAsStream, BODY_STREAM_DEFAULT_BUFFER};
 
 use crate::{
     http_headers::*, CookiesReader, HttpFailResult, HttpPath, HttpPathReader,
-    HttpRequestBodyContent, HttpRequestHeaders, MyHyperHttpRequest, QueryStringReader, RequestData,
-    RequestIp,
+    HttpRequestBodyContent, HttpRequestHeaders, IncomingBodyStream, MyHyperHttpRequest,
+    QueryStringReader, RequestData, RequestIp,
 };
 
 use hyper::{Method, Uri};
@@ -116,6 +116,17 @@ impl HttpRequest {
         buffer: usize,
     ) -> Result<HttpBodyAsStream, HttpFailResult> {
         self.data.take_body_stream(buffer)
+    }
+
+    /// Takes the body as a stream of bytes read off the wire as it arrives. Used by the generated
+    /// action code for a model that reads named body fields (`#[http_body]` /
+    /// `#[http_form_data]`) — it is parsed with `parse_with_body_stream`.
+    ///
+    /// `None` when the body is to be materialized instead, and is left in the request: a
+    /// middleware has already materialized it, or it announced a `Content-Encoding`, which only
+    /// the materialize path decodes.
+    pub fn take_incoming_body_stream(&mut self) -> Option<IncomingBodyStream> {
+        self.data.take_incoming_body_stream()
     }
 
     pub fn take_my_hyper_http_request(&mut self) -> MyHyperHttpRequest {

@@ -5,8 +5,8 @@ use hyper::Uri;
 use my_http_utils::http_input::HttpBodyAsStream;
 
 use crate::{
-    BodyContentType, BodyExpectations, HttpFailResult, HttpRequestBody, HttpRequestBodyContent,
-    MyHyperHttpRequest,
+    BodyContentType, BodyExpectations, ContentEncoding, HttpFailResult, HttpRequestBody,
+    HttpRequestBodyContent, IncomingBodyStream, MyHyperHttpRequest,
 };
 
 pub struct RequestData {
@@ -100,7 +100,33 @@ impl RequestData {
         }
     }
 
-    /// What this request promised about its body — used by both body-reading paths to tell a
+    /// Takes the body as an [`IncomingBodyStream`], to be read off the wire as it arrives. `None`
+    /// when it is to be materialized instead, and is left where it is: a middleware has already
+    /// materialized it, or it announced a `Content-Encoding` — only the materialize path decodes,
+    /// and only it reports an encoding it does not know.
+    pub fn take_incoming_body_stream(&mut self) -> Option<IncomingBodyStream> {
+        let expectations = self.body_expectations();
+
+        let Some(HttpRequestBody::Incoming {
+            incoming,
+            content_encoding,
+            ..
+        }) = &mut self.body
+        else {
+            return None;
+        };
+
+        if ContentEncoding::new(content_encoding.as_deref()).ok()? != ContentEncoding::None {
+            return None;
+        }
+
+        let incoming = incoming.take()?;
+        self.body = None;
+
+        Some(IncomingBodyStream::new(incoming, expectations))
+    }
+
+    /// What this request promised about its body — used by every body-reading path to tell a
     /// complete body from one the client abandoned.
     fn body_expectations(&self) -> BodyExpectations {
         BodyExpectations {

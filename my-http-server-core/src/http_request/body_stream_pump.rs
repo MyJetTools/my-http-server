@@ -4,11 +4,12 @@
 //! whole "where do the bytes come from" half lives here: pull DATA frames off
 //! `hyper::body::Incoming` and pour them into the sending half.
 //!
-//! [`next_data_frame`] is *the* body-reading primitive of this crate — both the pump below and the
-//! materialize-it-whole path ([`crate::HttpRequestBody::get_http_request_body`]) go through it, so
-//! there is exactly one place that knows how a body is taken apart. It works the same for
-//! `Transfer-Encoding: chunked` and for a `Content-Length` body: hyper decodes both into DATA
-//! frames, and the only difference is whether the length was known up front.
+//! [`next_data_frame`] is *the* body-reading primitive of this crate — the pump below, the
+//! materialize-it-whole path ([`crate::HttpRequestBody::get_http_request_body`]) and
+//! [`crate::IncomingBodyStream`] all go through it, so there is exactly one place that knows how a
+//! body is taken apart. It works the same for `Transfer-Encoding: chunked` and for a
+//! `Content-Length` body: hyper decodes both into DATA frames, and the only difference is whether
+//! the length was known up front.
 
 use my_http_utils::http_input::{HttpBodyAsStream, HttpBodyStreamSender, HttpParseError};
 
@@ -19,9 +20,9 @@ use crate::HttpRequestBody;
 /// "The body ended" is not the same as "the body is complete", and the difference can not be
 /// delegated to the transport. HTTP/1 truncation does surface as a hyper error, but an HTTP/2
 /// stream the client aborts with `RST_STREAM(NO_ERROR)` arrives as a perfectly ordinary end of
-/// body — so a handler would be handed a half-received upload labelled complete. Both ways of
-/// reading a body ([the pump](spawn_body_pump) and [read-it-whole](crate::HttpRequestBody)) check
-/// this, and they check it the same way.
+/// body — so a handler would be handed a half-received upload labelled complete. Every way of
+/// reading a body ([the pump](spawn_body_pump), [read-it-whole](crate::HttpRequestBody) and
+/// [`crate::IncomingBodyStream`]) checks this, and they check it the same way.
 #[derive(Clone, Copy, Debug)]
 pub struct BodyExpectations {
     pub version: hyper::Version,
@@ -104,6 +105,16 @@ impl BodyExpectations {
         }
 
         None
+    }
+
+    /// What a body read that hit [`read_timeout`](Self::read_timeout) is reported as, the same
+    /// way on every path that reads a body.
+    pub fn timeout_reason(&self, delivered: u64) -> String {
+        format!(
+            "Timeout while waiting for the request body: nothing received for {:?} after {} bytes",
+            self.read_timeout.unwrap_or_default(),
+            delivered
+        )
     }
 }
 
@@ -245,11 +256,9 @@ async fn pump(
                     Ok(frame) => frame,
                     Err(BodyReadTimeout) => {
                         sender
-                            .send_error(HttpParseError::BodyStream(format!(
-                                "Timeout while waiting for the request body: nothing received for {:?} after {} bytes",
-                                expectations.read_timeout.unwrap_or_default(),
-                                delivered
-                            )))
+                            .send_error(HttpParseError::BodyStream(
+                                expectations.timeout_reason(delivered),
+                            ))
                             .await;
                         return;
                     }

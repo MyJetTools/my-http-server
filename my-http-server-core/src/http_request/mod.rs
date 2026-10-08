@@ -16,3 +16,5 @@ mod body_stream_pump;
 pub use body_stream_pump::*;
 mod my_hyper_http_request;
 pub use my_hyper_http_request::*;
+mod incoming_body_stream;
+pub use incoming_body_stream::*;

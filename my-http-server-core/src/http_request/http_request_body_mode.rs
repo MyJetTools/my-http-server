@@ -6,12 +6,14 @@ use crate::{
 };
 
 /// The request body, kept **lazy**: it holds hyper's `Incoming` and is not turned into bytes until
-/// something actually asks for them. There are two ways to ask, and both go through the same
-/// frame-by-frame primitive ([`next_data_frame`]):
+/// something actually asks for them. There are three ways to ask, and all of them go through the
+/// same frame-by-frame primitive ([`next_data_frame`]):
 ///
 /// * materialize it whole — [`get_http_request_body`](Self::get_http_request_body) /
-///   [`into_http_request_body`](Self::into_http_request_body), used for deserialization,
-///   `#[http_body_raw]` and middleware;
+///   [`into_http_request_body`](Self::into_http_request_body), used for `#[http_body_raw]`, for
+///   a body that announced a `Content-Encoding`, and by middleware;
+/// * read it as it arrives — [`crate::IncomingBodyStream`], which the named body fields of a
+///   `#[http_body]` / `#[http_form_data]` model are parsed out of;
 /// * stream it — [`into_body_stream`](Self::into_body_stream), used by a
 ///   `#[http_body_as_stream]` model.
 ///
@@ -112,11 +114,7 @@ async fn read_bytes(
         let Ok(frame) = frame else {
             return Err(HttpFailResult::from((
                 400u16,
-                format!(
-                    "Timeout while waiting for the request body: nothing received for {:?} after {} bytes",
-                    expectations.read_timeout.unwrap_or_default(),
-                    delivered
-                ),
+                expectations.timeout_reason(delivered),
             )));
         };
 

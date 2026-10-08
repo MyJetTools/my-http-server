@@ -274,6 +274,8 @@ pub struct SearchInputModel {
 
 **Note:** You cannot mix `http_body`, `http_form_data`, `http_body_raw` and `http_body_as_stream` in the same model - only one body type is allowed per input model.
 
+**How the body is read.** A `#[http_body]` / `#[http_form_data]` body is parsed as it comes off the wire rather than collected first. Of a JSON body only the members the model reads are kept; the rest is still read, and let go, before the action runs — so a body cut short never reaches it, and the connection can be used again. A url-encoded or multipart body can only be parsed whole and is collected first. A body that announced a `Content-Encoding`, or that a middleware has already read, is parsed from the materialized (decoded) bytes instead. `#[http_body_raw]` always gets the whole body. A malformed JSON body is answered `412` as soon as the broken part arrives.
+
 **Note on Field Transformations:** The `to_lowercase` and `to_uppercase` attributes work only with `String` types, not with other types like `Option<String>` or numeric types.
 
 ### 4. Output Models
@@ -926,10 +928,12 @@ parsed from the decompressed bytes, so nothing in the action changes:
 | `deflate` | decoded with `flate2` — as a zlib stream (RFC 1950, what the spec means), falling back to a bare deflate stream (RFC 1951, what some clients send) |
 | anything else (`compress`, a list like `gzip, br`) | `400 Validation error: Unsupported content encoding: …` |
 
-Decoding happens on the **materialize** path only — `#[http_body]`, `#[http_body_raw]`,
-`#[http_form_data]` and any middleware that reads the body. A `#[http_body_as_stream]` body is
-handed on exactly as it arrived, still compressed: a pass-through action wants the bytes the
-client sent, and the header is there for it to act on.
+Decoding happens on the **materialize** path only — `#[http_body_raw]` and any middleware that
+reads the body. A `#[http_body]` / `#[http_form_data]` body is otherwise parsed as it comes off the
+wire; one that announced an encoding is materialized and decoded first instead, so the action sees
+the same thing either way. A `#[http_body_as_stream]` body is handed on exactly as it arrived,
+still compressed: a pass-through action wants the bytes the client sent, and the header is there
+for it to act on.
 
 Two details worth knowing:
 
@@ -1007,6 +1011,7 @@ means one dependency asking for them is enough to change the whole build.
 - Business logic should be implemented in `scripts/` module, not directly in actions
 - Path parameters in routes must match `#[http_path]` fields in input models
 - Only one body type (`http_body`, `http_form_data`, `http_body_raw` or `http_body_as_stream`) can be used per input model
+- A `#[http_body]` / `#[http_form_data]` body is parsed as it comes off the wire: of a JSON body only the members the model reads are kept, and the rest is read and let go before the action runs
 - A `#[http_body_as_stream]` body is read in chunks and is never materialized; a truncated upload surfaces as an error, not as a short body
 - A request body compressed with `gzip` / `deflate` / `br` / `zstd` is decoded before the model is parsed, off the tokio worker and up to `set_max_decompressed_body_size` (64 MiB by default, `413` past it); a streamed body is passed through as it arrived (see [Compressed Request Bodies](#compressed-request-bodies))
 - Headers are case-insensitive when reading
