@@ -208,7 +208,8 @@ async fn serve_websocket<TMyWebSocketCallback: MyWebSocketCallback + Send + Sync
         let message = match message {
             Ok(message) => message,
             Err(err) => {
-                println!("Getting WS message error:{}", err);
+                my_web_socket
+                    .write_debug_info("Error reading message from websocket", format!("{err}"));
                 my_web_socket.disconnect().await;
                 return Err(err.into());
             }

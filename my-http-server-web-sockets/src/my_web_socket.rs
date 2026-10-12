@@ -69,19 +69,20 @@ impl MyWebSocket {
         let result = self.send_messages_if_connected(msg).await;
 
         if let Err(err) = result {
-            let mut ctx = HashMap::new();
-
-            ctx.insert("Ip".to_string(), self.addr.to_string());
-            ctx.insert("Id".to_string(), self.id.to_string());
-            ctx.insert("ConnectedAt".to_string(), self.connected_at.to_rfc3339());
-            self.logs.write_warning(
-                "Error sending message to websocket".to_string(),
-                format!("{err}"),
-                Some(ctx),
-            );
+            self.write_debug_info("Error sending message to websocket", format!("{err}"));
 
             self.disconnect().await;
         }
+    }
+
+    pub(crate) fn write_debug_info(&self, process: &str, message: String) {
+        let mut ctx = HashMap::new();
+
+        ctx.insert("Ip".to_string(), self.addr.to_string());
+        ctx.insert("Id".to_string(), self.id.to_string());
+        ctx.insert("ConnectedAt".to_string(), self.connected_at.to_rfc3339());
+        self.logs
+            .write_debug_info(process.to_string(), message, Some(ctx));
     }
 
     pub fn get_query_string<'s>(&'s self) -> Option<QueryStringReader<'s>> {
@@ -115,7 +116,7 @@ impl MyWebSocket {
                 let result = item.close().await;
 
                 if let Err(err) = result {
-                    println!("Can not close websocket {}. Reason: {:?}", self.id, err);
+                    self.write_debug_info("Error closing websocket", format!("{err}"));
                 }
                 true
             } else {
