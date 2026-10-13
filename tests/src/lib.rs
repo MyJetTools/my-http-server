@@ -18,3 +18,6 @@ pub mod test_body_from_stream_e2e;
 
 #[cfg(test)]
 pub mod test_pkg_compile_date_time;
+
+#[cfg(test)]
+pub mod test_static_files_e2e;

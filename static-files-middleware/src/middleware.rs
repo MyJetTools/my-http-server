@@ -2,8 +2,9 @@ use my_http_server_core::*;
 use rust_extensions::StrOrString;
 
 use crate::{
-    calc_etag, deflate_compress, gzip_decompress, CachedContent, EtagCaches, FilesAccess,
-    FilesMapping, NoCache, RootPaths, NO_CACHE_CACHE_CONTROL, NO_CACHE_EXPIRES, NO_CACHE_PRAGMA,
+    calc_etag, deflate_compress, gzip_decompress, has_parent_segment, CachedContent, EtagCaches,
+    FilesAccess, FilesMapping, NoCache, RootPaths, NO_CACHE_CACHE_CONTROL, NO_CACHE_EXPIRES,
+    NO_CACHE_PRAGMA,
 };
 
 pub struct StaticFilesMiddleware {
@@ -331,6 +332,12 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
         ctx: &mut HttpContext,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
         let path = &ctx.request.http_path;
+
+        // Before anything else: glued to a folder, a path with a `..` segment is a file out of
+        // it - `/../../etc/hosts`. It is a file of no folder served here.
+        if has_parent_segment(path.as_str()) {
+            return Some(Err(HttpFailResult::as_forbidden(Some("Forbidden"))));
+        }
 
         let mut cache_policy = if self.no_cache.marked_as_no_cache(path) {
             CachePolicy::NoCache

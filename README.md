@@ -1096,6 +1096,12 @@ accessible directly when the builder API isn't enough.
 
 ## Path resolution
 
+A path with a `..` segment is answered `403 Forbidden` before any of the
+steps below: glued to a folder, `/../../etc/hosts` would be a file out of
+it. The segment is refused however it is written — as it is, percent-encoded
+(`%2e%2e`, `.%2e`), or set apart by `\`, `%2f` or `%5c` instead of `/`. Two
+dots inside a name (`/a..b.txt`) are a part of the name and are served.
+
 1. If the path is registered via
    `add_no_cache_headers_to_response_by_path(...)` — the whole ETag step is
    skipped. Otherwise: if `If-None-Match` is set and the ETag cache already
@@ -1238,6 +1244,8 @@ compatible with any code that pushes headers through that interface.
   — `RootPaths` (paths where index files apply; default `/`).
 - [static-files-middleware/src/file_mapping.rs](static-files-middleware/src/file_mapping.rs)
   — `FilesMapping { uri_prefix: HttpPath, folder_path: String }`.
+- [static-files-middleware/src/parent_segment.rs](static-files-middleware/src/parent_segment.rs)
+  — `has_parent_segment`: the check which keeps a request inside its folder.
 
 ## Dependencies
 
