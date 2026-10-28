@@ -21,3 +21,9 @@ pub mod test_pkg_compile_date_time;
 
 #[cfg(test)]
 pub mod test_static_files_e2e;
+
+#[cfg(test)]
+pub mod test_stream_compression_e2e;
+
+#[cfg(test)]
+pub mod test_protobuf_body_e2e;

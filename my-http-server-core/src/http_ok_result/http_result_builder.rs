@@ -1,10 +1,11 @@
 use std::io::Write;
 
-use flate2::{write::GzEncoder, Compression};
+use flate2::write::GzEncoder;
 use rust_extensions::StrOrString;
 
 use crate::{
-    cookies::*, AddHttpHeaders, HttpFailResult, HttpOutput, HttpResponseHeaders, WebContentType,
+    cookies::*, AddHttpHeaders, CompressionLevel, HttpFailResult, HttpOutput,
+    HttpResponseHeaders, WebContentType,
 };
 
 use super::HttpOkResult;
@@ -13,9 +14,6 @@ const EMPTY_STATUS_CODE: u16 = 204;
 
 const COMPRESSION_EFFICIENCY_NUM: usize = 80;
 const COMPRESSION_EFFICIENCY_DEN: usize = 100;
-/// A dynamic response is compressed on every request, so we stay on the
-/// balanced level instead of the slowest one.
-const GZIP_LEVEL: Compression = Compression::new(6);
 
 pub struct HttpResultBuilder {
     pub(crate) output: HttpOutput,
@@ -28,8 +26,8 @@ pub struct HttpResultBuilder {
      */
 }
 
-fn gzip(raw: &[u8]) -> std::io::Result<Vec<u8>> {
-    let mut encoder = GzEncoder::new(Vec::with_capacity(raw.len()), GZIP_LEVEL);
+fn gzip(raw: &[u8], level: CompressionLevel) -> std::io::Result<Vec<u8>> {
+    let mut encoder = GzEncoder::new(Vec::with_capacity(raw.len()), level.to_gzip());
     encoder.write_all(raw)?;
     encoder.finish()
 }
@@ -294,7 +292,7 @@ impl HttpResultBuilder {
         self
     }
 
-    pub fn with_compression(mut self, threshold: usize) -> Self {
+    pub fn with_compression(mut self, threshold: usize, level: CompressionLevel) -> Self {
         let compressed = {
             let body = match &self.output {
                 HttpOutput::Content { content, .. } => content,
@@ -307,7 +305,7 @@ impl HttpResultBuilder {
                 return self;
             }
 
-            let Ok(c) = gzip(body.as_slice()) else {
+            let Ok(c) = gzip(body.as_slice(), level) else {
                 return self;
             };
 
@@ -370,7 +368,9 @@ mod tests {
 
     #[test]
     fn empty_is_noop() {
-        let built = HttpResultBuilder::new().with_compression(1024).build();
+        let built = HttpResultBuilder::new()
+            .with_compression(1024, CompressionLevel::Balanced)
+            .build();
         match built {
             HttpOutput::Empty => {}
             other => panic!("expected Empty, got {:?}", other),
@@ -380,7 +380,7 @@ mod tests {
     #[test]
     fn redirect_is_noop() {
         let built = HttpOutput::as_redirect("/elsewhere", false)
-            .with_compression(1)
+            .with_compression(1, CompressionLevel::Balanced)
             .build();
         match built {
             HttpOutput::Redirect { headers, .. } => {
@@ -396,7 +396,7 @@ mod tests {
         let built = HttpResultBuilder {
             output: HttpOutput::as_content(raw.clone(), None),
         }
-        .with_compression(10 * 1024)
+        .with_compression(10 * 1024, CompressionLevel::Balanced)
             .build();
 
         match built {
@@ -416,7 +416,7 @@ mod tests {
         let built = HttpResultBuilder {
             output: HttpOutput::as_content(raw.clone(), None),
         }
-        .with_compression(10 * 1024)
+        .with_compression(10 * 1024, CompressionLevel::Balanced)
             .build();
 
         match built {
@@ -446,7 +446,7 @@ mod tests {
         let built = HttpResultBuilder {
             output: HttpOutput::as_content(raw.clone(), None),
         }
-        .with_compression(10 * 1024)
+        .with_compression(10 * 1024, CompressionLevel::Balanced)
             .build();
 
         match built {
@@ -458,6 +458,73 @@ mod tests {
             }
             other => panic!("expected Content, got {:?}", other),
         }
+    }
+
+    /// Text that compresses, but not trivially - so the level makes a difference.
+    fn words(len: usize) -> Vec<u8> {
+        const WORDS: [&str; 8] = [
+            "alpha ", "bravo ", "charlie ", "delta ", "echo ", "foxtrot ", "golf ", "hotel ",
+        ];
+
+        let mut raw = Vec::with_capacity(len);
+        let mut seed: u32 = 0x9E37_79B1;
+        while raw.len() < len {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            raw.extend_from_slice(WORDS[(seed >> 29) as usize].as_bytes());
+        }
+        raw
+    }
+
+    fn compressed_content(raw: &[u8], level: CompressionLevel) -> (Vec<u8>, Option<String>) {
+        let built = HttpResultBuilder {
+            output: HttpOutput::as_content(raw.to_vec(), None),
+        }
+        .with_compression(0, level)
+        .build();
+
+        match built {
+            HttpOutput::Content {
+                content, headers, ..
+            } => {
+                let encoding = find_header(&headers, "Content-Encoding").map(|v| v.to_string());
+                (content, encoding)
+            }
+            other => panic!("expected Content, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn the_level_is_applied() {
+        let raw = words(50 * 1024);
+
+        let (fast, fast_encoding) = compressed_content(&raw, CompressionLevel::Fast);
+        let (best, best_encoding) = compressed_content(&raw, CompressionLevel::Best);
+
+        assert_eq!(fast_encoding.as_deref(), Some("gzip"));
+        assert_eq!(best_encoding.as_deref(), Some("gzip"));
+        assert!(best.len() < fast.len(), "best {} fast {}", best.len(), fast.len());
+
+        for content in [fast, best] {
+            let mut roundtrip = Vec::new();
+            std::io::Read::read_to_end(
+                &mut flate2::read::GzDecoder::new(content.as_slice()),
+                &mut roundtrip,
+            )
+            .unwrap();
+            assert_eq!(roundtrip, raw);
+        }
+    }
+
+    /// Level 0 only frames the bytes, so the result is larger than the body and never passes the
+    /// efficiency check.
+    #[test]
+    fn a_stored_level_is_never_worth_it() {
+        let raw = words(50 * 1024);
+
+        let (content, encoding) = compressed_content(&raw, CompressionLevel::Level(0));
+
+        assert_eq!(content, raw);
+        assert_eq!(encoding, None);
     }
 }
 

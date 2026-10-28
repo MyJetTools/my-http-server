@@ -16,6 +16,8 @@ mod http_server_data;
 
 mod web_content_type;
 
+mod compression_level;
+
 // ── The value / reader / conversion / field-type layer is owned by my-http-utils (the same lib
 // fl-url and other clients use), so a `#[derive(MyHttpInput)]` model compiles on both sides.
 // Core re-exports it under the historical paths; server-only glue (hyper body, headers, path,
@@ -46,6 +48,8 @@ pub use request_credentials::*;
 //pub use request_flow::HttpServerRequestFlow;
 pub use request_ip::*;
 pub use web_content_type::WebContentType;
+
+pub use compression_level::CompressionLevel;
 
 pub use http_server_data::*;
 

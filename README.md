@@ -437,10 +437,13 @@ HttpOutput::from_builder()
 **Streaming Response:**
 ```rust
 let (output, producer) = HttpOutput::as_stream(100);
-// Send output in handle_request
-// Use producer to send chunks asynchronously
-output.into_ok_result(true).into()
+// Hand `producer` to a task which sends the chunks: `producer.send(bytes).await`
+output
+    .with_compression(&ctx.request, CompressionLevel::Fast) // optional: gzip on the fly when the client takes it
+    .get_result()
 ```
+
+The producer always sends plain bytes. With `with_compression`, every chunk is gzipped and flushed under the hood, and the gzip footer is written when the producer is dropped. See [Streaming Response Compression](docs/http-actions/responses.md#streaming-response-compression-gzip).
 
 ### 6. Error Handling
 

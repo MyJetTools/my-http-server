@@ -9,6 +9,7 @@ pub enum WebContentType {
     Text,
     Yaml,
     Wasm,
+    Protobuf,
     Raw(String),
 }
 
@@ -24,6 +25,7 @@ impl WebContentType {
             WebContentType::Svg => "image/svg+xml",
             WebContentType::Yaml => "text/yaml",
             WebContentType::Wasm => "application/wasm",
+            WebContentType::Protobuf => "application/x-protobuf",
             WebContentType::Raw(content_type) => content_type.as_str(),
         }
     }
