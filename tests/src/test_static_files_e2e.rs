@@ -9,8 +9,9 @@
 //! before sending it: what a test sends here is what gets to the wire.
 //!
 //! The ETag half: the `ETag` is quoted - weak for a compressed variant - and `If-None-Match` is
-//! answered `304` for every spelling of it a client may send, the unquoted one of 0.9.0 included.
-//! A `304` carries the caching headers of the `200` and no `Content-Type`.
+//! answered `304` for every spelling of it a client may send, including the way this library
+//! wrote ETags earlier: the same base64 of a SHA-256, padding stripped, no quotes. A `304`
+//! carries the caching headers of the `200` and no `Content-Type`.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -343,7 +344,7 @@ async fn the_etag_is_quoted_and_matched_however_the_client_spells_it() {
         format!("\"other\", {etag}"),
         format!("\"other\",{etag} , W/\"another\""),
         "*".to_string(),
-        // The way 0.9.0 sent it - the same hash, without quotes.
+        // The way this library wrote ETags earlier - the same hash, no quotes.
         opaque_tag.to_string(),
     ] {
         let response = request(port, "/css/site.css", &[("If-None-Match", &if_none_match)]).await;

@@ -30,6 +30,8 @@ rust-extensions = { tag = "0.1.5", git = "https://github.com/MyJetTools/rust-ext
 # not as an error.
 h2 = "0.4"
 http = "1"
+# `TokioIo`, to read and write an upgraded connection in the header read timeout test.
+hyper-util = { version = "*", features = ["tokio"] }
 bytes = "1"
 # Compressing a request body the way a client would, for the `Content-Encoding` tests.
 flate2 = "*"

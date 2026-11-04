@@ -36,3 +36,6 @@ pub mod test_malformed_request_e2e;
 
 #[cfg(test)]
 pub mod test_connections_counter_e2e;
+
+#[cfg(test)]
+pub mod test_header_read_timeout_e2e;

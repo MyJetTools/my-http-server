@@ -49,8 +49,9 @@ pub fn weak_etag(opaque_tag: &str) -> String {
 ///   around them. A comma inside the quotes is a part of the tag;
 /// - `W/` is not looked at, on either side;
 /// - a tag sent without quotes is taken as the opaque tag itself. That is how this library wrote
-///   ETags before 0.9.1, and the hashes did not change - a client holding one of those still gets
-///   its `304` instead of downloading the content again;
+///   ETags earlier - base64 of a SHA-256, padding stripped, no quotes - and the hashes did not
+///   change: a client holding one of those still gets its `304` instead of downloading the
+///   content again;
 /// - a field that is not a valid list matches nothing, whatever else is in it: answering `200` is
 ///   always safe, answering `304` to a client that does not have the content is not. So does an
 ///   `etag` that is not a valid entity tag.
@@ -132,7 +133,8 @@ fn parse_element(line: &[u8], start: usize) -> Option<(ListElement<'_>, usize)> 
     } else if rest.starts_with(b"\"") {
         start
     } else {
-        // No quotes: `*`, or a tag the way this library wrote them before 0.9.1.
+        // No quotes: `*`, or a tag the way this library wrote ETags earlier - base64 of a
+        // SHA-256, padding stripped, no quotes.
         let end = rest
             .iter()
             .position(|b| matches!(b, b',' | b' ' | b'\t'))
@@ -277,7 +279,8 @@ mod tests {
 
     #[test]
     fn an_etag_without_quotes_is_taken_as_the_opaque_tag() {
-        // The way this library wrote ETags before 0.9.1: base64 of a SHA-256, padding stripped.
+        // The way this library wrote ETags earlier: base64 of a SHA-256, padding stripped, no
+        // quotes.
         let legacy = "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg";
 
         assert!(matches(legacy, &strong_etag(legacy)));

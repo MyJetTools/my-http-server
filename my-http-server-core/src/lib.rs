@@ -13,6 +13,7 @@ mod request_ip;
 
 mod http_server;
 mod http_server_data;
+mod protocol_sniff_deadline;
 
 mod web_content_type;
 

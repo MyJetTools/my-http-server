@@ -443,7 +443,7 @@ HttpOutput::from_builder()
 ```
 
 - `strong_etag(hash)` gives `"hash"`, `weak_etag(hash)` gives `W/"hash"`. A strong ETag promises the same bytes, so every content-coding of a file (gzip, br, …) needs one of its own, or they all share a weak one.
-- `ctx.request.if_none_match_matches(&etag)` evaluates `If-None-Match` the way RFC 9110 §13.1.2 says, with the weak comparison: `*` matches anything; otherwise the field is a list of tags (a comma inside quotes is part of the tag); `W/` is ignored on both sides; a header sent as several lines counts as one list. A tag without quotes — the way this library wrote ETags before 0.9.1 — is taken as the opaque tag, so clients holding one still get their `304`. A malformed field matches nothing. `if_none_match_matches(values, &etag)` does the same for header values from anywhere else (`&str`, `&[u8]` or `&HeaderValue`).
+- `ctx.request.if_none_match_matches(&etag)` evaluates `If-None-Match` the way RFC 9110 §13.1.2 says, with the weak comparison: `*` matches anything; otherwise the field is a list of tags (a comma inside quotes is part of the tag); `W/` is ignored on both sides; a header sent as several lines counts as one list. A tag without quotes is taken as the opaque tag: that is how this library wrote ETags earlier (base64 of a SHA-256, padding stripped, no quotes), so clients holding one still get their `304`. A malformed field matches nothing. `if_none_match_matches(values, &etag)` does the same for header values from anywhere else (`&str`, `&[u8]` or `&HeaderValue`).
 - `as_not_modified()` has no body and no `Content-Type`. RFC 9110 §15.4.5 wants a `304` to carry the `ETag`, `Cache-Control`, `Expires`, `Vary` and `Content-Location` the `200` would carry: add them with `add_header`.
 
 **Content types:** `WebContentType::Html`, `Css`, `JavaScript` and `Text` are sent with `; charset=utf-8` (`text/html; charset=utf-8` and so on). `Json` is plain `application/json`: that type has no charset parameter. Any other type goes as `WebContentType::Raw(..)`. For the extensions `WebContentType::detect_by_extension` knows, see [Content-Type](#content-type).
@@ -644,6 +644,7 @@ Server settings, called before `start`:
 | Method | Default | What it does |
 |---|---|---|
 | `set_tcp_nodelay(bool)` | `true` | Sets `TCP_NODELAY` on every accepted TCP connection, as Go's `net/http` and nginx do. Without it, Nagle's algorithm together with the client's delayed ACK can hold back the end of a response by up to ~40 ms on Linux; HTTP/2 suffers most. `false` leaves Nagle's algorithm on. Unix sockets are not affected. |
+| `set_header_read_timeout(duration)` | 30 s | How long an HTTP/1 client has to send the head of a request (the request line and the headers); past it the connection is closed without a response, so a client sending its headers a byte at a time (slowloris) can not hold a connection forever. It is also how long an idle keep-alive connection waits for its next request. The body, the handler, a streamed response, an upgraded connection (websocket) and HTTP/2 are not covered by it. `None` switches it off. |
 | `set_body_read_timeout(duration)` | off | Idle timeout for reading a request body — see [`docs/http-actions/streamed-body.md`](docs/http-actions/streamed-body.md). |
 | `set_max_decompressed_body_size(bytes)` | 64 MiB | The largest size a compressed request body may decode to — see [Compressed Request Bodies](#compressed-request-bodies). |
 
@@ -1190,10 +1191,11 @@ dots inside a name (`/a..b.txt`) are a part of the name and are served.
 - `If-None-Match` is matched by `if_none_match_matches` from
   `my-http-server-core`: RFC 9110 §13.1.2 with the weak comparison — `*`,
   a list of tags, `W/` on either side, a header sent as several lines. A
-  tag without quotes is taken as the hash itself. That is how ETags looked
-  up to 0.9.0, and the hash did not change, so a client which cached a file
-  before the upgrade gets a `304`, not the whole file again. A malformed
-  field matches nothing, and the file is served.
+  tag without quotes is taken as the hash itself: that is how this library
+  wrote ETags earlier (the same base64 of a SHA-256, padding stripped, no
+  quotes), so a client which cached a file before the upgrade gets a `304`,
+  not the whole file again. A malformed field matches nothing, and the file
+  is served.
 - A `304 Not Modified` carries what the `200` to the same request carries,
   minus what describes a body: the `ETag` of the variant this request would
   get (strong or weak, by its `Accept-Encoding`), `Cache-Control: no-cache`,

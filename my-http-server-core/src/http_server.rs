@@ -3,7 +3,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::StatusCode;
 use std::panic::AssertUnwindSafe;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use hyper_util::server::conn::auto;
 #[cfg(feature = "with-telemetry")]
 use my_telemetry::TelemetryEventTagsBuilder;
@@ -23,9 +23,15 @@ use crate::{
 use crate::{HttpOkResult, SocketAddress};
 
 use crate::http_server_middleware::*;
+use crate::protocol_sniff_deadline::ProtocolSniffDeadline;
 use my_hyper_utils::*;
 
 pub const PANIC_HTTP_CODE: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
+
+/// How long an HTTP/1 client has to send the head of a request - see
+/// [`MyHttpServer::set_header_read_timeout`]. The same 30 s hyper itself defaults to once it has a
+/// timer.
+pub const DEFAULT_HEADER_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct HttpConnectionsCounter {
@@ -82,6 +88,7 @@ pub struct MyHttpServer {
     tech_middlewares: Option<Vec<Arc<dyn HttpServerTechMiddleware + Send + Sync + 'static>>>,
     connections: Arc<AtomicI64>,
     body_read_timeout: Option<std::time::Duration>,
+    header_read_timeout: Option<std::time::Duration>,
     max_decompressed_body_size: usize,
     tcp_nodelay: bool,
 }
@@ -94,6 +101,7 @@ impl MyHttpServer {
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
             body_read_timeout: None,
+            header_read_timeout: Some(DEFAULT_HEADER_READ_TIMEOUT),
             max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
             tcp_nodelay: true,
         }
@@ -107,6 +115,7 @@ impl MyHttpServer {
             tech_middlewares: Some(Vec::new()),
             connections: Arc::new(AtomicI64::new(0)),
             body_read_timeout: None,
+            header_read_timeout: Some(DEFAULT_HEADER_READ_TIMEOUT),
             max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
             tcp_nodelay: true,
         }
@@ -136,6 +145,28 @@ impl MyHttpServer {
     /// Off by default, to keep the behaviour this server has always had.
     pub fn set_body_read_timeout(&mut self, timeout: std::time::Duration) {
         self.body_read_timeout = Some(timeout);
+    }
+
+    /// How long an HTTP/1 client has to send the head of a request - the request line and the
+    /// headers, up to the empty line. A client that has not sent it all by then has its connection
+    /// closed, without a response. Without it, a client sending its headers a byte at a time
+    /// (slowloris) holds a connection, and its file descriptor, for as long as it likes.
+    ///
+    /// The clock starts once the connection is ready for a request: when it is accepted, and on a
+    /// keep-alive connection when the previous response has been sent. So it is also how long an
+    /// idle keep-alive connection is kept waiting for its next request. It stops at the end of the
+    /// head: the body, the time a handler takes, a streamed response and an upgraded connection
+    /// (websocket) are not covered by it. HTTP/2 is not covered by it either.
+    ///
+    /// `start` and `start_auto` first read a few bytes of a new connection to tell HTTP/2 from
+    /// HTTP/1, before the head is looked at; those bytes are held to the same timeout. A client
+    /// that drags out both can take up to twice the timeout over the first request of a
+    /// connection - never longer.
+    ///
+    /// [`DEFAULT_HEADER_READ_TIMEOUT`] (30 s) unless set. `None` switches it off:
+    /// `server.set_header_read_timeout(None)`.
+    pub fn set_header_read_timeout(&mut self, timeout: impl Into<Option<std::time::Duration>>) {
+        self.header_read_timeout = timeout.into();
     }
 
     /// How large a request body announced with a `Content-Encoding` may grow once decompressed.
@@ -198,6 +229,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: self.tech_middlewares.take().unwrap(),
             body_read_timeout: self.body_read_timeout,
+            header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
             tcp_nodelay: self.tcp_nodelay,
         };
@@ -249,6 +281,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: self.tech_middlewares.take().unwrap(),
             body_read_timeout: self.body_read_timeout,
+            header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
             tcp_nodelay: self.tcp_nodelay,
         };
@@ -300,6 +333,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: tech_middlewares.unwrap(),
             body_read_timeout: self.body_read_timeout,
+            header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
             tcp_nodelay: self.tcp_nodelay,
         };
@@ -345,6 +379,7 @@ impl MyHttpServer {
             middlewares: middlewares.unwrap(),
             tech_middlewares: tech_middlewares.unwrap(),
             body_read_timeout: self.body_read_timeout,
+            header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
             tcp_nodelay: self.tcp_nodelay,
         };
@@ -395,8 +430,7 @@ pub async fn start_http_1(
     let listen_addr = addr.to_string();
     let tcp_nodelay = http_server_middlewares.tcp_nodelay;
 
-    let mut http1 = http1::Builder::new();
-    http1.keep_alive(true);
+    let http1 = http1_builder(&http_server_middlewares);
     loop {
         if app_states.is_shutting_down() {
             break;
@@ -480,8 +514,7 @@ pub async fn start_http_1_unix_socket(
 
     let listener = listener.unwrap();
 
-    let mut http1 = http1::Builder::new();
-    http1.keep_alive(true);
+    let http1 = http1_builder(&http_server_middlewares);
     loop {
         if app_states.is_shutting_down() {
             break;
@@ -623,10 +656,7 @@ pub async fn start_http_auto(
     let listen_addr = addr.to_string();
     let tcp_nodelay = http_server_middlewares.tcp_nodelay;
 
-    let mut auto_builder = auto::Builder::new(TokioExecutor::new());
-    auto_builder.http1().keep_alive(true);
-    auto_builder.http2().enable_connect_protocol();
-    let auto_builder = Arc::new(auto_builder);
+    let auto_builder = Arc::new(auto_builder(&http_server_middlewares));
 
     loop {
         if app_states.is_shutting_down() {
@@ -641,7 +671,10 @@ pub async fn start_http_auto(
 
         let connection_guard = ConnectionCounterGuard::new(&connections);
 
-        let io = TokioIo::new(stream);
+        let io = TokioIo::new(ProtocolSniffDeadline::new(
+            stream,
+            http_server_middlewares.header_read_timeout,
+        ));
         let http_server_middlewares = http_server_middlewares.clone();
         let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
         let app_states = app_states.clone();
@@ -704,10 +737,7 @@ pub async fn start_http_auto_unix_socket(
 
     let listener = listener.unwrap();
 
-    let mut auto_builder = auto::Builder::new(TokioExecutor::new());
-    auto_builder.http1().keep_alive(true);
-    auto_builder.http2().enable_connect_protocol();
-    let auto_builder = Arc::new(auto_builder);
+    let auto_builder = Arc::new(auto_builder(&http_server_middlewares));
 
     loop {
         if app_states.is_shutting_down() {
@@ -724,7 +754,10 @@ pub async fn start_http_auto_unix_socket(
 
         let connection_guard = ConnectionCounterGuard::new(&connections);
 
-        let io = TokioIo::new(stream);
+        let io = TokioIo::new(ProtocolSniffDeadline::new(
+            stream,
+            http_server_middlewares.header_read_timeout,
+        ));
         let http_server_middlewares = http_server_middlewares.clone();
         let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
         let socket_addr = SocketAddress::Unix(Arc::new(format!("{:?}", socket_addr)));
@@ -753,6 +786,38 @@ pub async fn start_http_auto_unix_socket(
             }
         });
     }
+}
+
+/// The HTTP/1 builder of `start_h1`, for TCP and for a Unix socket alike.
+///
+/// hyper only applies `header_read_timeout` when the builder has a timer - without one there is
+/// no timeout at all, whatever is configured. And a timeout configured without a timer panics on
+/// the first connection, so the timer is set even when the timeout is switched off.
+fn http1_builder(http_server_middlewares: &HttpServerMiddlewares) -> http1::Builder {
+    let mut http1 = http1::Builder::new();
+    http1
+        .keep_alive(true)
+        .timer(TokioTimer::new())
+        .header_read_timeout(http_server_middlewares.header_read_timeout);
+    http1
+}
+
+/// The auto (h1/h2) builder of `start` and `start_auto`, for TCP and for a Unix socket alike. Its
+/// HTTP/1 side gets the timer and the header read timeout of [`http1_builder`]; hyper has no
+/// header read timeout for HTTP/2.
+///
+/// The first bytes of a connection, which the builder reads to tell HTTP/2 from HTTP/1, come
+/// before hyper's timeout starts: the accept loop wraps the stream in a [`ProtocolSniffDeadline`]
+/// to cover them.
+fn auto_builder(http_server_middlewares: &HttpServerMiddlewares) -> auto::Builder<TokioExecutor> {
+    let mut auto_builder = auto::Builder::new(TokioExecutor::new());
+    auto_builder
+        .http1()
+        .keep_alive(true)
+        .timer(TokioTimer::new())
+        .header_read_timeout(http_server_middlewares.header_read_timeout);
+    auto_builder.http2().enable_connect_protocol();
+    auto_builder
 }
 
 /// How long an accept loop rests after `accept()` failed for a reason other than the one
@@ -1181,6 +1246,24 @@ mod tests {
 
         server.set_tcp_nodelay(false);
         assert!(!server.tcp_nodelay);
+    }
+
+    #[test]
+    fn the_header_read_timeout_is_30_seconds_unless_set() {
+        let mut server = MyHttpServer::new(SocketAddr::from(([127, 0, 0, 1], 0)));
+        assert_eq!(
+            server.header_read_timeout,
+            Some(std::time::Duration::from_secs(30))
+        );
+
+        server.set_header_read_timeout(std::time::Duration::from_secs(5));
+        assert_eq!(
+            server.header_read_timeout,
+            Some(std::time::Duration::from_secs(5))
+        );
+
+        server.set_header_read_timeout(None);
+        assert_eq!(server.header_read_timeout, None);
     }
 
     #[tokio::test]
