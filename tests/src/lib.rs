@@ -27,3 +27,9 @@ pub mod test_stream_compression_e2e;
 
 #[cfg(test)]
 pub mod test_protobuf_body_e2e;
+
+#[cfg(test)]
+pub mod test_if_none_match_e2e;
+
+#[cfg(test)]
+pub mod test_malformed_request_e2e;

@@ -133,11 +133,16 @@ impl HttpOutput {
         }
     }
 
+    /// `304 Not Modified` - no body and no `Content-Type`.
+    ///
+    /// RFC 9110 §15.4.5 wants a `304` to carry the `ETag`, `Cache-Control`, `Expires`, `Vary` and
+    /// `Content-Location` the `200` to the same request would carry - add the ones the response
+    /// has with `add_header`.
     pub fn as_not_modified() -> HttpResultBuilder {
         HttpResultBuilder {
             output: HttpOutput::Content {
                 status_code: 304,
-                headers: HttpResponseHeaders::new(WebContentType::Text.into()),
+                headers: HttpResponseHeaders::new(None),
                 content: Default::default(),
             },
         }
@@ -427,5 +432,37 @@ impl HttpOutput {
 impl Into<my_hyper_utils::MyHttpResponse> for HttpOutput {
     fn into(self) -> MyHttpResponse {
         self.build_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn not_modified_has_no_content_type() {
+        let output = HttpOutput::as_not_modified().build();
+
+        assert_eq!(output.get_status_code(), 304);
+        assert_eq!(output.get_content_type_as_str(), None);
+        assert_eq!(output.get_content_size(), 0);
+
+        let response = output.build_response();
+        assert_eq!(response.status().as_u16(), 304);
+        assert!(response.headers().get(CONTENT_TYPE).is_none());
+    }
+
+    #[test]
+    fn not_modified_carries_the_headers_added_to_it() {
+        let response = HttpOutput::as_not_modified()
+            .add_header("ETag", "\"abc\"")
+            .add_header("Cache-Control", "no-cache")
+            .build()
+            .build_response();
+
+        assert_eq!(response.status().as_u16(), 304);
+        assert_eq!(response.headers().get("etag").unwrap(), "\"abc\"");
+        assert_eq!(response.headers().get("cache-control").unwrap(), "no-cache");
+        assert!(response.headers().get(CONTENT_TYPE).is_none());
     }
 }

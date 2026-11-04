@@ -51,6 +51,7 @@ pub struct MyHttpServer {
     connections: Arc<AtomicI64>,
     body_read_timeout: Option<std::time::Duration>,
     max_decompressed_body_size: usize,
+    tcp_nodelay: bool,
 }
 
 impl MyHttpServer {
@@ -62,6 +63,7 @@ impl MyHttpServer {
             connections: Arc::new(AtomicI64::new(0)),
             body_read_timeout: None,
             max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
+            tcp_nodelay: true,
         }
     }
 
@@ -74,7 +76,22 @@ impl MyHttpServer {
             connections: Arc::new(AtomicI64::new(0)),
             body_read_timeout: None,
             max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
+            tcp_nodelay: true,
         }
+    }
+
+    /// Whether `TCP_NODELAY` is set on every accepted TCP connection - `true` unless switched off,
+    /// as in Go's `net/http` and in nginx.
+    ///
+    /// Without it, Nagle's algorithm holds back the last small segment of a response until the
+    /// client acknowledges the previous one, and a client delaying its ACK (up to ~40 ms on Linux)
+    /// delays the end of the response just as long. HTTP/2, writing many small frames over one
+    /// connection, notices it most.
+    ///
+    /// `false` leaves accepted connections as the OS hands them out, with Nagle's algorithm on.
+    /// A Unix socket has no such option and is not affected either way.
+    pub fn set_tcp_nodelay(&mut self, value: bool) {
+        self.tcp_nodelay = value;
     }
 
     /// Stop waiting on a client that has gone quiet mid-body.
@@ -150,6 +167,7 @@ impl MyHttpServer {
             tech_middlewares: self.tech_middlewares.take().unwrap(),
             body_read_timeout: self.body_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            tcp_nodelay: self.tcp_nodelay,
         };
 
         let connections = self.connections.clone();
@@ -200,6 +218,7 @@ impl MyHttpServer {
             tech_middlewares: self.tech_middlewares.take().unwrap(),
             body_read_timeout: self.body_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            tcp_nodelay: self.tcp_nodelay,
         };
 
         let connections = self.connections.clone();
@@ -250,6 +269,7 @@ impl MyHttpServer {
             tech_middlewares: tech_middlewares.unwrap(),
             body_read_timeout: self.body_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            tcp_nodelay: self.tcp_nodelay,
         };
 
         let connections = self.connections.clone();
@@ -294,6 +314,7 @@ impl MyHttpServer {
             tech_middlewares: tech_middlewares.unwrap(),
             body_read_timeout: self.body_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            tcp_nodelay: self.tcp_nodelay,
         };
 
         let connections = self.connections.clone();
@@ -339,6 +360,8 @@ pub async fn start_http_1(
     }
 
     let listener = listener.unwrap();
+    let listen_addr = addr.to_string();
+    let tcp_nodelay = http_server_middlewares.tcp_nodelay;
 
     let mut http1 = http1::Builder::new();
     http1.keep_alive(true);
@@ -347,7 +370,11 @@ pub async fn start_http_1(
             break;
         }
 
-        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let Some((stream, socket_addr)) =
+            accept_tcp(&listener, &listen_addr, tcp_nodelay, &logger).await
+        else {
+            continue;
+        };
 
         connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
@@ -429,7 +456,13 @@ pub async fn start_http_1_unix_socket(
             break;
         }
 
-        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let (stream, socket_addr) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(err) => {
+                handle_accept_error(err, &unix_socket, &logger).await;
+                continue;
+            }
+        };
 
         connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
@@ -485,6 +518,8 @@ pub async fn start_http_2(
     }
 
     let listener = listener.unwrap();
+    let listen_addr = addr.to_string();
+    let tcp_nodelay = http_server_middlewares.tcp_nodelay;
 
     let mut http2_builder = hyper::server::conn::http2::Builder::new(TokioExecutor::new());
     http2_builder.enable_connect_protocol();
@@ -495,7 +530,11 @@ pub async fn start_http_2(
             break;
         }
 
-        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let Some((stream, socket_addr)) =
+            accept_tcp(&listener, &listen_addr, tcp_nodelay, &logger).await
+        else {
+            continue;
+        };
 
         connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
@@ -552,6 +591,8 @@ pub async fn start_http_auto(
     }
 
     let listener = listener.unwrap();
+    let listen_addr = addr.to_string();
+    let tcp_nodelay = http_server_middlewares.tcp_nodelay;
 
     let mut auto_builder = auto::Builder::new(TokioExecutor::new());
     auto_builder.http1().keep_alive(true);
@@ -563,7 +604,11 @@ pub async fn start_http_auto(
             break;
         }
 
-        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let Some((stream, socket_addr)) =
+            accept_tcp(&listener, &listen_addr, tcp_nodelay, &logger).await
+        else {
+            continue;
+        };
 
         connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
@@ -641,7 +686,13 @@ pub async fn start_http_auto_unix_socket(
             break;
         }
 
-        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let (stream, socket_addr) = match listener.accept().await {
+            Ok(accepted) => accepted,
+            Err(err) => {
+                handle_accept_error(err, &unix_socket, &logger).await;
+                continue;
+            }
+        };
 
         connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
@@ -677,6 +728,94 @@ pub async fn start_http_auto_unix_socket(
     }
 }
 
+/// How long an accept loop rests after `accept()` failed for a reason other than the one
+/// connection being lost - typically `EMFILE` / `ENFILE`, the process or the system out of file
+/// descriptors. Going round at once would only spin on the same error until some are freed.
+const ACCEPT_ERROR_PAUSE: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// Accepts the next connection of a TCP accept loop, and sets `TCP_NODELAY` on it if asked to.
+/// `None` when accepting failed: the error has been dealt with by [`handle_accept_error`], and the
+/// loop just goes round again.
+async fn accept_tcp(
+    listener: &tokio::net::TcpListener,
+    listen_addr: &str,
+    tcp_nodelay: bool,
+    logger: &Arc<dyn Logger + Send + Sync + 'static>,
+) -> Option<(tokio::net::TcpStream, SocketAddr)> {
+    let (stream, socket_addr) = match listener.accept().await {
+        Ok(accepted) => accepted,
+        Err(err) => {
+            handle_accept_error(err, listen_addr, logger).await;
+            return None;
+        }
+    };
+
+    if tcp_nodelay {
+        if let Err(err) = stream.set_nodelay(true) {
+            // Typically the peer is already gone. Not a reason to drop the connection: it is
+            // served either way, only without the option.
+            let mut ctx = HashMap::new();
+            ctx.insert("addr".to_string(), listen_addr.to_string());
+            ctx.insert("ip".to_string(), socket_addr.ip().to_string());
+
+            logger.write_debug_info(
+                "Http server accept".to_string(),
+                format!("Can not set TCP_NODELAY: {err}"),
+                Some(ctx),
+            );
+        }
+    }
+
+    Some((stream, socket_addr))
+}
+
+/// What an accept loop does with a failed `accept()`, before it goes round again. A failed
+/// `accept()` must not end the loop: the server would stop taking connections while the process
+/// went on living.
+///
+/// - The peer gave up on its connection before it was accepted - a normal event, which costs that
+///   one connection and nothing else: logged at debug level, and the next `accept()` follows at once.
+/// - Anything else - out of file descriptors, say - is an error, and is logged as one; the loop
+///   then rests [`ACCEPT_ERROR_PAUSE`] instead of spinning on it.
+async fn handle_accept_error(
+    err: std::io::Error,
+    listen_addr: &str,
+    logger: &Arc<dyn Logger + Send + Sync + 'static>,
+) {
+    let mut ctx = HashMap::new();
+    ctx.insert("addr".to_string(), listen_addr.to_string());
+
+    if is_connection_error(&err) {
+        logger.write_debug_info(
+            "Http server accept".to_string(),
+            format!("The connection was lost before it was accepted: {err}"),
+            Some(ctx),
+        );
+        return;
+    }
+
+    logger.write_error(
+        "Http server accept".to_string(),
+        format!(
+            "Can not accept a connection: {err}. Retrying in {} ms",
+            ACCEPT_ERROR_PAUSE.as_millis()
+        ),
+        Some(ctx),
+    );
+
+    tokio::time::sleep(ACCEPT_ERROR_PAUSE).await;
+}
+
+/// An `accept()` error which is about the one connection being accepted, not about the listener.
+fn is_connection_error(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        std::io::ErrorKind::ConnectionAborted
+            | std::io::ErrorKind::ConnectionReset
+            | std::io::ErrorKind::ConnectionRefused
+    )
+}
+
 pub async fn handle_requests(
     req: hyper::Request<hyper::body::Incoming>,
     http_server_middlewares: Arc<HttpServerMiddlewares>,
@@ -688,7 +827,13 @@ pub async fn handle_requests(
         return compile_app_is_shutting_down_http_response();
     }
 
-    let mut req = HttpRequest::new(req, addr).unwrap();
+    // A request which can not even be taken apart - a target which is not a path, a header which
+    // is not text - is the client's mistake: it is answered with the error it makes, before any
+    // middleware sees it. It must not take the connection down with it.
+    let mut req = match HttpRequest::new(req, addr) {
+        Ok(req) => req,
+        Err(err) => return Ok(err.into()),
+    };
     req.set_body_read_timeout(http_server_middlewares.body_read_timeout);
     req.set_max_decompressed_body_size(http_server_middlewares.max_decompressed_body_size);
 
@@ -936,4 +1081,113 @@ fn compile_app_is_shutting_down_http_response() -> hyper::Result<my_hyper_utils:
     let builder = hyper::Response::builder().status(502);
     let content = "Application is shutting down";
     hyper::Result::Ok((builder, content.as_bytes().to_vec()).to_my_http_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Default)]
+    struct RecordingLogger {
+        records: std::sync::Mutex<Vec<(&'static str, String)>>,
+    }
+
+    impl RecordingLogger {
+        fn record(&self, level: &'static str, message: String) {
+            self.records.lock().unwrap().push((level, message));
+        }
+
+        fn levels(&self) -> Vec<&'static str> {
+            self.records.lock().unwrap().iter().map(|r| r.0).collect()
+        }
+    }
+
+    impl Logger for RecordingLogger {
+        fn write_info(&self, _p: String, m: String, _c: Option<HashMap<String, String>>) {
+            self.record("info", m);
+        }
+        fn write_warning(&self, _p: String, m: String, _c: Option<HashMap<String, String>>) {
+            self.record("warning", m);
+        }
+        fn write_error(&self, _p: String, m: String, _c: Option<HashMap<String, String>>) {
+            self.record("error", m);
+        }
+        fn write_fatal_error(&self, _p: String, m: String, _c: Option<HashMap<String, String>>) {
+            self.record("fatal", m);
+        }
+        fn write_debug_info(&self, _p: String, m: String, _c: Option<HashMap<String, String>>) {
+            self.record("debug", m);
+        }
+    }
+
+    /// Accepts one connection through `accept_tcp`, with `tcp_nodelay` as given.
+    async fn accept_one(tcp_nodelay: bool) -> tokio::net::TcpStream {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let client = tokio::spawn(tokio::net::TcpStream::connect(addr));
+
+        let logger: Arc<dyn Logger + Send + Sync + 'static> = Arc::new(RecordingLogger::default());
+        let (stream, _) = accept_tcp(&listener, &addr.to_string(), tcp_nodelay, &logger)
+            .await
+            .expect("a connection is accepted");
+
+        let _client = client.await.unwrap().unwrap();
+
+        stream
+    }
+
+    #[tokio::test]
+    async fn an_accepted_tcp_connection_gets_tcp_nodelay() {
+        assert!(accept_one(true).await.nodelay().unwrap());
+    }
+
+    #[tokio::test]
+    async fn tcp_nodelay_switched_off_leaves_the_connection_as_it_was() {
+        assert!(!accept_one(false).await.nodelay().unwrap());
+    }
+
+    #[test]
+    fn tcp_nodelay_is_on_by_default() {
+        let mut server = MyHttpServer::new(SocketAddr::from(([127, 0, 0, 1], 0)));
+        assert!(server.tcp_nodelay);
+
+        server.set_tcp_nodelay(false);
+        assert!(!server.tcp_nodelay);
+    }
+
+    #[tokio::test]
+    async fn an_accept_error_is_logged_and_the_loop_rests() {
+        let recording = Arc::new(RecordingLogger::default());
+        let logger: Arc<dyn Logger + Send + Sync + 'static> = recording.clone();
+
+        let started = std::time::Instant::now();
+        handle_accept_error(
+            std::io::Error::other("Too many open files"),
+            "127.0.0.1:0",
+            &logger,
+        )
+        .await;
+
+        assert!(started.elapsed() >= ACCEPT_ERROR_PAUSE);
+        assert_eq!(recording.levels(), vec!["error"]);
+    }
+
+    #[tokio::test]
+    async fn a_connection_lost_before_accept_is_logged_at_debug_level_without_a_rest() {
+        let recording = Arc::new(RecordingLogger::default());
+        let logger: Arc<dyn Logger + Send + Sync + 'static> = recording.clone();
+
+        for kind in [
+            std::io::ErrorKind::ConnectionAborted,
+            std::io::ErrorKind::ConnectionReset,
+            std::io::ErrorKind::ConnectionRefused,
+        ] {
+            let started = std::time::Instant::now();
+            handle_accept_error(std::io::Error::from(kind), "127.0.0.1:0", &logger).await;
+            assert!(started.elapsed() < ACCEPT_ERROR_PAUSE, "{kind:?}");
+        }
+
+        assert_eq!(recording.levels(), vec!["debug", "debug", "debug"]);
+    }
 }

@@ -1,10 +1,11 @@
+use my_http_server_core::hyper::{header::IF_NONE_MATCH, HeaderMap};
 use my_http_server_core::*;
 use rust_extensions::StrOrString;
 
 use crate::{
     calc_etag, deflate_compress, gzip_decompress, has_parent_segment, CachedContent, EtagCaches,
-    FilesAccess, FilesMapping, NoCache, RootPaths, NO_CACHE_CACHE_CONTROL, NO_CACHE_EXPIRES,
-    NO_CACHE_PRAGMA,
+    FilesAccess, FilesMapping, KnownEtag, NoCache, RootPaths, NO_CACHE_CACHE_CONTROL,
+    NO_CACHE_EXPIRES, NO_CACHE_PRAGMA,
 };
 
 pub struct StaticFilesMiddleware {
@@ -32,17 +33,28 @@ enum CachePolicy<'s> {
     /// Path is registered with `add_no_cache_headers_to_response_by_path`
     NoCache,
     /// Regular path. Client sent us `If-None-Match`
-    IfNoneMatch(&'s str),
+    IfNoneMatch(IfNoneMatch<'s>),
     /// Regular path. Client did not send us `If-None-Match`
     Regular,
 }
 
 impl<'s> CachePolicy<'s> {
-    pub fn get_if_none_match(&self) -> Option<&'s str> {
+    /// Whether the client sent an `If-None-Match` which matches `etag`. Never for a no-cache path.
+    pub fn if_none_match_matches(&self, etag: &str) -> bool {
         match self {
-            CachePolicy::IfNoneMatch(etag) => Some(etag),
-            _ => None,
+            CachePolicy::IfNoneMatch(if_none_match) => if_none_match.matches(etag),
+            _ => false,
         }
+    }
+}
+
+/// The `If-None-Match` of the request - all of its lines, matched as one list.
+#[derive(Clone, Copy)]
+struct IfNoneMatch<'s>(&'s HeaderMap);
+
+impl IfNoneMatch<'_> {
+    fn matches(&self, etag: &str) -> bool {
+        if_none_match_matches(self.0.get_all(IF_NONE_MATCH), etag)
     }
 }
 
@@ -93,11 +105,39 @@ enum ResponseEncoding {
 }
 
 impl ResponseEncoding {
+    /// The variant a client gets: the stored gzip as it is if the client takes gzip, re-encoded
+    /// as deflate if it takes only that, the raw bytes otherwise. A file which is not stored
+    /// gzipped always goes as it is.
+    fn select(is_gzip: bool, accepted: AcceptedEncodings) -> Self {
+        if !is_gzip {
+            return ResponseEncoding::Identity;
+        }
+
+        if accepted.gzip {
+            ResponseEncoding::Gzip
+        } else if accepted.deflate {
+            ResponseEncoding::Deflate
+        } else {
+            ResponseEncoding::Identity
+        }
+    }
+
     fn header_value(self) -> Option<&'static str> {
         match self {
             ResponseEncoding::Identity => None,
             ResponseEncoding::Gzip => Some("gzip"),
             ResponseEncoding::Deflate => Some("deflate"),
+        }
+    }
+
+    /// The `ETag` of this variant of a content. The raw bytes are exactly what the hash was
+    /// computed over - a strong `"…"`. A compressed variant is other bytes of the same content:
+    /// a strong ETag shared with the raw bytes would claim they are the same bytes, so it goes
+    /// weak - `W/"…"`, which is what nginx does to an ETag when it compresses on the fly.
+    fn etag(self, opaque_tag: &str) -> String {
+        match self {
+            ResponseEncoding::Identity => strong_etag(opaque_tag),
+            ResponseEncoding::Gzip | ResponseEncoding::Deflate => weak_etag(opaque_tag),
         }
     }
 }
@@ -234,10 +274,14 @@ impl StaticFilesMiddleware {
         let not_found_file = self.not_found_file.as_ref()?;
         let file = get_file_name(file_folder, not_found_file);
 
-        if let Some(etag_header) = cache_policy.get_if_none_match() {
-            if let Some(etag_caches) = self.etag_caches.as_ref() {
-                if etag_caches.is_not_found(etag_header).await {
-                    return Some(HttpOutput::as_not_modified().into_ok_result(false));
+        if let (CachePolicy::IfNoneMatch(_), Some(etag_caches)) =
+            (cache_policy, self.etag_caches.as_ref())
+        {
+            if let Some(known) = etag_caches.get_not_found().await {
+                let etag =
+                    ResponseEncoding::select(known.is_gzip, accepted).etag(&known.opaque_tag);
+                if cache_policy.if_none_match_matches(&etag) {
+                    return Some(self.not_modified(etag));
                 }
             }
         }
@@ -254,13 +298,26 @@ impl StaticFilesMiddleware {
                 (body, encoding, CacheHeaders::no_cache())
             }
             CachePolicy::IfNoneMatch(_) | CachePolicy::Regular => {
-                let (body, encoding, etag) = match build_response_body(&file_content, accepted) {
-                    Ok(result) => result,
-                    Err(err) => return Some(Err(content_preparation_error(err))),
-                };
+                let (body, encoding, opaque_tag) =
+                    match build_response_body(&file_content, accepted) {
+                        Ok(result) => result,
+                        Err(err) => return Some(Err(content_preparation_error(err))),
+                    };
+
+                let etag = encoding.etag(&opaque_tag);
 
                 if let Some(etag_caches) = self.etag_caches.as_ref() {
-                    etag_caches.set_not_found(etag.clone()).await;
+                    etag_caches
+                        .set_not_found(KnownEtag {
+                            opaque_tag,
+                            is_gzip: file_content.is_gzip,
+                        })
+                        .await;
+
+                    // Nothing was known about the file yet - the first request after a start.
+                    if cache_policy.if_none_match_matches(&etag) {
+                        return Some(self.not_modified(etag));
+                    }
                 }
 
                 (body, encoding, CacheHeaders::with_etag(etag))
@@ -296,10 +353,25 @@ impl StaticFilesMiddleware {
             }
             CachePolicy::IfNoneMatch(_) | CachePolicy::Regular => match self.etag_caches.as_ref() {
                 Some(etag_cache) => {
-                    let (body, encoding, etag) = build_response_body(&file_content, accepted)
+                    let (body, encoding, opaque_tag) = build_response_body(&file_content, accepted)
                         .map_err(content_preparation_error)?;
 
-                    etag_cache.set(http_path, etag.clone()).await;
+                    let etag = encoding.etag(&opaque_tag);
+
+                    etag_cache
+                        .set(
+                            http_path,
+                            KnownEtag {
+                                opaque_tag,
+                                is_gzip: file_content.is_gzip,
+                            },
+                        )
+                        .await;
+
+                    // Nothing was known about the path yet - the first request after a start.
+                    if cache_policy.if_none_match_matches(&etag) {
+                        return self.not_modified(etag);
+                    }
 
                     (body, encoding, CacheHeaders::with_etag(etag))
                 }
@@ -323,6 +395,18 @@ impl StaticFilesMiddleware {
 
         builder.set_content(body).into_ok_result(false)
     }
+
+    /// `304 Not Modified` with the headers the `200` to the same request carries - the ones of
+    /// `add_header`, `ETag`, `Cache-Control` and `Vary` (RFC 9110 §15.4.5). Not the ones which
+    /// describe a body: no `Content-Type`, no `Content-Encoding`.
+    ///
+    /// `etag` is the one of the variant this request gets - see [`ResponseEncoding::etag`].
+    fn not_modified(&self, etag: String) -> Result<HttpOkResult, HttpFailResult> {
+        CacheHeaders::with_etag(etag)
+            .apply(HttpOutput::as_not_modified().add_headers_opt(self.get_headers()))
+            .add_header("Vary", "Accept-Encoding")
+            .into_ok_result(false)
+    }
 }
 
 #[async_trait::async_trait]
@@ -339,30 +423,15 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
             return Some(Err(HttpFailResult::as_forbidden(Some("Forbidden"))));
         }
 
-        let mut cache_policy = if self.no_cache.marked_as_no_cache(path) {
+        let headers = ctx.request.data.headers();
+
+        let cache_policy = if self.no_cache.marked_as_no_cache(path) {
             CachePolicy::NoCache
+        } else if headers.contains_key(IF_NONE_MATCH) {
+            CachePolicy::IfNoneMatch(IfNoneMatch(headers))
         } else {
             CachePolicy::Regular
         };
-
-        if let CachePolicy::Regular = cache_policy {
-            if let Some(etag) = ctx
-                .request
-                .get_headers()
-                .try_get_case_insensitive("if-none-match")
-            {
-                if let Ok(etag) = etag.as_str() {
-                    cache_policy = CachePolicy::IfNoneMatch(etag);
-                    if let Some(etag_cache) = self.etag_caches.as_ref() {
-                        if etag_cache.check_etag(path, etag).await {
-                            return Some(
-                                HttpOutput::as_not_modified().build().into_ok_result(false),
-                            );
-                        }
-                    }
-                }
-            }
-        }
 
         let accepted = ctx
             .request
@@ -371,6 +440,20 @@ impl HttpServerMiddleware for StaticFilesMiddleware {
             .and_then(|h| h.as_str().ok())
             .map(parse_accept_encoding)
             .unwrap_or_default();
+
+        // A path served before: the 304 is answered from what is known about it, without
+        // touching the file.
+        if let (CachePolicy::IfNoneMatch(_), Some(etag_caches)) =
+            (cache_policy, self.etag_caches.as_ref())
+        {
+            if let Some(known) = etag_caches.get(path).await {
+                let etag =
+                    ResponseEncoding::select(known.is_gzip, accepted).etag(&known.opaque_tag);
+                if cache_policy.if_none_match_matches(&etag) {
+                    return Some(self.not_modified(etag));
+                }
+            }
+        }
 
         for mapping in self.file_folders.iter() {
             if ctx.request.http_path.is_starting_with(&mapping.uri_prefix) {
@@ -445,40 +528,41 @@ fn parse_accept_encoding(header_value: &str) -> AcceptedEncodings {
     out
 }
 
-/// Returns (body, encoding, etag). Used when ETag is required — always
-/// materialises raw bytes if needed to compute the checksum.
+/// Returns (body, encoding, opaque tag). Used when ETag is required — always
+/// materialises raw bytes if needed to compute the checksum. The tag is the hash
+/// of the raw content whatever the encoding; [`ResponseEncoding::etag`] turns it
+/// into the `ETag` of the variant.
 fn build_response_body(
     cached: &CachedContent,
     accepted: AcceptedEncodings,
 ) -> std::io::Result<(Vec<u8>, ResponseEncoding, String)> {
-    if cached.is_gzip {
-        if accepted.gzip {
-            let etag = match &cached.etag {
-                Some(e) => e.clone(),
-                None => calc_etag(&gzip_decompress(&cached.data)?),
-            };
-            return Ok((cached.data.clone(), ResponseEncoding::Gzip, etag));
-        }
+    let encoding = ResponseEncoding::select(cached.is_gzip, accepted);
 
-        let raw = gzip_decompress(&cached.data)?;
-        let etag = match &cached.etag {
+    if encoding == ResponseEncoding::Gzip {
+        let opaque_tag = match &cached.etag {
             Some(e) => e.clone(),
-            None => calc_etag(&raw),
+            None => calc_etag(&gzip_decompress(&cached.data)?),
         };
-
-        if accepted.deflate {
-            let deflated = deflate_compress(&raw)?;
-            return Ok((deflated, ResponseEncoding::Deflate, etag));
-        }
-
-        return Ok((raw, ResponseEncoding::Identity, etag));
+        return Ok((cached.data.clone(), encoding, opaque_tag));
     }
 
-    let etag = match &cached.etag {
-        Some(e) => e.clone(),
-        None => calc_etag(&cached.data),
+    let raw = if cached.is_gzip {
+        gzip_decompress(&cached.data)?
+    } else {
+        cached.data.clone()
     };
-    Ok((cached.data.clone(), ResponseEncoding::Identity, etag))
+
+    let opaque_tag = match &cached.etag {
+        Some(e) => e.clone(),
+        None => calc_etag(&raw),
+    };
+
+    if encoding == ResponseEncoding::Deflate {
+        let deflated = deflate_compress(&raw)?;
+        return Ok((deflated, encoding, opaque_tag));
+    }
+
+    Ok((raw, encoding, opaque_tag))
 }
 
 /// Returns (body, encoding). Used when ETag is NOT required — avoids the
@@ -487,26 +571,50 @@ fn body_without_etag(
     cached: &CachedContent,
     accepted: AcceptedEncodings,
 ) -> std::io::Result<(Vec<u8>, ResponseEncoding)> {
-    if !cached.is_gzip {
-        return Ok((cached.data.clone(), ResponseEncoding::Identity));
+    match ResponseEncoding::select(cached.is_gzip, accepted) {
+        ResponseEncoding::Identity if !cached.is_gzip => {
+            Ok((cached.data.clone(), ResponseEncoding::Identity))
+        }
+        ResponseEncoding::Identity => {
+            Ok((gzip_decompress(&cached.data)?, ResponseEncoding::Identity))
+        }
+        ResponseEncoding::Gzip => Ok((cached.data.clone(), ResponseEncoding::Gzip)),
+        ResponseEncoding::Deflate => {
+            let raw = gzip_decompress(&cached.data)?;
+            Ok((deflate_compress(&raw)?, ResponseEncoding::Deflate))
+        }
     }
-
-    if accepted.gzip {
-        return Ok((cached.data.clone(), ResponseEncoding::Gzip));
-    }
-
-    let raw = gzip_decompress(&cached.data)?;
-    if accepted.deflate {
-        let deflated = deflate_compress(&raw)?;
-        return Ok((deflated, ResponseEncoding::Deflate));
-    }
-
-    Ok((raw, ResponseEncoding::Identity))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_accept_encoding;
+    use super::{parse_accept_encoding, AcceptedEncodings, ResponseEncoding};
+
+    #[test]
+    fn a_file_stored_raw_always_goes_raw() {
+        for (gzip, deflate) in [(false, false), (true, false), (false, true), (true, true)] {
+            let accepted = AcceptedEncodings { gzip, deflate };
+            assert!(ResponseEncoding::select(false, accepted) == ResponseEncoding::Identity);
+        }
+    }
+
+    #[test]
+    fn a_gzipped_file_goes_as_the_client_takes_it() {
+        let select =
+            |gzip, deflate| ResponseEncoding::select(true, AcceptedEncodings { gzip, deflate });
+
+        assert!(select(true, false) == ResponseEncoding::Gzip);
+        assert!(select(true, true) == ResponseEncoding::Gzip);
+        assert!(select(false, true) == ResponseEncoding::Deflate);
+        assert!(select(false, false) == ResponseEncoding::Identity);
+    }
+
+    #[test]
+    fn only_the_raw_variant_gets_a_strong_etag() {
+        assert_eq!(ResponseEncoding::Identity.etag("abc"), "\"abc\"");
+        assert_eq!(ResponseEncoding::Gzip.etag("abc"), "W/\"abc\"");
+        assert_eq!(ResponseEncoding::Deflate.etag("abc"), "W/\"abc\"");
+    }
 
     #[test]
     fn parses_gzip() {

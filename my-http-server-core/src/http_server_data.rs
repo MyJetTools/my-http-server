@@ -15,4 +15,8 @@ pub struct HttpServerMiddlewares {
     /// Set through
     /// [`MyHttpServer::set_max_decompressed_body_size`](crate::MyHttpServer::set_max_decompressed_body_size).
     pub max_decompressed_body_size: usize,
+    /// Whether `TCP_NODELAY` is set on every accepted TCP connection. Set through
+    /// [`MyHttpServer::set_tcp_nodelay`](crate::MyHttpServer::set_tcp_nodelay); `true` unless
+    /// switched off. A Unix socket has no such option and ignores it.
+    pub tcp_nodelay: bool,
 }

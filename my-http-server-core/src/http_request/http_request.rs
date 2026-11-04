@@ -48,7 +48,17 @@ impl HttpRequest {
     ) -> Result<Self, HttpFailResult> {
         let method = req.method().clone();
 
-        let http_path = HttpPath::from_str(req.uri().path());
+        // A target which is not a path - `OPTIONS *` (asterisk-form) or `CONNECT host:port`
+        // (authority-form) - has nothing an `HttpPath` could hold, so it is refused before one is
+        // made. An absolute-form target (`GET http://host/path`) carries a path of its own.
+        let path = req.uri().path();
+        if !path.starts_with('/') {
+            return Err(HttpFailResult::as_validation_error(
+                "The request target must be a path starting with '/'",
+            ));
+        }
+
+        let http_path = HttpPath::from_str(path);
 
         let result = Self {
             data: RequestData::new(req)?,
@@ -176,6 +186,18 @@ impl HttpRequest {
 
     pub fn get_headers(&self) -> &impl HttpRequestHeaders {
         self.data.headers()
+    }
+
+    /// Whether the `If-None-Match` of this request matches `etag` - the `ETag` the response
+    /// carries (`"x"`, `W/"x"` or just `x`). Every `If-None-Match` line of the request counts;
+    /// a request without one matches nothing.
+    ///
+    /// See [`if_none_match_matches`](crate::if_none_match_matches) for how the field is read.
+    pub fn if_none_match_matches(&self, etag: &str) -> bool {
+        crate::if_none_match_matches(
+            self.data.headers().get_all(hyper::header::IF_NONE_MATCH),
+            etag,
+        )
     }
 
     pub fn get_uri(&self) -> &Uri {

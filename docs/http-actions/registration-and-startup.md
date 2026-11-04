@@ -105,3 +105,5 @@ pub fn start(app: &Arc<AppContext>) {
 
 - Middlewares answer in the order they are added: swagger first, then the controllers.
 - `start` spawns the server and returns; calling it a second time panics.
+- Settings go before `start`: `set_tcp_nodelay(bool)` (`true` by default — `TCP_NODELAY` on every accepted TCP connection, so Nagle's algorithm and the client's delayed ACK do not hold back the end of a response; `false` leaves Nagle on; Unix sockets are not affected), `set_body_read_timeout(duration)` (off by default), `set_max_decompressed_body_size(bytes)` (64 MiB by default).
+- A failed `accept()` does not stop the server: an error such as `EMFILE` (out of file descriptors) is logged with `write_error` and accepting is tried again 100 ms later; a connection the peer dropped before it was accepted is logged at debug level.

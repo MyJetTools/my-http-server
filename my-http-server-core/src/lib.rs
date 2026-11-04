@@ -18,6 +18,9 @@ mod web_content_type;
 
 mod compression_level;
 
+mod etag;
+pub use etag::*;
+
 // ── The value / reader / conversion / field-type layer is owned by my-http-utils (the same lib
 // fl-url and other clients use), so a `#[derive(MyHttpInput)]` model compiles on both sides.
 // Core re-exports it under the historical paths; server-only glue (hyper body, headers, path,

@@ -46,6 +46,32 @@ HttpOutput::as_redirect("https://example.com/temp-url".to_string(), false)
     .into_ok_result(true).into()
 ```
 
+**Not Modified (304) with an ETag:**
+```rust
+// The exact bytes get a strong ETag; a compressed variant of the same content, weak_etag(&hash)
+let etag = strong_etag(&hash);
+
+if ctx.request.if_none_match_matches(&etag) {
+    return HttpOutput::as_not_modified()
+        .add_header("ETag", etag)
+        .add_header("Cache-Control", "no-cache")
+        .into_ok_result(false);
+}
+
+HttpOutput::from_builder()
+    .add_header("ETag", etag)
+    .add_header("Cache-Control", "no-cache")
+    .set_content_type(WebContentType::Html)
+    .set_content(content)
+    .into_ok_result(false)
+```
+
+- `strong_etag(hash)` → `"hash"`, `weak_etag(hash)` → `W/"hash"`. A strong ETag promises the same bytes: every content-coding of a file (gzip, br, …) needs one of its own, or they all share a weak one.
+- `ctx.request.if_none_match_matches(&etag)` evaluates `If-None-Match` per RFC 9110 §13.1.2 with the weak comparison: `*` matches anything; otherwise the field is a list of tags (a comma inside quotes is part of the tag); `W/` is ignored on both sides; a header sent as several lines counts as one list. A tag without quotes (how this library wrote ETags before 0.9.1) is taken as the opaque tag. A malformed field matches nothing. `if_none_match_matches(values, &etag)` does the same for header values from anywhere else.
+- `as_not_modified()` has no body and no `Content-Type`. Add what the `200` would carry from `ETag`, `Cache-Control`, `Expires`, `Vary`, `Content-Location` (RFC 9110 §15.4.5) with `add_header`.
+
+**Content types:** `WebContentType::Html`, `Css`, `JavaScript` and `Text` go with `; charset=utf-8`; `Json` is plain `application/json` (that type has no charset parameter). Any other type: `WebContentType::Raw(..)`. `WebContentType::detect_by_extension(path)` picks the type by the file extension (any letter case; `.mjs` is JavaScript, fonts, images, audio and video included) and returns `None` for an unknown one.
+
 **Custom Status Code and Headers:**
 ```rust
 HttpOutput::from_builder()

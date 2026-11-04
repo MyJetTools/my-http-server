@@ -159,9 +159,9 @@ This pattern requires:
 | [`streamed-body`](streamed-body.md) | `#[http_body_as_stream]`: reading an upload in chunks — memory, truncated uploads, `read_to_end`, the body read timeout, taking the body once |
 | [`output-models`](output-models.md) | Response models: when `MyHttpObjectStructure` is required (`model:` in `result:`), the compile error without it |
 | [`shared-models`](shared-models.md) | Models of an API a UI consumes live in a wasm-clean `rest-api-shared` crate with a `server` feature |
-| [`responses`](responses.md) | `HttpOutput`: JSON, text, HTML, YAML, empty, file, redirect, custom status and headers, streaming, gzip compression |
+| [`responses`](responses.md) | `HttpOutput`: JSON, text, HTML, YAML, empty, file, redirect, `304` with an ETag (`if_none_match_matches`), content types, custom status and headers, streaming, gzip compression |
 | [`errors`](errors.md) | `HttpFailResult` helpers and their log / telemetry flags, custom statuses; centralized domain → HTTP error conversions in `errors.rs` |
-| [`registration-and-startup`](registration-and-startup.md) | `build_controllers` on a `ControllersMiddleware`, authorization levels, deprecated routes, module exports, starting `MyHttpServer` with Swagger |
+| [`registration-and-startup`](registration-and-startup.md) | `build_controllers` on a `ControllersMiddleware`, authorization levels, deprecated routes, module exports, starting `MyHttpServer` with Swagger, server settings (`set_tcp_nodelay`, body limits) |
 | [`example`](example.md) | Two complete action files: a GET with a query and a JSON response, a POST with a JSON body and an empty response |
 | [`troubleshooting`](troubleshooting.md) | Common compilation errors of `http_route` and response models |
 | [`routes`](routes.md) | Path parameters in routes, model routes, the OPTIONS method |

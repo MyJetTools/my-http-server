@@ -422,6 +422,32 @@ HttpOutput::as_redirect("https://example.com/temp-url".to_string(), false)
     .into_ok_result(true).into()
 ```
 
+**Not Modified (304) with an ETag:**
+```rust
+// The exact bytes get a strong ETag; a compressed variant of the same content, weak_etag(&hash)
+let etag = strong_etag(&hash);
+
+if ctx.request.if_none_match_matches(&etag) {
+    return HttpOutput::as_not_modified()
+        .add_header("ETag", etag)
+        .add_header("Cache-Control", "no-cache")
+        .into_ok_result(false);
+}
+
+HttpOutput::from_builder()
+    .add_header("ETag", etag)
+    .add_header("Cache-Control", "no-cache")
+    .set_content_type(WebContentType::Html)
+    .set_content(content)
+    .into_ok_result(false)
+```
+
+- `strong_etag(hash)` gives `"hash"`, `weak_etag(hash)` gives `W/"hash"`. A strong ETag promises the same bytes, so every content-coding of a file (gzip, br, …) needs one of its own, or they all share a weak one.
+- `ctx.request.if_none_match_matches(&etag)` evaluates `If-None-Match` the way RFC 9110 §13.1.2 says, with the weak comparison: `*` matches anything; otherwise the field is a list of tags (a comma inside quotes is part of the tag); `W/` is ignored on both sides; a header sent as several lines counts as one list. A tag without quotes — the way this library wrote ETags before 0.9.1 — is taken as the opaque tag, so clients holding one still get their `304`. A malformed field matches nothing. `if_none_match_matches(values, &etag)` does the same for header values from anywhere else (`&str`, `&[u8]` or `&HeaderValue`).
+- `as_not_modified()` has no body and no `Content-Type`. RFC 9110 §15.4.5 wants a `304` to carry the `ETag`, `Cache-Control`, `Expires`, `Vary` and `Content-Location` the `200` would carry: add them with `add_header`.
+
+**Content types:** `WebContentType::Html`, `Css`, `JavaScript` and `Text` are sent with `; charset=utf-8` (`text/html; charset=utf-8` and so on). `Json` is plain `application/json`: that type has no charset parameter. Any other type goes as `WebContentType::Raw(..)`. For the extensions `WebContentType::detect_by_extension` knows, see [Content-Type](#content-type).
+
 **Custom Status Code and Headers:**
 ```rust
 HttpOutput::from_builder()
@@ -612,6 +638,16 @@ pub fn start(app: &Arc<AppContext>) {
     http_server.start(app.app_states.clone(), my_logger::LOGGER.clone());
 }
 ```
+
+Server settings, called before `start`:
+
+| Method | Default | What it does |
+|---|---|---|
+| `set_tcp_nodelay(bool)` | `true` | Sets `TCP_NODELAY` on every accepted TCP connection, as Go's `net/http` and nginx do. Without it, Nagle's algorithm together with the client's delayed ACK can hold back the end of a response by up to ~40 ms on Linux; HTTP/2 suffers most. `false` leaves Nagle's algorithm on. Unix sockets are not affected. |
+| `set_body_read_timeout(duration)` | off | Idle timeout for reading a request body — see [`docs/http-actions/streamed-body.md`](docs/http-actions/streamed-body.md). |
+| `set_max_decompressed_body_size(bytes)` | 64 MiB | The largest size a compressed request body may decode to — see [Compressed Request Bodies](#compressed-request-bodies). |
+
+A failed `accept()` does not stop the server. An error such as `EMFILE` / `ENFILE` (out of file descriptors) is logged with `write_error`, and the accept loop tries again 100 ms later. A connection the peer dropped before it was accepted is logged at debug level, and the loop goes on at once.
 
 ## Design Principles
 
@@ -1049,12 +1085,12 @@ http_server.add_middleware(Arc::new(middleware));
 - Index files (`index.html`, etc.) for root-like paths.
 - SPA fallback: serve a fixed file on any miss.
 - Automatic `Content-Type` detection by extension
-  (`WebContentType::detect_by_extension`).
+  (`WebContentType::detect_by_extension`, see [Content-Type](#content-type)).
 - ETag + `304 Not Modified` (optional).
 - Optional in-memory file cache.
-- **Zstd compression of cached files** with transparent `deflate` fallback
-  for legacy clients (`Accept-Encoding` / `Content-Encoding` / `Vary`
-  handled correctly).
+- **Gzip compression of cached files** with a `deflate` fallback for
+  clients which do not take gzip (`Accept-Encoding` / `Content-Encoding` /
+  `Vary` handled correctly).
 - Arbitrary response headers attached to every file.
 - Per-path hard `no-cache` (full header set against any proxy/CDN).
 
@@ -1088,8 +1124,8 @@ Every method consumes `self` and returns `Self`, so calls chain naturally.
 | `add_index_path(path)` | Path on which index files apply. Defaults to `/`. |
 | `add_file_mapping(name)` | Adds a URI-prefix mapping (via `FilesMapping { uri_prefix, folder_path }`). |
 | `set_not_found_file(name)` | File for SPA-style fallback. A leading slash is added automatically. |
-| `with_etag()` | Enables ETag (SHA-256 + base64) and `If-None-Match` → `304`. Also flips ETag computation on in `FilesAccess` so SHA-256 isn't recomputed per request. |
-| `enable_files_caching()` | Caches file contents in memory (`HashMap<String, CachedContent>`). Turns on the zstd compression branch. |
+| `with_etag()` | Enables ETag (SHA-256 + base64, in quotes; weak `W/"…"` for a compressed variant) and `If-None-Match` → `304` — see [ETag](#etag). Also flips ETag computation on in `FilesAccess` so SHA-256 isn't recomputed per request. |
+| `enable_files_caching()` | Caches file contents in memory (`HashMap<String, CachedContent>`). Turns on gzip compression of the cached files. |
 | `add_no_cache_headers_to_response_by_path(path)` | Path which must never be cached by the client. Matched segment by segment (case-insensitive, trailing slash and query string are ignored). For such a path ETag is not used at all — no `If-None-Match` check, no `304`, no `ETag` header — the content is always served with the full no-cache header set. Works with or without `with_etag()`. |
 | `add_header(name, value)` | Arbitrary response header attached to every file. Implements `AddHttpHeaders`. |
 
@@ -1107,9 +1143,9 @@ dots inside a name (`/a..b.txt`) are a part of the name and are served.
 
 1. If the path is registered via
    `add_no_cache_headers_to_response_by_path(...)` — the whole ETag step is
-   skipped. Otherwise: if `If-None-Match` is set and the ETag cache already
-   knows this ETag for the requested path — return `304 Not Modified`
-   immediately, no I/O.
+   skipped. Otherwise: if `If-None-Match` is set and matches the ETag
+   already known for the requested path — return `304 Not Modified`
+   immediately, no I/O (see [ETag](#etag)).
 2. For each `FilesMapping`, check whether the URL starts with its
    `uri_prefix`. If so, attempt to serve from the mapped directory,
    offsetting by the number of path segments the prefix consumed.
@@ -1142,15 +1178,75 @@ dots inside a name (`/a..b.txt`) are a part of the name and are served.
 
 ## ETag
 
-- Algorithm: `SHA-256(raw_bytes)`, `base64(STANDARD)` with trailing `=`
-  padding stripped.
-- ETag is always computed from the **raw** (uncompressed) content —
-  invariant of how the file is stored in the cache.
-- With cache + `with_etag()` the ETag is computed once and stored in
+- The hash: `SHA-256(raw_bytes)`, `base64(STANDARD)` with trailing `=`
+  padding stripped. It is always computed from the **raw** (uncompressed)
+  content, however the file is stored in the cache.
+- The `ETag` header carries it in quotes, as RFC 9110 wants:
+  - `ETag: "<hash>"` — strong — for the raw bytes;
+  - `ETag: W/"<hash>"` — weak — for the `gzip` and `deflate` variants. A
+    strong ETag promises the same bytes, and a compressed variant is other
+    bytes of the same content. The hash is the same. nginx does the same
+    to an ETag when it compresses on the fly.
+- `If-None-Match` is matched by `if_none_match_matches` from
+  `my-http-server-core`: RFC 9110 §13.1.2 with the weak comparison — `*`,
+  a list of tags, `W/` on either side, a header sent as several lines. A
+  tag without quotes is taken as the hash itself. That is how ETags looked
+  up to 0.9.0, and the hash did not change, so a client which cached a file
+  before the upgrade gets a `304`, not the whole file again. A malformed
+  field matches nothing, and the file is served.
+- A `304 Not Modified` carries what the `200` to the same request carries,
+  minus what describes a body: the `ETag` of the variant this request would
+  get (strong or weak, by its `Accept-Encoding`), `Cache-Control: no-cache`,
+  `Vary: Accept-Encoding` and the headers of `add_header`. No
+  `Content-Type`, no `Content-Encoding`, no body.
+- With cache + `with_etag()` the hash is computed once and stored in
   `CachedContent.etag`.
-- `EtagCaches` separately holds a path → ETag map plus a dedicated ETag
-  for the `not_found` file. `If-None-Match` hits that cache first, before
-  any I/O.
+- `EtagCaches` holds, for every path served, the hash and whether the file
+  is stored gzipped (which decides the variant), plus the same for the
+  `not_found` file. `If-None-Match` is matched against it first, before any
+  I/O. A path it does not know yet — the first request for it after a
+  start — is matched once the file has been read, so that request gets its
+  `304` too.
+
+## Content-Type
+
+Detected from the extension of the file name, in any letter case, by
+`WebContentType::detect_by_extension` (`my-http-server-core`). A file whose
+extension is not in the table goes without a `Content-Type`.
+
+| Extension | `Content-Type` |
+|---|---|
+| `html`, `htm` | `text/html; charset=utf-8` |
+| `css` | `text/css; charset=utf-8` |
+| `js`, `mjs` | `text/javascript; charset=utf-8` |
+| `json`, `map` | `application/json` |
+| `txt`, `text` | `text/plain; charset=utf-8` |
+| `csv` | `text/csv; charset=utf-8` |
+| `xml` | `application/xml` |
+| `yaml`, `yml` | `text/yaml` |
+| `webmanifest` | `application/manifest+json` |
+| `wasm` | `application/wasm` |
+| `pdf` | `application/pdf` |
+| `png` | `image/png` |
+| `svg` | `image/svg+xml` |
+| `ico` | `image/x-icon` |
+| `jpg`, `jpeg` | `image/jpeg` |
+| `gif` | `image/gif` |
+| `webp` | `image/webp` |
+| `avif` | `image/avif` |
+| `woff` | `font/woff` |
+| `woff2` | `font/woff2` |
+| `ttf` | `font/ttf` |
+| `otf` | `font/otf` |
+| `mp4` | `video/mp4` |
+| `webm` | `video/webm` |
+| `mp3` | `audio/mpeg` |
+| `ogg` | `audio/ogg` |
+| `wav` | `audio/wav` |
+
+Only the last segment of the path counts: a dot in a folder name
+(`/v1.2/file`) is not an extension. A module script or worker (`.mjs`)
+must come with the JavaScript type, or a browser refuses to run it.
 
 ## In-memory cache
 
@@ -1158,9 +1254,9 @@ Enabled by `enable_files_caching()`. Entry shape:
 
 ```rust
 pub struct CachedContent {
-    pub data: Vec<u8>,      // raw or zstd-compressed
-    pub is_zstd: bool,
-    pub etag: Option<String>,
+    pub data: Vec<u8>,      // raw or gzip-compressed
+    pub is_gzip: bool,
+    pub etag: Option<String>, // the hash, with with_etag()
 }
 ```
 
@@ -1172,53 +1268,43 @@ pub struct CachedContent {
   compression is **not** attempted (there would be no place to store the
   compressed result).
 
-## Compression: zstd (+ deflate fallback)
+## Compression: gzip (+ deflate fallback)
 
 When `enable_files_caching()` is on, each file's first cache-miss triggers
-a **zstd** compression attempt (level 11 — a practical balance between
-ratio and encode time; compression runs exactly once per file):
+a **gzip** compression attempt (level 9 — the file is compressed exactly
+once, when it is read from the disk, so the slowest level is affordable):
 
 - Size threshold: file **`> 10 KB`** (`10 * 1024` bytes) — candidate.
 - Efficiency threshold: compressed **`≤ 80%`** of the original — store
-  the compressed payload with `is_zstd = true`. Otherwise cache raw.
+  the compressed payload with `is_gzip = true`. Otherwise cache raw.
 
 ### Serving the client
 
-Both `zstd` and `deflate` tokens are parsed out of `Accept-Encoding` on
-every request. The three-way negotiation:
+Both `gzip` and `deflate` tokens are parsed out of `Accept-Encoding` on
+every request. The negotiation:
 
-| Cache entry | Client accepts `zstd` | Client accepts `deflate` | Response body |
-|---|---|---|---|
-| raw | — | — | raw `Vec<u8>` (no `Content-Encoding`) |
-| zstd | yes | — | cached as-is + `Content-Encoding: zstd` |
-| zstd | no | yes | decompress cache → `deflate` on the fly + `Content-Encoding: deflate` |
-| zstd | no | no | decompress cache → raw, no `Content-Encoding` |
-
-Rationale: zstd is ~10–20% better ratio and significantly faster to
-decode than deflate, but HTTP `Content-Encoding: zstd` is only widely
-supported from Chrome 123 / Firefox 126 / Safari 17.4 (all spring 2024).
-For clients that don't advertise `zstd` but do advertise `deflate`, we
-transparently re-encode on the fly — no extra memory, no double caching.
+| Cache entry | Client accepts `gzip` | Client accepts `deflate` | Response body | `ETag` |
+|---|---|---|---|---|
+| raw | — | — | raw bytes, no `Content-Encoding` | strong |
+| gzip | yes | — | cached as-is + `Content-Encoding: gzip` | weak |
+| gzip | no | yes | decompress cache → `deflate` on the fly + `Content-Encoding: deflate` | weak |
+| gzip | no | no | decompress cache → raw, no `Content-Encoding` | strong |
 
 `Vary: Accept-Encoding` is added to **every** response the middleware
-produces, so intermediate caches/CDNs don't mix representations.
+produces, `304` included, so intermediate caches/CDNs don't mix
+representations.
 
 The `Accept-Encoding` parser is token-based: split by `,`, strip
-`;q=...` parameters, compare case-insensitive. `"gzip"` is ignored —
-neither algorithm is triggered by substring matches.
+`;q=...` parameters, compare case-insensitive. Other codings (`br`,
+`zstd`, …) are ignored, and neither algorithm is triggered by a
+substring (`gzip2`, `deflate-raw`).
 
 ### When no compression is applied
 
 - Cache is disabled.
 - File `≤ 10 KB`.
-- Zstd was ineffective (`> 80%` of raw) — file is stored raw and served
+- Gzip was ineffective (`> 80%` of raw) — file is stored raw and served
   raw to everyone.
-
-### Gzip
-
-Not supported. Modern browsers that prefer gzip also accept `deflate`
-(or `zstd`), so the existing fallback covers them. Can be added if an
-HTTP client that only speaks gzip shows up.
 
 ## Arbitrary headers
 
@@ -1235,12 +1321,13 @@ compatible with any code that pushes headers through that interface.
   — `StaticFilesMiddleware`, path resolution, response assembly,
   `Accept-Encoding` parser.
 - [static-files-middleware/src/files_access.rs](static-files-middleware/src/files_access.rs)
-  — `FilesAccess` and `CachedContent` (cache + zstd + ETag).
+  — `FilesAccess` and `CachedContent` (cache + gzip + ETag).
 - [static-files-middleware/src/compression.rs](static-files-middleware/src/compression.rs)
-  — `try_zstd` (10 KB / 80% thresholds) + `zstd_decompress` for cache,
+  — `try_gzip` (10 KB / 80% thresholds) + `gzip_decompress` for cache,
   `deflate_compress` / `deflate_decompress` for on-the-fly fallback.
 - [static-files-middleware/src/etag_caches.rs](static-files-middleware/src/etag_caches.rs)
-  — `EtagCaches` and `calc_etag`.
+  — `EtagCaches` (what a `304` is answered from without I/O) and
+  `calc_etag`.
 - [static-files-middleware/src/no_cache.rs](static-files-middleware/src/no_cache.rs)
   — list of paths flagged as no-cache.
 - [static-files-middleware/src/root_paths.rs](static-files-middleware/src/root_paths.rs)
