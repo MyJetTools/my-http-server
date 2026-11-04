@@ -116,7 +116,8 @@ impl HttpRequestHeaders for HeaderMap {
 
         for (key, value) in self {
             let key = key.as_str().to_string();
-            let value = value.to_str().unwrap().to_string();
+            // A value the client sent with bytes which are not text must not panic the request.
+            let value = String::from_utf8_lossy(value.as_bytes()).into_owned();
 
             result.insert(key, value);
         }

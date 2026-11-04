@@ -167,5 +167,5 @@ This pattern requires:
 | [`routes`](routes.md) | Path parameters in routes, model routes, the OPTIONS method |
 | [`field-validation`](field-validation.md) | Field validators (with and without `HttpContext`), custom `#[http_input_field]` types, debugging input parsing |
 | [`enums`](enums.md) | `MyHttpStringEnum` / `MyHttpIntegerEnum` as input types and their case attributes |
-| [`client-ip`](client-ip.md) | The client ip from `get_ip()` — never parse `X-Forwarded-For` by hand |
+| [`client-ip`](client-ip.md) | The client ip from `get_ip()` — never parse `X-Forwarded-For` by hand; the host from `try_get_host()` |
 | [`cookies`](cookies.md) | Setting cookies on the response builder |

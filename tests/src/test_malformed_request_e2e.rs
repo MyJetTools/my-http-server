@@ -4,6 +4,9 @@
 //! killing the connection's task: the client was left without an answer. Now each is answered with
 //! the error the library already makes for it - 400 or 412 - and the server goes on serving.
 //!
+//! Past the start of a request it is the same: a host which can not be read is `None` from
+//! `try_get_host`, and swagger lets such a request go by.
+//!
 //! The socket is written to by hand, so the request line and the raw bytes of a header are exactly
 //! what gets to the wire.
 
@@ -12,6 +15,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use my_http_server::controllers::swagger::SwaggerMiddleware;
+use my_http_server::controllers::ControllersMiddleware;
 use my_http_server::*;
 use rust_extensions::{AppStates, Logger};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -19,7 +24,8 @@ use tokio::net::TcpStream;
 
 // ─────────────────────────────── harness ───────────────────────────────
 
-/// Answers every request it gets with `200 ok <method> <path>`.
+/// Answers every request it gets with `200 ok <method> <path>` - but for `/host`, which answers
+/// with what `try_get_host` reads out of the request.
 struct EchoMiddleware;
 
 #[my_http_server::async_trait::async_trait]
@@ -28,6 +34,11 @@ impl HttpServerMiddleware for EchoMiddleware {
         &self,
         ctx: &mut HttpContext,
     ) -> Option<Result<HttpOkResult, HttpFailResult>> {
+        if ctx.request.http_path.as_str() == "/host" {
+            let host = ctx.request.try_get_host().unwrap_or("<none>").to_string();
+            return Some(HttpOutput::as_text(format!("host {host}")).into_ok_result(false));
+        }
+
         let text = format!(
             "ok {} {}",
             ctx.request.method,
@@ -55,11 +66,20 @@ enum Mode {
 }
 
 async fn start_server(mode: Mode) -> (u16, HttpConnectionsCounter) {
+    start_server_with(mode, false).await
+}
+
+/// [`start_server`], with the swagger middleware in front of the echo one if `swagger`.
+async fn start_server_with(mode: Mode, swagger: bool) -> (u16, HttpConnectionsCounter) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     drop(listener);
 
     let mut server = MyHttpServer::new(SocketAddr::from(([127, 0, 0, 1], port)));
+    if swagger {
+        let controllers = Arc::new(ControllersMiddleware::new(None, None));
+        server.add_middleware(Arc::new(SwaggerMiddleware::new(controllers, "Test", "1.0")));
+    }
     server.add_middleware(Arc::new(EchoMiddleware));
     let connections = server.get_http_connections_counter();
 
@@ -81,7 +101,20 @@ async fn start_server(mode: Mode) -> (u16, HttpConnectionsCounter) {
 
 struct Response {
     status: u16,
+    head: String,
     body: String,
+}
+
+impl Response {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.head.lines().skip(1).find_map(|line| {
+            let (header_name, value) = line.split_once(':')?;
+            header_name
+                .trim()
+                .eq_ignore_ascii_case(name)
+                .then(|| value.trim())
+        })
+    }
 }
 
 /// Writes `request` to a new connection exactly as it is and reads the response to it. `None`
@@ -114,6 +147,7 @@ async fn send(port: u16, request: &[u8]) -> Option<Response> {
                 return Some(Response {
                     status,
                     body: String::from_utf8_lossy(body).to_string(),
+                    head,
                 });
             }
         }
@@ -257,5 +291,105 @@ async fn well_formed_requests_are_served_as_before() {
             assert_eq!(response.status, 200, "{mode:?} {name}");
             assert_eq!(response.body, expected_body, "{mode:?} {name}");
         }
+    }
+}
+
+/// `try_get_host` passes over a header which does not read as text, and says `None` when there is
+/// no host left - where `get_host` panicked.
+#[tokio::test]
+async fn try_get_host_reads_what_can_be_read() {
+    let (port, _) = start_server(Mode::Auto).await;
+
+    let requests: [(&str, &[u8], &str); 5] = [
+        (
+            "Host",
+            b"GET /host HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+            "host example.com",
+        ),
+        (
+            "0xFF in Host, X-Forwarded-Host",
+            b"GET /host HTTP/1.1\r\nHost: \xff\r\nX-Forwarded-Host: proxy.example.com\r\nConnection: close\r\n\r\n",
+            "host proxy.example.com",
+        ),
+        (
+            "0xFF in Host, an absolute-form target",
+            b"GET http://target.example.com/host HTTP/1.1\r\nHost: \xff\r\nConnection: close\r\n\r\n",
+            "host target.example.com",
+        ),
+        (
+            "0xFF in Host and nothing else",
+            b"GET /host HTTP/1.1\r\nHost: \xff\r\nConnection: close\r\n\r\n",
+            "host <none>",
+        ),
+        (
+            "HTTP/1.0 without Host",
+            b"GET /host HTTP/1.0\r\n\r\n",
+            "host <none>",
+        ),
+    ];
+
+    for (name, request, expected_body) in requests {
+        let response = send(port, request)
+            .await
+            .unwrap_or_else(|| panic!("{name}: the connection was dropped"));
+
+        assert_eq!(response.status, 200, "{name}");
+        assert_eq!(response.body, expected_body, "{name}");
+    }
+}
+
+/// Swagger lets a request whose host it can not tell go by to the next middleware, instead of
+/// panicking into a 500.
+#[tokio::test]
+async fn swagger_skips_a_request_whose_host_it_can_not_tell() {
+    let (port, _) = start_server_with(Mode::Auto, true).await;
+
+    // With a host, swagger answers as it always has.
+    let redirect = send(
+        port,
+        b"GET /swagger HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    )
+    .await
+    .expect("a response");
+    assert_eq!(redirect.status, 302);
+    assert_eq!(
+        redirect.header("location"),
+        Some("http://localhost/swagger/index.html")
+    );
+
+    let yaml = send(
+        port,
+        b"GET /swagger/v1/swagger.yaml HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    )
+    .await
+    .expect("a response");
+    assert_eq!(yaml.status, 200);
+    assert!(!yaml.body.starts_with("ok "), "{}", yaml.body);
+
+    let requests: [(&str, &[u8], &str); 3] = [
+        (
+            "HTTP/1.0 without Host",
+            b"GET /swagger HTTP/1.0\r\n\r\n",
+            "ok GET /swagger",
+        ),
+        (
+            "0xFF in Host",
+            b"GET /swagger HTTP/1.1\r\nHost: \xff\r\nConnection: close\r\n\r\n",
+            "ok GET /swagger",
+        ),
+        (
+            "swagger.yaml, HTTP/1.0 without Host",
+            b"GET /swagger/v1/swagger.yaml HTTP/1.0\r\n\r\n",
+            "ok GET /swagger/v1/swagger.yaml",
+        ),
+    ];
+
+    for (name, request, expected_body) in requests {
+        let response = send(port, request)
+            .await
+            .unwrap_or_else(|| panic!("{name}: the connection was dropped"));
+
+        assert_eq!(response.status, 200, "{name}");
+        assert_eq!(response.body, expected_body, "{name}");
     }
 }

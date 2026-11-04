@@ -67,7 +67,7 @@ impl RequestData {
         match self.body.as_mut() {
             Some(body) => body.get_http_request_body(expectations).await,
             None => {
-                panic!("Body is removed and can not be accessed")
+                panic!("Body is removed and can not be accessed - probably it is already in the input model")
             }
         }
     }
@@ -78,7 +78,7 @@ impl RequestData {
         match self.body.take() {
             Some(body) => return body.into_http_request_body(expectations).await,
             None => {
-                panic!("Body is taken by some middleware before")
+                panic!("Body is taken by some middleware before - probably it is already in the input model")
             }
         }
     }
@@ -195,7 +195,7 @@ impl RequestData {
                 }
             },
             None => {
-                panic!("Body is taken by some middleware before")
+                panic!("Body is taken by some middleware before - probably it is already in the input model")
             }
         }
     }

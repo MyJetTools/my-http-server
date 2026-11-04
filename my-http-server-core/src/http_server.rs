@@ -38,6 +38,38 @@ impl HttpConnectionsCounter {
     }
 }
 
+/// Counts one accepted connection in [`HttpConnectionsCounter`] for as long as it lives: one up
+/// when made, one down when dropped.
+///
+/// Every accept loop makes one right after `accept()` and moves it into the connection's task, so
+/// the connection stops being counted however the task ends - `connection.await` returning, a
+/// panic unwinding out of it, or the task dropped unfinished. A `fetch_sub` written after
+/// `connection.await` would be skipped by a panic, leaving the count one too high for good.
+///
+/// The task binds it to a name - `let _connection_guard = connection_guard;` - to keep it to the
+/// end. `let _ = connection_guard;` would not move it into the task at all: it would be dropped as
+/// the accept loop goes round, with the connection still open.
+#[must_use = "the connection stops being counted as soon as the guard is dropped"]
+struct ConnectionCounterGuard {
+    connections: Arc<AtomicI64>,
+}
+
+impl ConnectionCounterGuard {
+    fn new(connections: &Arc<AtomicI64>) -> Self {
+        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Self {
+            connections: connections.clone(),
+        }
+    }
+}
+
+impl Drop for ConnectionCounterGuard {
+    fn drop(&mut self) {
+        self.connections
+            .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ListenAddr {
     Tcp(SocketAddr),
@@ -376,7 +408,7 @@ pub async fn start_http_1(
             continue;
         };
 
-        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let connection_guard = ConnectionCounterGuard::new(&connections);
 
         let io = TokioIo::new(stream);
         let http_server_middlewares = http_server_middlewares.clone();
@@ -405,13 +437,12 @@ pub async fn start_http_1(
             )
             .with_upgrades();
 
-        let connections_clone = connections.clone();
         tokio::task::spawn(async move {
+            let _connection_guard = connection_guard;
+
             if let Err(_err) = connection.await {
                 //println!("Error serving connection: {:?}", err);
             }
-
-            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         });
     }
 }
@@ -464,7 +495,7 @@ pub async fn start_http_1_unix_socket(
             }
         };
 
-        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let connection_guard = ConnectionCounterGuard::new(&connections);
 
         let io = TokioIo::new(stream);
         let http_server_middlewares = http_server_middlewares.clone();
@@ -493,13 +524,12 @@ pub async fn start_http_1_unix_socket(
             )
             .with_upgrades();
 
-        let connections_clone = connections.clone();
         tokio::task::spawn(async move {
+            let _connection_guard = connection_guard;
+
             if let Err(_err) = connection.await {
                 //println!("Error serving connection: {:?}", err);
             }
-
-            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         });
     }
 }
@@ -536,7 +566,7 @@ pub async fn start_http_2(
             continue;
         };
 
-        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let connection_guard = ConnectionCounterGuard::new(&connections);
 
         let io = TokioIo::new(stream);
         let http_server_middlewares = http_server_middlewares.clone();
@@ -564,13 +594,12 @@ pub async fn start_http_2(
             }),
         );
 
-        let connections_clone = connections.clone();
         tokio::task::spawn(async move {
+            let _connection_guard = connection_guard;
+
             if let Err(_err) = connection.await {
                 //println!("Error serving connection: {:?}", err);
             }
-
-            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         });
     }
 }
@@ -610,16 +639,17 @@ pub async fn start_http_auto(
             continue;
         };
 
-        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let connection_guard = ConnectionCounterGuard::new(&connections);
 
         let io = TokioIo::new(stream);
         let http_server_middlewares = http_server_middlewares.clone();
         let logger: Arc<dyn Logger + Send + Sync> = logger.clone();
         let app_states = app_states.clone();
         let builder = auto_builder.clone();
-        let connections_clone = connections.clone();
 
         tokio::task::spawn(async move {
+            let _connection_guard = connection_guard;
+
             let connection = builder.serve_connection_with_upgrades(
                 io,
                 service_fn(move |req| {
@@ -637,8 +667,6 @@ pub async fn start_http_auto(
             if let Err(_err) = connection.await {
                 //println!("Error serving connection: {:?}", err);
             }
-
-            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         });
     }
 }
@@ -694,7 +722,7 @@ pub async fn start_http_auto_unix_socket(
             }
         };
 
-        connections.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let connection_guard = ConnectionCounterGuard::new(&connections);
 
         let io = TokioIo::new(stream);
         let http_server_middlewares = http_server_middlewares.clone();
@@ -702,9 +730,10 @@ pub async fn start_http_auto_unix_socket(
         let socket_addr = SocketAddress::Unix(Arc::new(format!("{:?}", socket_addr)));
         let app_states = app_states.clone();
         let builder = auto_builder.clone();
-        let connections_clone = connections.clone();
 
         tokio::task::spawn(async move {
+            let _connection_guard = connection_guard;
+
             let connection = builder.serve_connection_with_upgrades(
                 io,
                 service_fn(move |req| {
@@ -722,8 +751,6 @@ pub async fn start_http_auto_unix_socket(
             if let Err(_err) = connection.await {
                 //println!("Error serving connection: {:?}", err);
             }
-
-            connections_clone.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
         });
     }
 }
@@ -1189,5 +1216,37 @@ mod tests {
         }
 
         assert_eq!(recording.levels(), vec!["debug", "debug", "debug"]);
+    }
+
+    #[tokio::test]
+    async fn a_connection_whose_task_panics_stops_being_counted() {
+        let connections = Arc::new(AtomicI64::new(0));
+        let counter = HttpConnectionsCounter {
+            connections: connections.clone(),
+        };
+
+        let connection_guard = ConnectionCounterGuard::new(&connections);
+        assert_eq!(counter.get_connections_amount(), 1);
+
+        // A connection which panics while it is being served, in a task spawned the way every
+        // accept loop spawns one.
+        let (panic_now, panic_signal) = tokio::sync::oneshot::channel::<()>();
+        let connection = async move {
+            let _ = panic_signal.await;
+            panic!("the connection panicked");
+        };
+
+        let task = tokio::spawn(async move {
+            let _connection_guard = connection_guard;
+            connection.await;
+        });
+
+        // The task is under way, waiting on its connection: still counted.
+        tokio::task::yield_now().await;
+        assert_eq!(counter.get_connections_amount(), 1);
+
+        panic_now.send(()).unwrap();
+        assert!(task.await.unwrap_err().is_panic());
+        assert_eq!(counter.get_connections_amount(), 0);
     }
 }

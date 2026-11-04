@@ -151,24 +151,42 @@ impl HttpRequest {
         RequestIp::new(&self.addr, self.get_headers())
     }
 
+    /// The host the request is addressed to - see [`try_get_host`](Self::try_get_host) for where
+    /// it is looked for.
+    ///
+    /// Panics when the request names no host that can be read. Use `try_get_host` to answer such
+    /// a request instead.
     pub fn get_host(&self) -> &str {
-        // HTTP/1 sends the host in the `Host` header — check it first.
-        if let Some(value) = self.data.headers().try_get_case_insensitive("host") {
-            return value.as_str().unwrap();
+        match self.try_get_host() {
+            Some(host) => host,
+            None => panic!(
+                "Host is not set: neither Host header, X-Forwarded-Host, nor :authority is present and readable"
+            ),
+        }
+    }
+
+    /// The host the request is addressed to, or `None` when the request names none - an HTTP/1.0
+    /// request without `Host`, say.
+    ///
+    /// HTTP/1 sends it in the `Host` header, which is checked first. Behind a reverse proxy the
+    /// original host may come in `X-Forwarded-Host`. HTTP/2 carries it in the `:authority`
+    /// pseudo-header, which hyper surfaces as the URI authority. A header whose value does not
+    /// read as text is passed over, as if it were not there.
+    pub fn try_get_host(&self) -> Option<&str> {
+        let headers = self.data.headers();
+
+        for header_name in ["host", X_FORWARDED_HOST] {
+            if let Some(value) = headers.try_get_case_insensitive(header_name) {
+                if let Ok(value) = value.as_str() {
+                    return Some(value);
+                }
+            }
         }
 
-        // Behind a reverse proxy the original host may come in X-Forwarded-Host.
-        if let Some(value) = self.data.headers().try_get_case_insensitive(X_FORWARDED_HOST) {
-            return value.as_str().unwrap();
-        }
-
-        // HTTP/2 carries the host in the `:authority` pseudo-header (surfaced by hyper as the URI
-        // authority).
-        if let Some(authority) = self.data.uri().authority() {
-            return authority.as_str();
-        }
-
-        panic!("Host is not set: neither Host header, X-Forwarded-Host, nor :authority is present");
+        self.data
+            .uri()
+            .authority()
+            .map(|authority| authority.as_str())
     }
 
     pub fn get_path_and_query(&self) -> &str {

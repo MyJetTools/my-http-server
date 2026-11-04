@@ -47,3 +47,15 @@ let ip = http_request
 ```
 
 **Note:** extracting `CF-IPCountry` (Cloudflare country) or other non-IP headers is unrelated — read those from `get_headers()` directly.
+
+## The host the request is addressed to
+
+Use `ctx.request.try_get_host()` — `Option<&str>`. It reads the `Host` header, then `X-Forwarded-Host`, then the HTTP/2 `:authority`, and passes over a value which does not read as text. `None` means the client named no host (an HTTP/1.0 request without `Host`, say) — answer or skip such a request yourself:
+
+```rust
+let Some(host) = ctx.request.try_get_host() else {
+    return None; // a middleware: let the next one have it
+};
+```
+
+`get_host()` is the same, but panics when there is no host — a client can make it panic, so prefer `try_get_host()`.

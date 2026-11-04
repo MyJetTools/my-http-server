@@ -47,7 +47,11 @@ impl HttpServerMiddleware for SwaggerMiddleware {
 
         if ctx.request.http_path.segments_amount() == 1 {
             let scheme = ctx.request.get_scheme();
-            let host = ctx.request.get_host();
+            // No host to put into the URL - not a request swagger can answer: the next
+            // middleware gets it.
+            let Some(host) = ctx.request.try_get_host() else {
+                return None;
+            };
             let new_url = format!("{}://{}/swagger/index.html", scheme, host);
 
             let output = HttpOutput::as_redirect(new_url, false);
@@ -139,7 +143,9 @@ impl HttpServerMiddleware for SwaggerMiddleware {
             .has_values_at_index_case_insensitive(1, &["v1", "swagger.yaml"])
         {
             let scheme = ctx.request.get_scheme();
-            let host = ctx.request.get_host();
+            let Some(host) = ctx.request.try_get_host() else {
+                return None;
+            };
 
             let global_fail_results = if let Some(factory) = &self.controllers.auth_error_factory {
                 factory.get_global_http_fail_result_types()

@@ -44,7 +44,11 @@ impl HttpRequestBody {
                 content_type,
                 content_encoding,
             } => {
-                let mut take = incoming.take().unwrap();
+                // Gone only if an earlier read of the body failed half-way: reading it again
+                // is a bug of the handler.
+                let mut take = incoming.take().expect(
+                    "Body is taken by some middleware before: an earlier read of it failed",
+                );
                 let content_encoding = ContentEncoding::new(content_encoding.as_deref())?;
 
                 let bytes = read_bytes(content_encoding, &mut take, expectations).await?;
@@ -72,7 +76,11 @@ impl HttpRequestBody {
                 content_type,
                 content_encoding,
             } => {
-                let mut take = incoming.take().unwrap();
+                // Gone only if an earlier read of the body failed half-way: reading it again
+                // is a bug of the handler.
+                let mut take = incoming.take().expect(
+                    "Body is taken by some middleware before: an earlier read of it failed",
+                );
                 let content_encoding = ContentEncoding::new(content_encoding.as_deref())?;
                 let bytes = read_bytes(content_encoding, &mut take, expectations).await?;
                 let body = HttpRequestBodyContent::new(bytes, content_type)?;
