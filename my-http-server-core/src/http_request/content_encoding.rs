@@ -1,6 +1,7 @@
 use std::io::Read;
 
 use hyper::body::Bytes;
+use my_http_utils::encryption::AES128GCM_CONTENT_ENCODING;
 
 use crate::HttpFailResult;
 
@@ -58,7 +59,7 @@ impl ContentEncoding {
             return Ok(Self::Deflate);
         }
 
-        if header_value.eq_ignore_ascii_case(crate::aes128gcm::CONTENT_ENCODING) {
+        if header_value.eq_ignore_ascii_case(AES128GCM_CONTENT_ENCODING) {
             return Ok(Self::Aes128Gcm);
         }
 
@@ -164,7 +165,7 @@ impl ContentEncoding {
             ContentEncoding::Br => "br",
             ContentEncoding::Zstd => "zstd",
             ContentEncoding::Deflate => "deflate",
-            ContentEncoding::Aes128Gcm => crate::aes128gcm::CONTENT_ENCODING,
+            ContentEncoding::Aes128Gcm => AES128GCM_CONTENT_ENCODING,
         }
     }
 }

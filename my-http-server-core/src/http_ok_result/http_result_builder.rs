@@ -3,9 +3,11 @@ use std::io::Write;
 use flate2::write::GzEncoder;
 use rust_extensions::StrOrString;
 
+use my_http_utils::encryption::{HttpBodyEncryptionKey, AES128GCM_CONTENT_ENCODING};
+
 use crate::{
-    aes128gcm, cookies::*, AddHttpHeaders, BodyEncryptionKey, CompressionLevel, HttpFailResult,
-    HttpOutput, HttpResponseHeaders, WebContentType,
+    cookies::*, AddHttpHeaders, CompressionLevel, HttpFailResult, HttpOutput, HttpResponseHeaders,
+    WebContentType,
 };
 
 use super::HttpOkResult;
@@ -349,11 +351,17 @@ impl HttpResultBuilder {
         self.add_header("Content-Encoding", "gzip")
     }
 
-    /// Encrypts the body with `key`: `Content-Encoding: aes128gcm` (RFC 8188), a fresh random salt
-    /// every time, records of 4096 bytes, no key id in the header. This is how my-reverse-proxy's
-    /// `docs/encrypted-service-data.md` has a service answer. `Content-Type` stays the type of the
-    /// data as it was before encryption. The response also gets `Cache-Control: no-store`, unless
-    /// the action set a `Cache-Control` of its own.
+    /// Encrypts the body with `key`: `Content-Encoding: aes128gcm` (RFC 8188), written by
+    /// my-http-utils' [`HttpBodyEncryptionKey::encrypt`] - a fresh random salt every time, records
+    /// of 4096 bytes, no key id in the header. This is how my-reverse-proxy's
+    /// `docs/encrypted-service-data.md` has a service answer, and the client opens it with
+    /// `key.decrypt(..)`. Unlike a request body, an answer carries no clock: what is encrypted is
+    /// exactly the body. `Content-Type` stays the type of the data as it was before encryption.
+    /// The response also gets `Cache-Control: no-store`, unless the action set a `Cache-Control`
+    /// of its own.
+    ///
+    /// A [`BodyEncryptionKey`](crate::BodyEncryptionKey) derefs to the key, so `.encode(&info.key)`
+    /// and `.encode(&key_from_the_list)` work as they are.
     ///
     /// What is encrypted is the body as it is at the call, so call this after the content is set.
     /// A body that [`with_compression`](Self::with_compression) has already gzipped is encrypted as
@@ -368,7 +376,7 @@ impl HttpResultBuilder {
     ///
     /// Panics only if the operating system has no random bytes for the salt. A body is never sent
     /// unencrypted instead.
-    pub fn encode(mut self, key: &BodyEncryptionKey) -> Self {
+    pub fn encode(mut self, key: &HttpBodyEncryptionKey) -> Self {
         let headers = match &mut self.output {
             HttpOutput::Content {
                 content, headers, ..
@@ -380,14 +388,14 @@ impl HttpResultBuilder {
                     return self;
                 }
 
-                *content = aes128gcm::encrypt(key.as_ikm(), content);
+                *content = key.encrypt(content);
                 headers
             }
             HttpOutput::Empty | HttpOutput::Redirect { .. } => return self,
             HttpOutput::Raw(_) => panic!("Can not encode raw response"),
         };
 
-        add_content_coding(headers, aes128gcm::CONTENT_ENCODING);
+        add_content_coding(headers, AES128GCM_CONTENT_ENCODING);
 
         if !has_header(headers, "cache-control") {
             headers.add_header("Cache-Control".into(), "no-store".to_string());
@@ -598,8 +606,8 @@ mod tests {
         assert_eq!(encoding, None);
     }
 
-    fn key(byte: u8) -> BodyEncryptionKey {
-        BodyEncryptionKey::new("test", [byte; BodyEncryptionKey::LEN])
+    fn key(byte: u8) -> HttpBodyEncryptionKey {
+        HttpBodyEncryptionKey::from_bytes(&[byte; HttpBodyEncryptionKey::LEN]).unwrap()
     }
 
     fn content_and_headers(output: HttpOutput) -> (u16, Vec<u8>, HttpResponseHeaders) {
@@ -613,21 +621,21 @@ mod tests {
         }
     }
 
+    /// Encoded with a key of the server's list: a `BodyEncryptionKey` goes where the key does.
     #[test]
     fn an_encoded_body_opens_with_the_key_and_keeps_its_content_type() {
+        let from_the_list = crate::BodyEncryptionKey::new("proxy", key(7));
+
         let built = HttpOutput::as_text("ip_white_lists: {}")
-            .encode(&key(7))
+            .encode(&from_the_list)
             .build();
 
         let (status_code, content, headers) = content_and_headers(built);
 
         assert_eq!(status_code, 200);
         assert_ne!(content, b"ip_white_lists: {}");
-        assert_eq!(
-            aes128gcm::decrypt(&[7u8; 32], &content).unwrap(),
-            b"ip_white_lists: {}"
-        );
-        assert!(aes128gcm::decrypt(&[8u8; 32], &content).is_err());
+        assert_eq!(key(7).decrypt(&content).unwrap(), b"ip_white_lists: {}");
+        assert!(key(8).decrypt(&content).is_err());
 
         assert_eq!(find_header(&headers, "Content-Encoding"), Some("aes128gcm"));
         assert_eq!(find_header(&headers, "Cache-Control"), Some("no-store"));
@@ -649,10 +657,7 @@ mod tests {
         let (status_code, content, _) = content_and_headers(built);
 
         assert_eq!(status_code, 409);
-        assert_eq!(
-            aes128gcm::decrypt(&[1u8; 32], &content).unwrap(),
-            b"conflict"
-        );
+        assert_eq!(key(1).decrypt(&content).unwrap(), b"conflict");
     }
 
     #[test]
@@ -697,7 +702,7 @@ mod tests {
             .collect();
         assert_eq!(content_encoding, vec!["gzip, aes128gcm"]);
 
-        let gzipped = aes128gcm::decrypt(&[3u8; 32], &content).unwrap();
+        let gzipped = key(3).decrypt(&content).unwrap();
         let mut plain = Vec::new();
         std::io::Read::read_to_end(
             &mut flate2::read::GzDecoder::new(gzipped.as_slice()),
@@ -722,7 +727,7 @@ mod tests {
         let (_, content, headers) = content_and_headers(built);
 
         assert_eq!(find_header(&headers, "Content-Encoding"), Some("aes128gcm"));
-        assert_eq!(aes128gcm::decrypt(&[3u8; 32], &content).unwrap(), raw);
+        assert_eq!(key(3).decrypt(&content).unwrap(), raw);
     }
 
     #[test]
@@ -767,10 +772,7 @@ mod tests {
             HttpOutput::File {
                 content, headers, ..
             } => {
-                assert_eq!(
-                    aes128gcm::decrypt(&[5u8; 32], &content).unwrap(),
-                    b"hosts: {}"
-                );
+                assert_eq!(key(5).decrypt(&content).unwrap(), b"hosts: {}");
                 assert_eq!(find_header(&headers, "Content-Encoding"), Some("aes128gcm"));
             }
             other => panic!("expected File, got {:?}", other),

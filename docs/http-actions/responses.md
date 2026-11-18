@@ -137,7 +137,7 @@ Pick `threshold` based on the response type — JSON / HTML payloads under a few
 
 **Encrypted Response (aes128gcm):**
 
-`HttpResultBuilder::encode(&key)` encrypts the body with a `BodyEncryptionKey`: `Content-Encoding: aes128gcm` (RFC 8188), the encoding my-reverse-proxy reads its services' data in. The action decides whether to encrypt and with which key. It usually takes the key by id from the same `Arc<BodyEncryptionKeys>` the server decrypts request bodies with (see [registration-and-startup](registration-and-startup.md)):
+`HttpResultBuilder::encode(&key)` encrypts the body: `Content-Encoding: aes128gcm` (RFC 8188), written by my-http-utils' `HttpBodyEncryptionKey::encrypt`, the encoding my-reverse-proxy reads its services' data in. `key` is an `HttpBodyEncryptionKey`, and a `BodyEncryptionKey` of the server's list derefs to one, so either goes in as it is. The action decides whether to encrypt and with which key. It usually takes the key by id from the same `Arc<BodyEncryptionKeys>` the server decrypts request bodies with (see [registration-and-startup](registration-and-startup.md)):
 
 ```rust
 let key = action.app.body_encryption_keys.get_by_id("proxy").ok_or_else(|| {
@@ -161,10 +161,10 @@ HttpOutput::as_json(result)
     .into_ok_result(false)
 ```
 
-- **What it sends.** A fresh random salt every time, records of 4096 bytes and no key id in the header. `Content-Type` stays the type of the data before encryption. `Cache-Control: no-store` is added unless the action set a `Cache-Control` of its own.
+- **What it sends.** A fresh random salt every time, records of 4096 bytes and no key id in the header. What is encrypted is exactly the body the action wrote: unlike a request, an answer carries no clock in front of it, so the client opens it with `key.decrypt(&body)`, not as an `EncryptedBody`. `Content-Type` stays the type of the data before encryption. `Cache-Control: no-store` is added unless the action set a `Cache-Control` of its own.
 - **Order.** The body is encrypted as it is at the call, so call `encode` after the content is set. After `with_compression` has gzipped the body, the header becomes `Content-Encoding: gzip, aes128gcm`, the codings in the order applied. Compressing after `encode` gains nothing, because encrypted bytes don't compress, and `with_compression` then leaves the body alone.
 - **Variants.** `Content` and `File` with a body are encrypted, whatever the status code. An empty body, `Empty` and `Redirect` have nothing to encrypt, so `encode` does nothing. `Raw` panics.
-- **Keys.** A key is 32 random bytes plus an id: `BodyEncryptionKey::from_base64("proxy", "<openssl rand -base64 32>")?` or `BodyEncryptionKey::new("proxy", bytes)`. `get_by_id` returns a cheap clone: the bytes are shared, never printed by `Debug`, and zeroed once the last clone is dropped.
+- **Keys.** A `BodyEncryptionKey` is my-http-utils' `HttpBodyEncryptionKey` (32 random bytes) plus an id: `BodyEncryptionKey::from_base64("proxy", "<openssl rand -base64 32>")?`, `from_bytes("proxy", &bytes)?` or `BodyEncryptionKey::new("proxy", http_body_encryption_key)`. A bad key is an `HttpBodyEncryptionKeyError`, whose text never repeats what it was given. `get_by_id` returns a cheap clone: the key is shared, never printed by `Debug`, and wiped once the last clone is dropped.
 - A streamed response (`HttpOutput::as_stream`) is not encrypted by `encode`.
 
 **Streaming Response Compression (gzip):**

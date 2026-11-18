@@ -22,9 +22,16 @@ mod compression_level;
 mod etag;
 pub use etag::*;
 
-pub mod aes128gcm;
 mod body_encryption_keys;
 pub use body_encryption_keys::{BodyEncryptionKey, BodyEncryptionKeys, EncryptionInfo};
+// `Content-Encoding: aes128gcm` is my-http-utils' standard, the one fl-url and the services behind
+// my-reverse-proxy encrypt with. Re-exported item by item rather than as an `encryption` module:
+// an application that has a crate of that name and glob-imports this one would find the name
+// ambiguous.
+pub use my_http_utils::encryption::{
+    EncryptedBody, HttpBodyDecryptError, HttpBodyEncryptionKey, HttpBodyEncryptionKeyError,
+    AES128GCM_CONTENT_ENCODING,
+};
 
 // ── The value / reader / conversion / field-type layer is owned by my-http-utils (the same lib
 // fl-url and other clients use), so a `#[derive(MyHttpInput)]` model compiles on both sides.

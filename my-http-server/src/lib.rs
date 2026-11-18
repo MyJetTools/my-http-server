@@ -11,8 +11,11 @@ pub mod macros {
 #[cfg(any(feature = "macros", feature = "controllers"))]
 pub extern crate my_http_server_controllers as controllers;
 
-#[cfg(any(feature = "websocket"))]
+#[cfg(feature = "websocket")]
 pub extern crate my_http_server_web_sockets as web_sockets;
+
+#[cfg(feature = "socket-io")]
+pub extern crate my_http_server_socket_io_middleware as socket_io;
 
 #[cfg(feature = "signal-r")]
 pub mod signal_r {

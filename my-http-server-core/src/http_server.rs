@@ -187,19 +187,26 @@ impl MyHttpServer {
     }
 
     /// The keys a request body announced with `Content-Encoding: aes128gcm` (RFC 8188) is
-    /// decrypted with: each is tried in turn, and the handler reads the body that opened, as if it
-    /// had come in plain. How it came - the key that opened it, its salt - is on the request:
+    /// decrypted with: each is tried in turn. The body is my-http-utils'
+    /// [`EncryptedBody`](crate::EncryptedBody): what is encrypted starts with the sender's clock
+    /// (unix microseconds, 8 bytes little-endian); the server takes it off, and the handler reads
+    /// the rest as the body, as if it had come in plain. A client sends such a body with fl-url's
+    /// `encrypted(&key)`, or my-http-utils' `HttpRequestBody::encrypt`. How it came - the key that
+    /// opened it, the clock, the salt - is on the request:
     /// [`HttpRequest::get_encryption_info`](crate::HttpRequest::get_encryption_info). Keep a clone
     /// of the `Arc`:
     /// [`BodyEncryptionKeys::set`](crate::BodyEncryptionKeys::set) replaces the keys while the
     /// server runs.
     ///
-    /// The body is decrypted when it is read, like a compressed one. A body that comes in plain
-    /// is taken as it is, and a `#[http_body_as_stream]` body is handed on as it arrived. An
-    /// encrypted body is never read as plain:
+    /// The body is decrypted when it is read, like a compressed one. `gzip, aes128gcm` - gzipped,
+    /// then encrypted, what `compress().encrypt()` sends - is decrypted, then decompressed. A body
+    /// that comes in plain is taken as it is, and a `#[http_body_as_stream]` body is handed on as
+    /// it arrived. An empty body is empty bytes to the standard, encrypted or not: it is handed on
+    /// empty, with no encryption info. An encrypted body is never read as plain:
     /// - `415 Unsupported Media Type` with `Accept-Encoding` (RFC 9110 §15.5.16) when the server
     ///   has no key: these were never set, or the list is empty;
-    /// - `400` when no key opens it, or it is damaged or cut short.
+    /// - `400` when no key opens it, when it is damaged or cut short, or when what opened is
+    ///   shorter than the clock.
     ///
     /// Responses are not encrypted here: an action does that with
     /// [`HttpResultBuilder::encode`](crate::HttpResultBuilder::encode).

@@ -121,13 +121,14 @@ impl HttpRequest {
     }
 
     /// How the body came encrypted, when it came with `Content-Encoding: aes128gcm`: the key of the
-    /// server's list that opened it, its salt, record size and the key id from its header. `None`
-    /// for a body that came in plain, and until the body is read. An action whose input model
-    /// reads the body gets it already read.
+    /// server's list that opened it, the sender's clock, its salt, record size and the key id from
+    /// its header. `None` for a body that came in plain, for an empty body (nothing in it is
+    /// encrypted, whatever its header says), and until the body is read. An action whose input
+    /// model reads the body gets it already read.
     ///
-    /// With it an action can answer with the key the client used -
-    /// `.encode(&info.key)` - check a salt against replays, or refuse a body that should have come
-    /// encrypted and did not.
+    /// With it an action can answer with the key the client used - `.encode(&info.key)` - refuse
+    /// a replay by the clock and the salt, or refuse a body that should have come encrypted and
+    /// did not. See `docs/http-actions/encrypted-requests.md`.
     pub fn get_encryption_info(&self) -> Option<&crate::EncryptionInfo> {
         self.data.get_encryption_info()
     }

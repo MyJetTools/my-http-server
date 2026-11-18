@@ -9,7 +9,7 @@ use super::body_decoding::{BodyDecoding, DecodedBody};
 
 /// The request body, kept **lazy**: it holds hyper's `Incoming` and is not turned into bytes until
 /// something actually asks for them. There are three ways to ask, and all of them go through the
-/// same frame-by-frame primitive ([`next_data_frame`]):
+/// same frame-by-frame primitive ([`next_data_frame`](crate::next_data_frame)):
 ///
 /// * materialize it whole — [`get_http_request_body`](Self::get_http_request_body) /
 ///   [`into_http_request_body`](Self::into_http_request_body), used for `#[http_body_raw]`, for

@@ -19,8 +19,13 @@ my-json = { tag = "0.3.2", git = "https://github.com/MyJetTools/my-json.git" }
 
 my-telemetry = { tag = "1.3.0", git = "https://github.com/MyJetTools/my-telemetry.git", optional = true }
 
+# `encryption`: `Content-Encoding: aes128gcm` (RFC 8188) - `HttpBodyEncryptionKey` and
+# `EncryptedBody`, the one implementation fl-url and the services behind my-reverse-proxy use too.
+# Request bodies are opened with `BodyEncryptionKeys`, answers encrypted with
+# `HttpResultBuilder::encode`. Pure Rust, no C toolchain.
 my-http-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-http-utils.git", features = [
     "server",
+    "encryption",
 ] }
 
 
@@ -28,7 +33,6 @@ futures = "*"
 
 tokio = { version = "*", features = ["net", "rt-multi-thread", "macros", "time"] }
 
-lazy_static = "*"
 hyper = { version = "*", features = ["http1", "http2", "server"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
@@ -44,17 +48,6 @@ ruzstd = "*"
 http = "*"
 bytes = "*"
 my-hyper-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-hyper-utils.git" }
-
-# `Content-Encoding: aes128gcm` (RFC 8188): request bodies opened with `BodyEncryptionKeys`, and
-# `HttpResultBuilder::encode`. RustCrypto is pure Rust, like the decoders above, so no C toolchain.
-# The majors are pinned, unlike the rest: hmac and sha2 have to agree on `digest`, and these crates
-# change their API between majors.
-aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc", "zeroize"] }
-hmac = "0.13"
-sha2 = "0.11"
-getrandom = "0.4"
-zeroize = "1"
-base64 = "0.23"
 
 [dev-dependencies]
 # `tokio::io::duplex` and the read/write extensions, for the tests of `ProtocolSniffDeadline`.
