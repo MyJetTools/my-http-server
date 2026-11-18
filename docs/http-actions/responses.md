@@ -135,6 +135,38 @@ Behaviour by `HttpOutput` variant:
 
 Pick `threshold` based on the response type — JSON / HTML payloads under a few KiB usually aren't worth compressing once you account for client-side decode cost. Setting `threshold = 0` forces compression to be attempted on every non-empty body (still gated by the 80% efficiency check).
 
+**Encrypted Response (aes128gcm):**
+
+`HttpResultBuilder::encode(&key)` encrypts the body with a `BodyEncryptionKey`: `Content-Encoding: aes128gcm` (RFC 8188), the encoding my-reverse-proxy reads its services' data in. The action decides whether to encrypt and with which key. It usually takes the key by id from the same `Arc<BodyEncryptionKeys>` the server decrypts request bodies with (see [registration-and-startup](registration-and-startup.md)):
+
+```rust
+let key = action.app.body_encryption_keys.get_by_id("proxy").ok_or_else(|| {
+    HttpFailResult::from((503u16, "No key to encrypt the answer with yet".to_string()))
+})?;
+
+HttpOutput::as_yaml(model)
+    .encode(&key)
+    .into_ok_result(false)
+```
+
+To answer with the key the client encrypted the request with, take it from the request:
+
+```rust
+let Some(info) = ctx.request.get_encryption_info() else {
+    return Err(HttpFailResult::from((415u16, "The body has to come encrypted".to_string())));
+};
+
+HttpOutput::as_json(result)
+    .encode(&info.key)
+    .into_ok_result(false)
+```
+
+- **What it sends.** A fresh random salt every time, records of 4096 bytes and no key id in the header. `Content-Type` stays the type of the data before encryption. `Cache-Control: no-store` is added unless the action set a `Cache-Control` of its own.
+- **Order.** The body is encrypted as it is at the call, so call `encode` after the content is set. After `with_compression` has gzipped the body, the header becomes `Content-Encoding: gzip, aes128gcm`, the codings in the order applied. Compressing after `encode` gains nothing, because encrypted bytes don't compress, and `with_compression` then leaves the body alone.
+- **Variants.** `Content` and `File` with a body are encrypted, whatever the status code. An empty body, `Empty` and `Redirect` have nothing to encrypt, so `encode` does nothing. `Raw` panics.
+- **Keys.** A key is 32 random bytes plus an id: `BodyEncryptionKey::from_base64("proxy", "<openssl rand -base64 32>")?` or `BodyEncryptionKey::new("proxy", bytes)`. `get_by_id` returns a cheap clone: the bytes are shared, never printed by `Debug`, and zeroed once the last clone is dropped.
+- A streamed response (`HttpOutput::as_stream`) is not encrypted by `encode`.
+
 **Streaming Response Compression (gzip):**
 
 `HttpOutputAsStream::with_compression(&ctx.request, level)` gzips a streamed response on the fly, at the same `CompressionLevel` as above. The producer doesn't change — it keeps sending plain bytes, and the compression happens under the hood:

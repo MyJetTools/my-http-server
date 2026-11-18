@@ -5,8 +5,9 @@ use hyper::Uri;
 use my_http_utils::http_input::HttpBodyAsStream;
 
 use crate::{
-    BodyContentType, BodyExpectations, ContentEncoding, HttpFailResult, HttpRequestBody,
-    HttpRequestBodyContent, IncomingBodyStream, MyHyperHttpRequest,
+    BodyContentType, BodyEncryptionKeys, BodyExpectations, ContentEncoding, EncryptionInfo,
+    HttpFailResult, HttpRequestBody, HttpRequestBodyContent, IncomingBodyStream,
+    MyHyperHttpRequest,
 };
 
 pub struct RequestData {
@@ -14,6 +15,10 @@ pub struct RequestData {
     body: Option<HttpRequestBody>,
     body_read_timeout: Option<std::time::Duration>,
     max_decompressed_body_size: usize,
+    body_encryption_keys: Option<std::sync::Arc<BodyEncryptionKeys>>,
+    /// Set once the body is read, when it came encrypted. Kept here as well as in the body, so a
+    /// middleware that takes the body does not take it away from the action.
+    encryption_info: Option<EncryptionInfo>,
 }
 
 impl RequestData {
@@ -56,6 +61,8 @@ impl RequestData {
             body: Some(body),
             body_read_timeout: None,
             max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
+            body_encryption_keys: None,
+            encryption_info: None,
         };
 
         Ok(result)
@@ -63,9 +70,20 @@ impl RequestData {
 
     pub async fn get_body(&mut self) -> Result<&HttpRequestBodyContent, HttpFailResult> {
         let expectations = self.body_expectations();
+        let encryption_keys = self.body_encryption_keys.as_deref();
 
         match self.body.as_mut() {
-            Some(body) => body.get_http_request_body(expectations).await,
+            Some(body) => {
+                let content = body
+                    .get_http_request_body(expectations, encryption_keys)
+                    .await?;
+
+                if let Some(encryption_info) = content.get_encryption_info() {
+                    self.encryption_info = Some(encryption_info.clone());
+                }
+
+                Ok(content)
+            }
             None => {
                 panic!("Body is removed and can not be accessed - probably it is already in the input model")
             }
@@ -76,11 +94,27 @@ impl RequestData {
         let expectations = self.body_expectations();
 
         match self.body.take() {
-            Some(body) => return body.into_http_request_body(expectations).await,
+            Some(body) => {
+                let content = body
+                    .into_http_request_body(expectations, self.body_encryption_keys.as_deref())
+                    .await?;
+
+                if let Some(encryption_info) = content.get_encryption_info() {
+                    self.encryption_info = Some(encryption_info.clone());
+                }
+
+                Ok(content)
+            }
             None => {
                 panic!("Body is taken by some middleware before - probably it is already in the input model")
             }
         }
+    }
+
+    /// How the body came encrypted - see [`EncryptionInfo`]. `None` until the body is read, and
+    /// for a body that came in plain.
+    pub fn get_encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.encryption_info.as_ref()
     }
 
     /// Takes the body as a stream of chunks. Like [`receive_body`](Self::receive_body) it *takes*
@@ -143,6 +177,10 @@ impl RequestData {
 
     pub fn set_max_decompressed_body_size(&mut self, max_size: usize) {
         self.max_decompressed_body_size = max_size;
+    }
+
+    pub fn set_body_encryption_keys(&mut self, keys: Option<std::sync::Arc<BodyEncryptionKeys>>) {
+        self.body_encryption_keys = keys;
     }
 
     /// `Content-Length` when the client sent a valid one. `None` for a chunked body — and for a

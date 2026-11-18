@@ -18,7 +18,8 @@ use tokio::sync::Mutex;
 use std::sync::Arc;
 
 use crate::{
-    HttpContext, HttpFailResult, HttpRequest, HttpServerMiddleware, HttpServerMiddlewares,
+    BodyEncryptionKeys, HttpContext, HttpFailResult, HttpRequest, HttpServerMiddleware,
+    HttpServerMiddlewares,
 };
 use crate::{HttpOkResult, SocketAddress};
 
@@ -90,6 +91,7 @@ pub struct MyHttpServer {
     body_read_timeout: Option<std::time::Duration>,
     header_read_timeout: Option<std::time::Duration>,
     max_decompressed_body_size: usize,
+    body_encryption_keys: Option<Arc<BodyEncryptionKeys>>,
     tcp_nodelay: bool,
 }
 
@@ -103,6 +105,7 @@ impl MyHttpServer {
             body_read_timeout: None,
             header_read_timeout: Some(DEFAULT_HEADER_READ_TIMEOUT),
             max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
+            body_encryption_keys: None,
             tcp_nodelay: true,
         }
     }
@@ -117,6 +120,7 @@ impl MyHttpServer {
             body_read_timeout: None,
             header_read_timeout: Some(DEFAULT_HEADER_READ_TIMEOUT),
             max_decompressed_body_size: crate::DEFAULT_MAX_DECOMPRESSED_BODY_SIZE,
+            body_encryption_keys: None,
             tcp_nodelay: true,
         }
     }
@@ -182,6 +186,27 @@ impl MyHttpServer {
         self.max_decompressed_body_size = max_size;
     }
 
+    /// The keys a request body announced with `Content-Encoding: aes128gcm` (RFC 8188) is
+    /// decrypted with: each is tried in turn, and the handler reads the body that opened, as if it
+    /// had come in plain. How it came - the key that opened it, its salt - is on the request:
+    /// [`HttpRequest::get_encryption_info`](crate::HttpRequest::get_encryption_info). Keep a clone
+    /// of the `Arc`:
+    /// [`BodyEncryptionKeys::set`](crate::BodyEncryptionKeys::set) replaces the keys while the
+    /// server runs.
+    ///
+    /// The body is decrypted when it is read, like a compressed one. A body that comes in plain
+    /// is taken as it is, and a `#[http_body_as_stream]` body is handed on as it arrived. An
+    /// encrypted body is never read as plain:
+    /// - `415 Unsupported Media Type` with `Accept-Encoding` (RFC 9110 §15.5.16) when the server
+    ///   has no key: these were never set, or the list is empty;
+    /// - `400` when no key opens it, or it is damaged or cut short.
+    ///
+    /// Responses are not encrypted here: an action does that with
+    /// [`HttpResultBuilder::encode`](crate::HttpResultBuilder::encode).
+    pub fn set_body_encryption_keys(&mut self, keys: Arc<BodyEncryptionKeys>) {
+        self.body_encryption_keys = Some(keys);
+    }
+
     pub fn add_middleware(
         &mut self,
         middleware: Arc<dyn HttpServerMiddleware + Send + Sync + 'static>,
@@ -231,6 +256,7 @@ impl MyHttpServer {
             body_read_timeout: self.body_read_timeout,
             header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            body_encryption_keys: self.body_encryption_keys.clone(),
             tcp_nodelay: self.tcp_nodelay,
         };
 
@@ -283,6 +309,7 @@ impl MyHttpServer {
             body_read_timeout: self.body_read_timeout,
             header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            body_encryption_keys: self.body_encryption_keys.clone(),
             tcp_nodelay: self.tcp_nodelay,
         };
 
@@ -335,6 +362,7 @@ impl MyHttpServer {
             body_read_timeout: self.body_read_timeout,
             header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            body_encryption_keys: self.body_encryption_keys.clone(),
             tcp_nodelay: self.tcp_nodelay,
         };
 
@@ -381,6 +409,7 @@ impl MyHttpServer {
             body_read_timeout: self.body_read_timeout,
             header_read_timeout: self.header_read_timeout,
             max_decompressed_body_size: self.max_decompressed_body_size,
+            body_encryption_keys: self.body_encryption_keys.clone(),
             tcp_nodelay: self.tcp_nodelay,
         };
 
@@ -928,6 +957,7 @@ pub async fn handle_requests(
     };
     req.set_body_read_timeout(http_server_middlewares.body_read_timeout);
     req.set_max_decompressed_body_size(http_server_middlewares.max_decompressed_body_size);
+    req.set_body_encryption_keys(http_server_middlewares.body_encryption_keys.clone());
 
     let method = req.method.clone();
     let mut request_ctx = HttpContext::new(req);

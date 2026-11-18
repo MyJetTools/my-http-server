@@ -23,6 +23,10 @@ pub enum ContentEncoding {
     /// `deflate` names two formats in the wild: the zlib stream the HTTP spec means (RFC 1950),
     /// and the bare deflate stream some clients send instead (RFC 1951). Both are read.
     Deflate,
+    /// An encrypted body (RFC 8188), not a compressed one. It is opened with the server's
+    /// [`BodyEncryptionKeys`](crate::BodyEncryptionKeys), never decompressed, and a body that does
+    /// not open is never read as anything else.
+    Aes128Gcm,
 }
 
 impl ContentEncoding {
@@ -54,14 +58,21 @@ impl ContentEncoding {
             return Ok(Self::Deflate);
         }
 
+        if header_value.eq_ignore_ascii_case(crate::aes128gcm::CONTENT_ENCODING) {
+            return Ok(Self::Aes128Gcm);
+        }
+
         Err(HttpFailResult::as_validation_error(format!(
             "Unsupported content encoding: {}",
             header_value
         )))
     }
 
-    /// Undoes the announced encoding. A body that announced none is returned as it is, whatever its
-    /// size - `max_decompressed_size` bounds only what a decoder produces.
+    /// Undoes the announced compression. A body that announced none is returned as it is, whatever
+    /// its size - `max_decompressed_size` bounds only what a decoder produces.
+    ///
+    /// An `aes128gcm` body is not compressed: it takes the keys to open, and this refuses it
+    /// rather than hand on the encrypted bytes as the body.
     pub fn decompress_if_needed(
         &self,
         body: Bytes,
@@ -71,6 +82,12 @@ impl ContentEncoding {
 
         let result = match self {
             ContentEncoding::None => return Ok(body),
+            ContentEncoding::Aes128Gcm => {
+                return Err(HttpFailResult::as_fatal_error(
+                    "An aes128gcm body is opened with the server's BodyEncryptionKeys, not decompressed"
+                        .to_string(),
+                ))
+            }
             ContentEncoding::GZip => decompress_gzip(body.as_slice(), max_decompressed_size),
             ContentEncoding::Br => decompress_br(body.as_slice(), max_decompressed_size),
             ContentEncoding::Zstd => decompress_zstd(body.as_slice(), max_decompressed_size),
@@ -147,6 +164,7 @@ impl ContentEncoding {
             ContentEncoding::Br => "br",
             ContentEncoding::Zstd => "zstd",
             ContentEncoding::Deflate => "deflate",
+            ContentEncoding::Aes128Gcm => crate::aes128gcm::CONTENT_ENCODING,
         }
     }
 }
@@ -378,6 +396,20 @@ mod tests {
             ContentEncoding::new(Some("Deflate")).unwrap(),
             ContentEncoding::Deflate
         );
+        assert_eq!(
+            ContentEncoding::new(Some(" AES128GCM ")).unwrap(),
+            ContentEncoding::Aes128Gcm
+        );
+    }
+
+    /// The bytes of an encrypted body are never the body: without the keys there is nothing to
+    /// hand on.
+    #[test]
+    fn an_encrypted_body_is_not_decompressed() {
+        let result = ContentEncoding::Aes128Gcm
+            .decompress_if_needed(BODY.to_vec().into(), DEFAULT_MAX_DECOMPRESSED_BODY_SIZE);
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -542,7 +574,7 @@ mod tests {
                     bomb.as_slice(),
                     4096,
                 )),
-                ContentEncoding::None => unreachable!(),
+                ContentEncoding::None | ContentEncoding::Aes128Gcm => unreachable!(),
             };
 
             let mut decoder = CountingReader {

@@ -10,6 +10,7 @@ mod http_path_reader;
 pub use http_path_reader::*;
 mod content_encoding;
 pub use content_encoding::*;
+mod body_decoding;
 mod http_request_body_mode;
 pub use http_request_body_mode::*;
 mod body_stream_pump;

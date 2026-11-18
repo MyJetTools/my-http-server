@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{HttpServerMiddleware, HttpServerTechMiddleware};
+use crate::{BodyEncryptionKeys, HttpServerMiddleware, HttpServerTechMiddleware};
 
 pub struct HttpServerMiddlewares {
     pub middlewares: Vec<Arc<dyn HttpServerMiddleware + Send + Sync + 'static>>,
@@ -20,6 +20,11 @@ pub struct HttpServerMiddlewares {
     /// Set through
     /// [`MyHttpServer::set_max_decompressed_body_size`](crate::MyHttpServer::set_max_decompressed_body_size).
     pub max_decompressed_body_size: usize,
+    /// The keys a body announced with `Content-Encoding: aes128gcm` is decrypted with. Set
+    /// through
+    /// [`MyHttpServer::set_body_encryption_keys`](crate::MyHttpServer::set_body_encryption_keys);
+    /// `None` answers such a body `415`.
+    pub body_encryption_keys: Option<Arc<BodyEncryptionKeys>>,
     /// Whether `TCP_NODELAY` is set on every accepted TCP connection. Set through
     /// [`MyHttpServer::set_tcp_nodelay`](crate::MyHttpServer::set_tcp_nodelay); `true` unless
     /// switched off. A Unix socket has no such option and ignores it.

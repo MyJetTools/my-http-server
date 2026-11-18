@@ -4,8 +4,8 @@ use flate2::write::GzEncoder;
 use rust_extensions::StrOrString;
 
 use crate::{
-    cookies::*, AddHttpHeaders, CompressionLevel, HttpFailResult, HttpOutput,
-    HttpResponseHeaders, WebContentType,
+    aes128gcm, cookies::*, AddHttpHeaders, BodyEncryptionKey, CompressionLevel, HttpFailResult,
+    HttpOutput, HttpResponseHeaders, WebContentType,
 };
 
 use super::HttpOkResult;
@@ -30,6 +30,30 @@ fn gzip(raw: &[u8], level: CompressionLevel) -> std::io::Result<Vec<u8>> {
     let mut encoder = GzEncoder::new(Vec::with_capacity(raw.len()), level.to_gzip());
     encoder.write_all(raw)?;
     encoder.finish()
+}
+
+fn has_header(headers: &HttpResponseHeaders, name: &str) -> bool {
+    headers
+        .headers
+        .iter()
+        .any(|(key, _)| key.as_str().eq_ignore_ascii_case(name))
+}
+
+/// Puts `coding` into `Content-Encoding` after the codings already there, so the one header lists
+/// them in the order they were applied.
+fn add_content_coding(headers: &mut HttpResponseHeaders, coding: &str) {
+    let existing = headers
+        .headers
+        .iter_mut()
+        .find(|(key, _)| key.as_str().eq_ignore_ascii_case("content-encoding"));
+
+    match existing {
+        Some((_, value)) => {
+            value.push_str(", ");
+            value.push_str(coding);
+        }
+        None => headers.add_header("Content-Encoding".into(), coding.to_string()),
+    }
 }
 
 impl HttpResultBuilder {
@@ -325,6 +349,53 @@ impl HttpResultBuilder {
         self.add_header("Content-Encoding", "gzip")
     }
 
+    /// Encrypts the body with `key`: `Content-Encoding: aes128gcm` (RFC 8188), a fresh random salt
+    /// every time, records of 4096 bytes, no key id in the header. This is how my-reverse-proxy's
+    /// `docs/encrypted-service-data.md` has a service answer. `Content-Type` stays the type of the
+    /// data as it was before encryption. The response also gets `Cache-Control: no-store`, unless
+    /// the action set a `Cache-Control` of its own.
+    ///
+    /// What is encrypted is the body as it is at the call, so call this after the content is set.
+    /// A body that [`with_compression`](Self::with_compression) has already gzipped is encrypted as
+    /// it is, and the header becomes `Content-Encoding: gzip, aes128gcm`: the codings in the order
+    /// they were applied (RFC 9110 §8.4). Compressing afterwards gains nothing, since encrypted
+    /// bytes do not compress, so `with_compression` then leaves the body alone.
+    ///
+    /// - `Content`, `File` with a body → the body is encrypted, whatever the status code.
+    /// - An empty body, `Empty`, `Redirect` → nothing to encrypt: a no-op. A `204` must not get a
+    ///   body of encryption overhead.
+    /// - `Raw` → panics (the framework can't introspect a pre-built `MyHttpResponse`).
+    ///
+    /// Panics only if the operating system has no random bytes for the salt. A body is never sent
+    /// unencrypted instead.
+    pub fn encode(mut self, key: &BodyEncryptionKey) -> Self {
+        let headers = match &mut self.output {
+            HttpOutput::Content {
+                content, headers, ..
+            }
+            | HttpOutput::File {
+                content, headers, ..
+            } => {
+                if content.is_empty() {
+                    return self;
+                }
+
+                *content = aes128gcm::encrypt(key.as_ikm(), content);
+                headers
+            }
+            HttpOutput::Empty | HttpOutput::Redirect { .. } => return self,
+            HttpOutput::Raw(_) => panic!("Can not encode raw response"),
+        };
+
+        add_content_coding(headers, aes128gcm::CONTENT_ENCODING);
+
+        if !has_header(headers, "cache-control") {
+            headers.add_header("Cache-Control".into(), "no-store".to_string());
+        }
+
+        self
+    }
+
     pub fn into_ok_result(self, write_telemetry: bool) -> Result<HttpOkResult, HttpFailResult> {
         let output = self.build();
         Ok(HttpOkResult {
@@ -525,6 +596,185 @@ mod tests {
 
         assert_eq!(content, raw);
         assert_eq!(encoding, None);
+    }
+
+    fn key(byte: u8) -> BodyEncryptionKey {
+        BodyEncryptionKey::new("test", [byte; BodyEncryptionKey::LEN])
+    }
+
+    fn content_and_headers(output: HttpOutput) -> (u16, Vec<u8>, HttpResponseHeaders) {
+        match output {
+            HttpOutput::Content {
+                status_code,
+                content,
+                headers,
+            } => (status_code, content, headers),
+            other => panic!("expected Content, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn an_encoded_body_opens_with_the_key_and_keeps_its_content_type() {
+        let built = HttpOutput::as_text("ip_white_lists: {}")
+            .encode(&key(7))
+            .build();
+
+        let (status_code, content, headers) = content_and_headers(built);
+
+        assert_eq!(status_code, 200);
+        assert_ne!(content, b"ip_white_lists: {}");
+        assert_eq!(
+            aes128gcm::decrypt(&[7u8; 32], &content).unwrap(),
+            b"ip_white_lists: {}"
+        );
+        assert!(aes128gcm::decrypt(&[8u8; 32], &content).is_err());
+
+        assert_eq!(find_header(&headers, "Content-Encoding"), Some("aes128gcm"));
+        assert_eq!(find_header(&headers, "Cache-Control"), Some("no-store"));
+        assert_eq!(
+            headers.content_type.as_ref().map(|value| value.as_str()),
+            Some(WebContentType::Text.as_str())
+        );
+    }
+
+    /// The status code is the action's: an error can be answered encrypted too.
+    #[test]
+    fn any_status_code_is_encoded() {
+        let built = HttpResultBuilder::new()
+            .set_status_code(409)
+            .set_content(b"conflict".to_vec())
+            .encode(&key(1))
+            .build();
+
+        let (status_code, content, _) = content_and_headers(built);
+
+        assert_eq!(status_code, 409);
+        assert_eq!(
+            aes128gcm::decrypt(&[1u8; 32], &content).unwrap(),
+            b"conflict"
+        );
+    }
+
+    #[test]
+    fn a_cache_control_of_the_action_is_kept() {
+        let built = HttpOutput::as_text("data")
+            .add_header("Cache-Control", "private, max-age=10")
+            .encode(&key(1))
+            .build();
+
+        let (_, _, headers) = content_and_headers(built);
+
+        let cache_control: Vec<_> = headers
+            .headers
+            .iter()
+            .filter(|(name, _)| name.as_str().eq_ignore_ascii_case("cache-control"))
+            .map(|(_, value)| value.as_str())
+            .collect();
+
+        assert_eq!(cache_control, vec!["private, max-age=10"]);
+    }
+
+    /// Compressed first, then encrypted: one header listing both, in that order, and the bytes
+    /// under the encryption are the gzip ones.
+    #[test]
+    fn a_compressed_body_is_encrypted_as_it_is() {
+        let raw = vec![b'a'; 50 * 1024];
+
+        let built = HttpResultBuilder {
+            output: HttpOutput::as_content(raw.clone(), None),
+        }
+        .with_compression(1024, CompressionLevel::Balanced)
+        .encode(&key(3))
+        .build();
+
+        let (_, content, headers) = content_and_headers(built);
+
+        let content_encoding: Vec<_> = headers
+            .headers
+            .iter()
+            .filter(|(name, _)| name.as_str().eq_ignore_ascii_case("content-encoding"))
+            .map(|(_, value)| value.as_str())
+            .collect();
+        assert_eq!(content_encoding, vec!["gzip, aes128gcm"]);
+
+        let gzipped = aes128gcm::decrypt(&[3u8; 32], &content).unwrap();
+        let mut plain = Vec::new();
+        std::io::Read::read_to_end(
+            &mut flate2::read::GzDecoder::new(gzipped.as_slice()),
+            &mut plain,
+        )
+        .unwrap();
+        assert_eq!(plain, raw);
+    }
+
+    /// Encrypted bytes do not compress, so compressing after `encode` leaves them alone.
+    #[test]
+    fn compressing_after_encoding_changes_nothing() {
+        let raw = vec![b'a'; 50 * 1024];
+
+        let built = HttpResultBuilder {
+            output: HttpOutput::as_content(raw.clone(), None),
+        }
+        .encode(&key(3))
+        .with_compression(1024, CompressionLevel::Balanced)
+        .build();
+
+        let (_, content, headers) = content_and_headers(built);
+
+        assert_eq!(find_header(&headers, "Content-Encoding"), Some("aes128gcm"));
+        assert_eq!(aes128gcm::decrypt(&[3u8; 32], &content).unwrap(), raw);
+    }
+
+    #[test]
+    fn nothing_to_encode_is_a_noop() {
+        match HttpResultBuilder::new().encode(&key(1)).build() {
+            HttpOutput::Empty => {}
+            other => panic!("expected Empty, got {:?}", other),
+        }
+
+        match HttpOutput::as_redirect("/elsewhere", false)
+            .encode(&key(1))
+            .build()
+        {
+            HttpOutput::Redirect { headers, .. } => {
+                assert!(find_header(&headers, "Content-Encoding").is_none());
+            }
+            other => panic!("expected Redirect, got {:?}", other),
+        }
+
+        // A 204 with a header set: a Content with no body, which stays without one.
+        let built = HttpResultBuilder::new()
+            .add_header("X-Test", "1")
+            .encode(&key(1))
+            .build();
+        let (status_code, content, headers) = content_and_headers(built);
+        assert_eq!(status_code, 204);
+        assert!(content.is_empty());
+        assert!(find_header(&headers, "Content-Encoding").is_none());
+    }
+
+    #[test]
+    fn a_file_is_encoded() {
+        let builder = HttpResultBuilder {
+            output: HttpOutput::File {
+                file_name: "settings.yaml".to_string(),
+                content: b"hosts: {}".to_vec(),
+                headers: Default::default(),
+            },
+        };
+
+        match builder.encode(&key(5)).build() {
+            HttpOutput::File {
+                content, headers, ..
+            } => {
+                assert_eq!(
+                    aes128gcm::decrypt(&[5u8; 32], &content).unwrap(),
+                    b"hosts: {}"
+                );
+                assert_eq!(find_header(&headers, "Content-Encoding"), Some("aes128gcm"));
+            }
+            other => panic!("expected File, got {:?}", other),
+        }
     }
 }
 

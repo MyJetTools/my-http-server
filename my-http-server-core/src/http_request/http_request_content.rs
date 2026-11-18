@@ -1,6 +1,6 @@
 use serde::de::DeserializeOwned;
 
-use crate::{BodyContentType, BodyReader, HttpFailResult};
+use crate::{BodyContentType, BodyReader, EncryptionInfo, HttpFailResult};
 
 /// The request body once received over hyper: raw bytes plus the detected content type. Typed
 /// field reading is delegated to my-http-utils' [`BodyReader`] (same value layer the model
@@ -8,6 +8,7 @@ use crate::{BodyContentType, BodyReader, HttpFailResult};
 pub struct HttpRequestBodyContent {
     raw_body: Vec<u8>,
     body_content_type: BodyContentType,
+    encryption_info: Option<EncryptionInfo>,
 }
 
 impl HttpRequestBodyContent {
@@ -24,7 +25,19 @@ impl HttpRequestBodyContent {
         Ok(Self {
             raw_body: body,
             body_content_type,
+            encryption_info: None,
         })
+    }
+
+    /// How the body came encrypted, when it came with `Content-Encoding: aes128gcm`; `None` for a
+    /// body that came in plain. The request keeps it too:
+    /// [`HttpRequest::get_encryption_info`](crate::HttpRequest::get_encryption_info).
+    pub fn get_encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.encryption_info.as_ref()
+    }
+
+    pub(crate) fn set_encryption_info(&mut self, encryption_info: Option<EncryptionInfo>) {
+        self.encryption_info = encryption_info;
     }
 
     pub fn as_slice(&self) -> &[u8] {

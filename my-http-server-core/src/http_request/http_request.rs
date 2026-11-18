@@ -113,6 +113,25 @@ impl HttpRequest {
         self.data.set_max_decompressed_body_size(max_size);
     }
 
+    /// The keys a body announced with `Content-Encoding: aes128gcm` is decrypted with. Set from
+    /// [`MyHttpServer::set_body_encryption_keys`](crate::MyHttpServer::set_body_encryption_keys);
+    /// a middleware may replace them for a particular route before the body is read.
+    pub fn set_body_encryption_keys(&mut self, keys: Option<Arc<crate::BodyEncryptionKeys>>) {
+        self.data.set_body_encryption_keys(keys);
+    }
+
+    /// How the body came encrypted, when it came with `Content-Encoding: aes128gcm`: the key of the
+    /// server's list that opened it, its salt, record size and the key id from its header. `None`
+    /// for a body that came in plain, and until the body is read. An action whose input model
+    /// reads the body gets it already read.
+    ///
+    /// With it an action can answer with the key the client used -
+    /// `.encode(&info.key)` - check a salt against replays, or refuse a body that should have come
+    /// encrypted and did not.
+    pub fn get_encryption_info(&self) -> Option<&crate::EncryptionInfo> {
+        self.data.get_encryption_info()
+    }
+
     /// Takes the body as a stream of chunks, with the default channel capacity. Used by the
     /// generated action code for a `#[http_body_as_stream]` model.
     pub fn take_body_stream(&mut self) -> Result<HttpBodyAsStream, HttpFailResult> {

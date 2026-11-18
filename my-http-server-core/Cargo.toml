@@ -45,6 +45,17 @@ http = "*"
 bytes = "*"
 my-hyper-utils = { tag = "0.1.0", git = "https://github.com/MyJetTools/my-hyper-utils.git" }
 
+# `Content-Encoding: aes128gcm` (RFC 8188): request bodies opened with `BodyEncryptionKeys`, and
+# `HttpResultBuilder::encode`. RustCrypto is pure Rust, like the decoders above, so no C toolchain.
+# The majors are pinned, unlike the rest: hmac and sha2 have to agree on `digest`, and these crates
+# change their API between majors.
+aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc", "zeroize"] }
+hmac = "0.13"
+sha2 = "0.11"
+getrandom = "0.4"
+zeroize = "1"
+base64 = "0.23"
+
 [dev-dependencies]
 # `tokio::io::duplex` and the read/write extensions, for the tests of `ProtocolSniffDeadline`.
 tokio = { version = "*", features = ["io-util"] }

@@ -1,9 +1,11 @@
 use my_http_utils::http_input::HttpBodyAsStream;
 
 use crate::{
-    next_data_frame_with_timeout, spawn_body_pump, BodyContentType, BodyExpectations,
-    ContentEncoding, HttpFailResult, HttpRequestBodyContent,
+    next_data_frame_with_timeout, spawn_body_pump, BodyContentType, BodyEncryptionKeys,
+    BodyExpectations, HttpFailResult, HttpRequestBodyContent,
 };
+
+use super::body_decoding::{BodyDecoding, DecodedBody};
 
 /// The request body, kept **lazy**: it holds hyper's `Incoming` and is not turned into bytes until
 /// something actually asks for them. There are three ways to ask, and all of them go through the
@@ -17,9 +19,10 @@ use crate::{
 /// * stream it — [`into_body_stream`](Self::into_body_stream), used by a
 ///   `#[http_body_as_stream]` model.
 ///
-/// A body that announced a `Content-Encoding` is decompressed on the first path, and only there:
-/// a streamed body is handed on exactly as it arrived, which is what a pass-through action wants
-/// and the only thing this crate can do frame by frame.
+/// A body that announced a `Content-Encoding` is decoded on the first path, and only there -
+/// decompressed, or decrypted with the server's [`BodyEncryptionKeys`] (`aes128gcm`). A streamed
+/// body is handed on exactly as it arrived, which is what a pass-through action wants and the only
+/// thing this crate can do frame by frame.
 pub enum HttpRequestBody {
     Incoming {
         incoming: Option<hyper::body::Incoming>,
@@ -34,9 +37,12 @@ pub enum HttpRequestBody {
 }
 
 impl HttpRequestBody {
+    /// `encryption_keys` open a body announced with `Content-Encoding: aes128gcm`; see
+    /// [`MyHttpServer::set_body_encryption_keys`](crate::MyHttpServer::set_body_encryption_keys).
     pub async fn get_http_request_body(
         &mut self,
         expectations: BodyExpectations,
+        encryption_keys: Option<&BodyEncryptionKeys>,
     ) -> Result<&HttpRequestBodyContent, HttpFailResult> {
         match self {
             HttpRequestBody::Incoming {
@@ -49,10 +55,11 @@ impl HttpRequestBody {
                 let mut take = incoming.take().expect(
                     "Body is taken by some middleware before: an earlier read of it failed",
                 );
-                let content_encoding = ContentEncoding::new(content_encoding.as_deref())?;
+                let decoding = BodyDecoding::new(content_encoding.as_deref(), encryption_keys)?;
 
-                let bytes = read_bytes(content_encoding, &mut take, expectations).await?;
-                let body = HttpRequestBodyContent::new(bytes, content_type.clone())?;
+                let decoded = read_bytes(decoding, &mut take, expectations).await?;
+                let mut body = HttpRequestBodyContent::new(decoded.bytes, content_type.clone())?;
+                body.set_encryption_info(decoded.encryption_info);
                 *self = HttpRequestBody::Full(body);
             }
             HttpRequestBody::Full(http_request_body) => return Ok(http_request_body),
@@ -66,9 +73,11 @@ impl HttpRequestBody {
         }
     }
 
+    /// Same as [`get_http_request_body`](Self::get_http_request_body), taking the body.
     pub async fn into_http_request_body(
         self,
         expectations: BodyExpectations,
+        encryption_keys: Option<&BodyEncryptionKeys>,
     ) -> Result<HttpRequestBodyContent, HttpFailResult> {
         match self {
             HttpRequestBody::Incoming {
@@ -81,9 +90,10 @@ impl HttpRequestBody {
                 let mut take = incoming.take().expect(
                     "Body is taken by some middleware before: an earlier read of it failed",
                 );
-                let content_encoding = ContentEncoding::new(content_encoding.as_deref())?;
-                let bytes = read_bytes(content_encoding, &mut take, expectations).await?;
-                let body = HttpRequestBodyContent::new(bytes, content_type)?;
+                let decoding = BodyDecoding::new(content_encoding.as_deref(), encryption_keys)?;
+                let decoded = read_bytes(decoding, &mut take, expectations).await?;
+                let mut body = HttpRequestBodyContent::new(decoded.bytes, content_type)?;
+                body.set_encryption_info(decoded.encryption_info);
                 return Ok(body);
             }
             HttpRequestBody::Full(http_request_body) => return Ok(http_request_body),
@@ -105,13 +115,13 @@ impl HttpRequestBody {
 /// the same completeness rule. Both matter: a truncated upload must not reach a `#[http_body_raw]`
 /// action, or a middleware that reads the body, looking like the whole thing.
 ///
-/// Decompression comes last, after the completeness check: `Content-Length` counts the bytes on
-/// the wire, which are the compressed ones.
+/// Decoding comes last, after the completeness check: `Content-Length` counts the bytes on the
+/// wire, which are the compressed or encrypted ones.
 async fn read_bytes(
-    body_compression: ContentEncoding,
+    decoding: BodyDecoding,
     incoming: &mut hyper::body::Incoming,
     expectations: BodyExpectations,
-) -> Result<Vec<u8>, HttpFailResult> {
+) -> Result<DecodedBody, HttpFailResult> {
     let mut result: Vec<u8> = Vec::new();
     let mut delivered: u64 = 0;
     let mut end_stream = crate::EndStreamWatch::new();
@@ -149,23 +159,22 @@ async fn read_bytes(
 
     // The overwhelming majority of bodies announce no encoding: they are handed on right here,
     // with no trip to the blocking pool.
-    if body_compression == ContentEncoding::None {
-        return Ok(result);
+    if decoding.is_none() {
+        return Ok(DecodedBody::plain(result));
     }
 
     // Decompressing is CPU work, and with a limit in the tens of megabytes it is hundreds of
-    // milliseconds of it - enough to stall every other task parked on this tokio worker. So it
-    // runs on the blocking pool, and this task just waits for it.
+    // milliseconds of it - enough to stall every other task parked on this tokio worker.
+    // Decrypting a large body is too. So it runs on the blocking pool, and this task just waits
+    // for it.
     let max_decompressed_size = expectations.max_decompressed_body_size;
 
-    tokio::task::spawn_blocking(move || {
-        body_compression.decompress_if_needed(result.into(), max_decompressed_size)
-    })
-    .await
-    .map_err(|err| {
-        HttpFailResult::as_fatal_error(format!(
-            "Decompressing the request body did not finish: {}",
-            err
-        ))
-    })?
+    tokio::task::spawn_blocking(move || decoding.decode(result, max_decompressed_size))
+        .await
+        .map_err(|err| {
+            HttpFailResult::as_fatal_error(format!(
+                "Decoding the request body did not finish: {}",
+                err
+            ))
+        })?
 }
