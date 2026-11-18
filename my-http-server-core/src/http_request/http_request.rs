@@ -126,9 +126,10 @@ impl HttpRequest {
     /// encrypted, whatever its header says), and until the body is read. An action whose input
     /// model reads the body gets it already read.
     ///
-    /// With it an action can answer with the key the client used - `.encode(&info.key)` - refuse
-    /// a replay by the clock and the salt, or refuse a body that should have come encrypted and
-    /// did not. See `docs/http-actions/encrypted-requests.md`.
+    /// A body that has it has passed the replay checks: its clock is within the window of the
+    /// server's, and its salt was accepted once. With it an action answers with the key the client
+    /// used - `.encode(&info.key)` - or refuses a body that should have come encrypted and did not.
+    /// See `docs/http-actions/encrypted-requests.md`.
     pub fn get_encryption_info(&self) -> Option<&crate::EncryptionInfo> {
         self.data.get_encryption_info()
     }

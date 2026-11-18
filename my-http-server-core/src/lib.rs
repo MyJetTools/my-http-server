@@ -23,6 +23,7 @@ mod etag;
 pub use etag::*;
 
 mod body_encryption_keys;
+mod replay_guard;
 pub use body_encryption_keys::{BodyEncryptionKey, BodyEncryptionKeys, EncryptionInfo};
 // `Content-Encoding: aes128gcm` is my-http-utils' standard, the one fl-url and the services behind
 // my-reverse-proxy encrypt with. Re-exported item by item rather than as an `encryption` module:

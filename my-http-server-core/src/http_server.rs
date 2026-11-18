@@ -207,6 +207,10 @@ impl MyHttpServer {
     ///   has no key: these were never set, or the list is empty;
     /// - `400` when no key opens it, when it is damaged or cut short, or when what opened is
     ///   shorter than the clock.
+    /// - `403` for a replay: a clock more than
+    ///   [`get_max_clock_skew`](crate::BodyEncryptionKeys::get_max_clock_skew) off the server's
+    ///   (10 seconds by default), or a salt already accepted. The salts are kept with the keys, so
+    ///   servers handed the same `Arc` share them.
     ///
     /// Responses are not encrypted here: an action does that with
     /// [`HttpResultBuilder::encode`](crate::HttpResultBuilder::encode).

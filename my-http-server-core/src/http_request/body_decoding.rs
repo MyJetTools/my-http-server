@@ -3,9 +3,10 @@ use std::sync::Arc;
 use my_http_utils::encryption::{EncryptedBody, HttpBodyDecryptError, AES128GCM_CONTENT_ENCODING};
 
 use crate::{
-    body_encryption_keys::open_request_body, BodyEncryptionKey, BodyEncryptionKeys,
-    ContentEncoding, EncryptionInfo, HttpFailResult, HttpOutput, HttpResponseHeaders,
-    WebContentType,
+    body_encryption_keys::open_request_body,
+    replay_guard::{Replay, ReplayGuard},
+    BodyEncryptionKey, BodyEncryptionKeys, ContentEncoding, EncryptionInfo, HttpFailResult,
+    HttpOutput, HttpResponseHeaders, WebContentType,
 };
 
 /// The content codings a request body may come in, as a `415` lists them in `Accept-Encoding`
@@ -21,9 +22,11 @@ pub(crate) enum BodyDecoding {
     Decompress(ContentEncoding),
     /// `Content-Encoding: aes128gcm`, alone or after a compression (`gzip, aes128gcm`, what
     /// my-http-utils' `compress().encrypt()` sends): decrypted with the keys of the server as they
-    /// were when the body was read, tried in turn, then decompressed when it was compressed first.
+    /// were when the body was read, tried in turn, checked for a replay, then decompressed when it
+    /// was compressed first.
     Decrypt {
         keys: Arc<Vec<BodyEncryptionKey>>,
+        replay_guard: Arc<ReplayGuard>,
         /// [`ContentEncoding::None`], or the compression applied before the encryption.
         then: ContentEncoding,
     },
@@ -53,14 +56,21 @@ impl BodyDecoding {
             Ok(compression) => compression,
         };
 
-        let keys = encryption_keys
-            .map(BodyEncryptionKeys::snapshot)
-            .filter(|keys| !keys.is_empty());
+        let Some(encryption_keys) = encryption_keys else {
+            return Err(no_key_to_decrypt_the_body());
+        };
 
-        match keys {
-            Some(keys) => Ok(Self::Decrypt { keys, then }),
-            None => Err(no_key_to_decrypt_the_body()),
+        let keys = encryption_keys.snapshot();
+
+        if keys.is_empty() {
+            return Err(no_key_to_decrypt_the_body());
         }
+
+        Ok(Self::Decrypt {
+            keys,
+            replay_guard: encryption_keys.replay_guard(),
+            then,
+        })
     }
 
     pub(crate) fn is_none(&self) -> bool {
@@ -79,7 +89,11 @@ impl BodyDecoding {
             Self::Decompress(compression) => compression
                 .decompress_if_needed(body.into(), max_decompressed_size)
                 .map(DecodedBody::plain),
-            Self::Decrypt { keys, then } => {
+            Self::Decrypt {
+                keys,
+                replay_guard,
+                then,
+            } => {
                 // The standard has an empty body be empty bytes, both ways: nothing is encrypted
                 // in it, so no key opens it and it carries no salt and no clock. It is handed on
                 // as an empty body, without encryption info - it proves nothing about who sent
@@ -95,6 +109,12 @@ impl BodyDecoding {
                     timestamp,
                     body: plain,
                 } = opened;
+
+                // A replay is refused before the body is decompressed: a copy costs no more than
+                // its decryption.
+                replay_guard
+                    .accept(salt, timestamp)
+                    .map_err(replay_refused)?;
 
                 let encryption_info = EncryptionInfo::new(key.clone(), &body, salt, timestamp);
 
@@ -175,6 +195,24 @@ fn no_key_to_decrypt_the_body() -> HttpFailResult {
         false,
         true,
     )
+}
+
+/// `403`: the body opened, and it is a replay - or the clocks are too far apart to tell. The text
+/// says which, and how far off the clocks are: a client whose clock drifts is refused on every
+/// call, and this is how it learns why.
+fn replay_refused(replay: Replay) -> HttpFailResult {
+    let reason = match replay {
+        Replay::ClockOff { off, max } => format!(
+            "Refused the encrypted request body (Content-Encoding: {}): the sender's clock (its timestamp) is {:?} off the server's clock, and at most {:?} either way is accepted",
+            AES128GCM_CONTENT_ENCODING, off, max
+        ),
+        Replay::SaltSeen => format!(
+            "Refused the encrypted request body (Content-Encoding: {}): a body with this salt was already accepted. A body is accepted once: a retry encrypts it again",
+            AES128GCM_CONTENT_ENCODING
+        ),
+    };
+
+    HttpFailResult::as_forbidden(Some(reason))
 }
 
 /// `400`, the way a compressed body that does not decode is answered: the client sent a body the

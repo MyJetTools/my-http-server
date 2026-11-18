@@ -13,6 +13,9 @@
 //! without the header. The request tells the action how the body came: `get_encryption_info` gives
 //! the key that opened it, the clock and the salt. The other way is the action's:
 //! `HttpResultBuilder::encode`, with a key it takes by id or with the key the request came with.
+//!
+//! A body that opened is checked for a replay before the action runs: a clock more than the window
+//! off the server's, or a salt already accepted, is a `403`.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -428,6 +431,11 @@ fn as_sent(body: HttpRequestBody) -> (Vec<u8>, String) {
     (body.into_vec(), content_encoding)
 }
 
+/// The server's clock a second ago, in unix microseconds: well within the window it accepts.
+fn a_second_ago() -> i64 {
+    DateTimeAsMicroseconds::now().unix_microseconds - 1_000_000
+}
+
 /// Same, with the clock of now.
 fn encrypted(byte: u8, body: &[u8]) -> Vec<u8> {
     encrypted_at(byte, DateTimeAsMicroseconds::now().unix_microseconds, body)
@@ -506,7 +514,9 @@ async fn a_body_gzipped_then_encrypted_is_decrypted_then_gunzipped() {
 async fn the_clock_is_eight_bytes_little_endian_before_the_body() {
     let port = start_server(Some(rotating_keys())).await;
 
-    let mut plain = 1_700_000_000_123_456i64.to_le_bytes().to_vec();
+    let timestamp = a_second_ago();
+
+    let mut plain = timestamp.to_le_bytes().to_vec();
     plain.extend_from_slice(BODY);
     let body = http_key(1).encrypt(&plain);
 
@@ -516,7 +526,7 @@ async fn the_clock_is_eight_bytes_little_endian_before_the_body() {
 
     let answer = String::from_utf8(http_key(1).decrypt(&response.body).unwrap()).unwrap();
     assert!(answer.starts_with("email=a@b.com key=old "), "{answer}");
-    assert!(answer.ends_with(" ts=1700000000123456"), "{answer}");
+    assert!(answer.ends_with(&format!(" ts={timestamp}")), "{answer}");
 }
 
 /// What was encrypted has to start with the sender's clock: 8 bytes. Less than that is a body
@@ -763,7 +773,8 @@ async fn an_action_answers_encrypted_with_the_key_it_takes_by_id() {
 async fn an_action_reads_the_encryption_info_and_answers_with_the_key_the_client_used() {
     let port = start_server(Some(rotating_keys())).await;
 
-    let body = encrypted_at(1, 1_700_000_000_123_456, BODY);
+    let timestamp = a_second_ago();
+    let body = encrypted_at(1, timestamp, BODY);
 
     let response = post(port, "/answer-with-request-key", Some("aes128gcm"), &body).await;
 
@@ -775,8 +786,9 @@ async fn an_action_reads_the_encryption_info_and_answers_with_the_key_the_client
     assert_eq!(
         String::from_utf8(answer).unwrap(),
         format!(
-            "email=a@b.com key=old rs=4096 salt={} ts=1700000000123456",
-            hex(&body[..16])
+            "email=a@b.com key=old rs=4096 salt={} ts={}",
+            hex(&body[..16]),
+            timestamp
         )
     );
 }
@@ -790,4 +802,142 @@ async fn a_plain_body_comes_without_encryption_info() {
     let response = post(port, "/answer-with-request-key", None, BODY).await;
 
     assert!(response.status_is(415), "{:?}", response);
+}
+
+// ─────────────────────────────── replays ───────────────────────────────
+
+/// The same bytes twice: the first is the request, the second a copy of it. The server refuses the
+/// copy before the action runs, by its salt.
+#[tokio::test]
+async fn a_body_sent_twice_is_refused_the_second_time() {
+    let port = start_server(Some(rotating_keys())).await;
+
+    let body = encrypted(1, BODY);
+
+    let response = post(port, "/echo-json", Some("aes128gcm"), &body).await;
+    assert!(response.status_is(200), "{:?}", response);
+
+    let response = post(port, "/echo-json", Some("aes128gcm"), &body).await;
+    assert!(response.status_is(403), "{:?}", response);
+    assert!(
+        response.body_text().contains("already accepted"),
+        "{:?}",
+        response
+    );
+
+    // The same body encrypted again - a fresh salt - is a new request.
+    let response = post(port, "/echo-json", Some("aes128gcm"), &encrypted(1, BODY)).await;
+    assert!(response.status_is(200), "{:?}", response);
+}
+
+/// A copy is refused whichever route it is sent to, and whichever server reads it: the salts are
+/// kept with the keys, not with the route.
+#[tokio::test]
+async fn a_copy_is_refused_on_another_route_too() {
+    let port = start_server(Some(rotating_keys())).await;
+
+    let body = encrypted(1, BODY);
+
+    let response = post(port, "/echo-json", Some("aes128gcm"), &body).await;
+    assert!(response.status_is(200), "{:?}", response);
+
+    let response = post(port, "/describe-raw", Some("aes128gcm"), &body).await;
+    assert!(response.status_is(403), "{:?}", response);
+}
+
+#[tokio::test]
+async fn two_servers_with_one_list_of_keys_share_the_salts() {
+    let keys = rotating_keys();
+    let first = start_server(Some(keys.clone())).await;
+    let second = start_server(Some(keys)).await;
+
+    let body = encrypted(1, BODY);
+
+    let response = post(first, "/echo-json", Some("aes128gcm"), &body).await;
+    assert!(response.status_is(200), "{:?}", response);
+
+    let response = post(second, "/echo-json", Some("aes128gcm"), &body).await;
+    assert!(response.status_is(403), "{:?}", response);
+}
+
+/// The sender's clock may be up to 10 seconds off the server's, either way. Further off, the body
+/// is refused, and the text says by how much.
+#[tokio::test]
+async fn a_clock_too_far_off_is_a_403_either_way() {
+    let port = start_server(Some(rotating_keys())).await;
+
+    let now = DateTimeAsMicroseconds::now().unix_microseconds;
+
+    for timestamp in [now - 5_000_000, now + 5_000_000] {
+        let response = post(
+            port,
+            "/echo-json",
+            Some("aes128gcm"),
+            &encrypted_at(1, timestamp, BODY),
+        )
+        .await;
+        assert!(response.status_is(200), "{timestamp}: {:?}", response);
+    }
+
+    for timestamp in [now - 15_000_000, now + 15_000_000, 0] {
+        let response = post(
+            port,
+            "/echo-json",
+            Some("aes128gcm"),
+            &encrypted_at(1, timestamp, BODY),
+        )
+        .await;
+        assert!(response.status_is(403), "{timestamp}: {:?}", response);
+        assert!(
+            response.body_text().contains("off the server's clock"),
+            "{:?}",
+            response
+        );
+    }
+}
+
+/// The window is the application's to set; a body further off than it is refused.
+#[tokio::test]
+async fn the_window_can_be_narrowed() {
+    let keys = Arc::new(
+        BodyEncryptionKeys::new(vec![key("only", 1)]).with_max_clock_skew(Duration::from_secs(2)),
+    );
+    assert_eq!(keys.get_max_clock_skew(), Duration::from_secs(2));
+
+    let port = start_server(Some(keys)).await;
+
+    let three_seconds_ago = DateTimeAsMicroseconds::now().unix_microseconds - 3_000_000;
+    let response = post(
+        port,
+        "/echo-json",
+        Some("aes128gcm"),
+        &encrypted_at(1, three_seconds_ago, BODY),
+    )
+    .await;
+
+    assert!(response.status_is(403), "{:?}", response);
+}
+
+/// A body refused for its clock is not remembered, and neither is one that never decrypted: a
+/// replay check only counts bodies that were accepted.
+#[tokio::test]
+async fn only_accepted_bodies_are_remembered() {
+    let port = start_server(Some(rotating_keys())).await;
+
+    // Not opened: no key of the server's.
+    let foreign = encrypted(7, BODY);
+    let response = post(port, "/echo-json", Some("aes128gcm"), &foreign).await;
+    assert!(response.status_is(400), "{:?}", response);
+
+    // The same salt under a key the server holds, now that it is a fresh body: accepted.
+    let salt: [u8; 16] = foreign[..16].try_into().unwrap();
+    let body = EncryptedBody {
+        salt,
+        timestamp: DateTimeAsMicroseconds::now(),
+        body: BODY.to_vec(),
+    }
+    .encrypt(&http_key(1));
+
+    let response = post(port, "/echo-json", Some("aes128gcm"), &body).await;
+    assert!(response.status_is(200), "{:?}", response);
 }

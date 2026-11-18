@@ -58,87 +58,46 @@ let info = ctx.request.get_encryption_info(); // None: the body came in plain
 
 The info is filled in when the body is read. An action whose input model reads the body gets it already read.
 
-## Best Practice: Refuse Replayed Requests
+## Replayed Requests: the Server Refuses Them
 
-Encryption proves that the sender holds a key. It does not stop someone from capturing a body on the way and sending it again: the copy decrypts exactly like the original. A replayed read does no harm, because its answer is encrypted with the key. A replayed write applies the change again. So an action that changes something does three things:
+Encryption proves that the sender holds a key. It does not stop someone from capturing a body on the way and sending it again: the copy decrypts exactly like the original. So once a body has opened, before the action runs (and before a compressed body is decompressed), the server checks it:
 
-1. **Takes encrypted bodies only.** `get_encryption_info()` is `None` for a plain body: answer `415`.
-2. **Checks the clock of the sender.** Refuse a body whose `timestamp` is more than **10 seconds** off the server's clock, **in the past or in the future**.
-3. **Remembers the salt.** Keep the salt of every accepted body for **20 seconds**, and refuse a body whose salt is already kept. Check and remember in one step under one lock, so that two copies arriving at once do not both pass.
+1. **The clock of the sender.** A body whose `ts` is more than **10 seconds** off the server's clock, **in the past or in the future**, is refused.
+2. **The salt.** A body whose salt was already accepted is refused. Check and remember are one step under one lock, so of two copies that arrive at once, one passes.
 
-Why these numbers: a body passes the clock check only while its `timestamp` is within 10 seconds of the server's clock, which is 20 seconds at most. Its salt is kept for 20 seconds from the moment the body was first accepted. While its `timestamp` would still let a copy through, the salt refuses it; after that, the `timestamp` does. So the salt must be kept for twice the time window, and the window must be bounded on both sides: a `timestamp` from the future would keep a body passing after its salt is forgotten.
+Both refusals are `403`, and the text says which one and, for the clock, by how much:
 
-```rust
-use std::collections::{hash_map::Entry, HashMap};
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
-
-pub const TS_WINDOW: Duration = Duration::from_secs(10);
-const SALT_MEMORY: Duration = Duration::from_secs(20); // twice TS_WINDOW
-
-/// The salts of the bodies accepted in the last 20 seconds. One per process, kept in AppContext.
-#[derive(Default)]
-pub struct AcceptedSalts {
-    salts: Mutex<HashMap<[u8; 16], Instant>>,
-}
-
-impl AcceptedSalts {
-    /// `true` the first time a salt comes within `SALT_MEMORY`, `false` for every copy after it.
-    pub fn accept(&self, salt: [u8; 16]) -> bool {
-        let now = Instant::now();
-        let mut salts = self.salts.lock().unwrap();
-
-        // Fine for the traffic of an admin action; a busy one sweeps on a timer instead.
-        salts.retain(|_, accepted| now.duration_since(*accepted) < SALT_MEMORY);
-
-        match salts.entry(salt) {
-            Entry::Occupied(_) => false,
-            Entry::Vacant(entry) => {
-                entry.insert(now);
-                true
-            }
-        }
-    }
-}
+```text
+Refused the encrypted request body (Content-Encoding: aes128gcm): the sender's clock (its timestamp) is 14.2s off the server's clock, and at most 10s either way is accepted
+Refused the encrypted request body (Content-Encoding: aes128gcm): a body with this salt was already accepted. A body is accepted once: a retry encrypts it again
 ```
 
-In the action:
+**How long a salt is kept.** A salt is kept with its `ts` until `ts + 10 s` is behind the server's clock. From then on a copy fails the clock check by itself, so there is no moment when a copy passes. Every encrypted request first forgets the pairs that have run out, so what is kept is the bodies accepted in the last 20 seconds at most. A plain request does not touch any of this.
+
+**The window** is set on the keys:
 
 ```rust
-async fn handle_request(
-    action: &SetSettingsAction,
-    input_data: SetSettingsHttpInput,
-    ctx: &mut HttpContext,
-) -> Result<HttpOkResult, HttpFailResult> {
-    let Some(info) = ctx.request.get_encryption_info() else {
-        return Err(HttpFailResult::from((415u16, "The body has to come encrypted".to_string())));
-    };
-
-    // `abs_diff`: a timestamp of i64::MIN must be refused, not overflow.
-    let off = Duration::from_micros(
-        DateTimeAsMicroseconds::now()
-            .unix_microseconds
-            .abs_diff(info.timestamp.unix_microseconds),
-    );
-
-    if off > TS_WINDOW {
-        return Err(HttpFailResult::as_forbidden(Some(format!(
-            "The clock of the request is {:?} off the server's clock: at most {:?} is accepted",
-            off, TS_WINDOW
-        ))));
-    }
-
-    if !action.app.accepted_salts.accept(info.salt) {
-        return Err(HttpFailResult::as_forbidden(Some("This body was already accepted")));
-    }
-
-    // ... apply the change ...
-
-    HttpOutput::as_json(result).encode(&info.key).into_ok_result(false)
-}
+let keys = Arc::new(
+    BodyEncryptionKeys::new(vec![key]).with_max_clock_skew(Duration::from_secs(30)),
+);
 ```
 
-- **Order.** Check the clock first, then the salt. A body refused for its clock is never remembered.
-- **Status.** `403` with the reason. The clock error says how far off the clocks are: a client whose clock drifts more than 10 seconds is refused on every call, and the text tells it why. Both sides need synchronised clocks (NTP).
+A wider window tolerates clients with worse clocks, and keeps every salt that much longer. Both clocks are wall clocks: keep the clients and the server synchronised (NTP).
+
+What is left to the action:
+
+- **Taking encrypted bodies only.** `get_encryption_info()` is `None` for a plain body and for an empty one, which carries no salt and no clock to check. An action that changes something answers those `415`:
+
+```rust
+let Some(info) = ctx.request.get_encryption_info() else {
+    return Err(HttpFailResult::from((415u16, "The body has to come encrypted".to_string())));
+};
+
+// ... apply the change: the body is fresh and seen once ...
+
+HttpOutput::as_json(result).encode(&info.key).into_ok_result(false)
+```
+
 - **Retries.** A retry that should go through encrypts the body again: a fresh `ts` and a fresh salt. Resending the same bytes is a replay, and it is refused. fl-url resends the bytes it built (and replays only idempotent methods), so a write that has to be retried is a new call.
-- **Limits.** The salts live in the process. Behind several instances, a copy sent to another instance passes, so these calls go to one instance, or the salts go to a shared store. A restart forgets the salts: a body accepted just before the restart can be sent again for the rest of its time window.
+- **Limits.** The salts are kept by the `BodyEncryptionKeys`: every server of the process it is handed to shares them (a TCP port and a unix socket of the same service, say). Behind several instances, a copy sent to another instance passes, so these calls go to one instance. A restart forgets the salts: a body accepted just before the restart can be sent again for the rest of its window.
+- **Streamed bodies** (`#[http_body_as_stream]`) are handed on still encrypted, so the server checks nothing: an action that decrypts one itself checks it itself.

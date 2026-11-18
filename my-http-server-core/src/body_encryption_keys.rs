@@ -1,9 +1,12 @@
 use std::sync::{Arc, PoisonError, RwLock};
+use std::time::Duration;
 
 use my_http_utils::encryption::{
     EncryptedBody, HttpBodyDecryptError, HttpBodyEncryptionKey, HttpBodyEncryptionKeyError,
 };
 use rust_extensions::date_time::DateTimeAsMicroseconds;
+
+use crate::replay_guard::ReplayGuard;
 
 /// A key for `Content-Encoding: aes128gcm` bodies with the id the application knows it by: an
 /// [`HttpBodyEncryptionKey`] of my-http-utils (32 random bytes, `openssl rand -base64 32`) and a
@@ -81,17 +84,44 @@ impl std::fmt::Debug for BodyEncryptionKey {
 /// `Arc` the application keeps too: [`set`](Self::set) replaces the keys while the server runs, so
 /// keys that only arrive after the start are used from the next body read on.
 ///
+/// It also refuses replays. A request body carries the sender's clock and a fresh salt, and a body
+/// is accepted only when its clock is within [`max_clock_skew`](Self::with_max_clock_skew) of the
+/// server's (10 seconds by default, in the past or in the future) and its salt has not been
+/// accepted before. A salt is kept with its timestamp until a copy would fail the clock check
+/// anyway. Every server this `Arc` is handed to shares those salts.
+///
 /// An action that answers encrypted takes the key it wants by id and hands it to
 /// [`HttpResultBuilder::encode`](crate::HttpResultBuilder::encode).
 pub struct BodyEncryptionKeys {
     keys: RwLock<Arc<Vec<BodyEncryptionKey>>>,
+    replay_guard: Arc<ReplayGuard>,
 }
 
 impl BodyEncryptionKeys {
+    /// How far the sender's clock may be from the server's, either way, unless
+    /// [`with_max_clock_skew`](Self::with_max_clock_skew) says otherwise.
+    pub const DEFAULT_MAX_CLOCK_SKEW: Duration = Duration::from_secs(10);
+
     pub fn new(keys: Vec<BodyEncryptionKey>) -> Self {
         Self {
             keys: RwLock::new(Arc::new(keys)),
+            replay_guard: Arc::new(ReplayGuard::new(Self::DEFAULT_MAX_CLOCK_SKEW)),
         }
+    }
+
+    /// How far the sender's clock (the timestamp a request body starts with) may be from the
+    /// server's, in the past or in the future. A body further off is refused with `403`. The
+    /// salts are kept that much longer too: a salt goes once its timestamp is `max` behind the
+    /// server's clock, so a wider window costs memory for every body accepted in it.
+    ///
+    /// Both clocks are wall clocks: keep the clients and the server synchronised (NTP).
+    pub fn with_max_clock_skew(mut self, max: Duration) -> Self {
+        self.replay_guard = Arc::new(ReplayGuard::new(max));
+        self
+    }
+
+    pub fn get_max_clock_skew(&self) -> Duration {
+        self.replay_guard.max_clock_skew()
     }
 
     /// Replaces every key. A body that is being decrypted right now finishes with the keys it
@@ -136,6 +166,11 @@ impl BodyEncryptionKeys {
             .read()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// What every body decrypted with these keys is checked against, whichever server read it.
+    pub(crate) fn replay_guard(&self) -> Arc<ReplayGuard> {
+        self.replay_guard.clone()
     }
 }
 
@@ -193,7 +228,7 @@ pub struct EncryptionInfo {
     /// hand it to [`HttpResultBuilder::encode`](crate::HttpResultBuilder::encode).
     pub key: BodyEncryptionKey,
     /// The salt of the body ([`EncryptedBody::salt`]): 16 random bytes, fresh in every body.
-    /// Remembering these is how a replayed body is told from a new one.
+    /// The server has already refused a body whose salt it had accepted before.
     pub salt: [u8; 16],
     /// The record size the body was written with: 4096 from my-http-utils.
     pub record_size: u32,
@@ -201,8 +236,8 @@ pub struct EncryptionInfo {
     /// that opened the body is [`key`](Self::key) either way.
     pub header_key_id: Vec<u8>,
     /// The sender's clock when it encrypted the body ([`EncryptedBody::timestamp`]): unix
-    /// microseconds. The server takes it off the body. Checking it against the server's clock is
-    /// the action's job: see `docs/http-actions/encrypted-requests.md`.
+    /// microseconds. The server takes it off the body, and has already refused a body whose clock
+    /// is too far off its own: see `docs/http-actions/encrypted-requests.md`.
     pub timestamp: DateTimeAsMicroseconds,
 }
 
